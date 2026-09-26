@@ -46,7 +46,7 @@
     var list=document.getElementById("list");if(!list)return;
     var favs=_read();
     if(!favs.length){
-      list.innerHTML='<div class="mb-wrap"><div class="mb-intro">Your personal board. Tap the \u2606 star on any predicted winner \u2014 team or player \u2014 to pin it here.</div>'+
+      list.innerHTML='<div class="mb-wrap"><div class="mb-intro">Your personal board. Tap the \u2606 star on any predicted winner, team or player, to pin it here.</div>'+
         '<div class="mb-empty"><div class="mb-empty-star">\u2606</div><div class="mb-empty-h">No favorites yet</div>'+
         '<p>Open any game\u2019s prediction and tap the star next to the predicted winner. Your teams and players collect here for one-tap access to their matchups.</p></div></div>';
       return;
@@ -99,7 +99,7 @@
   document.querySelectorAll(".th-opt").forEach(function(b){
     b.addEventListener("click",function(){var k=b.dataset.th;try{localStorage.setItem("ll_theme",k);}catch(e){}applyTheme(k);});
   });
-  var savedAc="#3ad17a";try{savedAc=localStorage.getItem("ll_accent")||"#3ad17a";}catch(e){}
+  var savedAc="#E8B04B";try{savedAc=localStorage.getItem("ll_accent")||"#E8B04B";}catch(e){}
   applyAccent(savedAc);
   document.querySelectorAll(".ac-opt").forEach(function(b){
     b.addEventListener("click",function(){var c=b.dataset.ac;try{localStorage.setItem("ll_accent",c);}catch(e){}applyAccent(c);});
@@ -149,7 +149,7 @@
     var list=document.getElementById("list");
     var b=(d&&d.buckets)||[];
     var intro='<div class="cal-intro"><div class="cal-h">Are our probabilities honest?</div>'+
-      '<p>When the model says a pick has an <b>X% chance</b>, how often does it actually win? A well-calibrated model tracks reality \u2014 an 80% pick should win about 80% of the time. Built only from picks with a stored probability, so it sharpens as more settle.</p></div>';
+      '<p>When the model says a pick has an <b>X% chance</b>, how often does it actually win? A well-calibrated model tracks reality, an 80% pick should win about 80% of the time. Built only from picks with a stored probability, so it sharpens as more settle.</p></div>';
     if(!b.length){
       list.innerHTML='<div class="cal-wrap">'+intro+'<div class="cal-empty">Not enough settled picks with a stored probability yet. The curve fills in as today\u2019s and future picks grade out.</div></div>';return;}
     var rows='';
@@ -167,7 +167,7 @@
       calCurve(b)+
       '<div class="cal-legend"><span class="cal-key-fill"></span> actual win rate <span class="cal-key-mark"></span> what the model claimed</div>'+
       '<div class="cal-chart">'+rows+'</div>'+
-      '<div class="cal-foot">Green rows = claim and reality agree within 6 points. Same honest results the model is graded on \u2014 nothing hand-picked.</div></div>';
+      '<div class="cal-foot">Green rows = claim and reality agree within 6 points. Same honest results the model is graded on, nothing hand-picked.</div></div>';
   }
 })();
 /* ===== Recent Results (on-site receipts) ===== */
@@ -196,7 +196,7 @@
     var d;try{d=await getJSON("/api/results/recent?days=7");}catch(e){
       list.innerHTML='<div class="rs-wrap"><div class="rs-empty">Couldn\u2019t load results right now.</div></div>';return;}
     var days=(d&&d.days)||[];
-    var intro='<div class="rs-intro">Every graded pick, win or lose \u2014 no deleted losers. The same record the model is scored on.</div>';
+    var intro='<div class="rs-intro">Every graded pick, win or lose, no deleted losers. The same record the model is scored on.</div>';
     if(!days.length){list.innerHTML='<div class="rs-wrap">'+intro+'<div class="rs-empty">No graded results yet. They fill in here as games settle.</div></div>';return;}
     var sum=(d.summary||{});
     var h='<div class="rs-wrap">'+intro+
@@ -256,7 +256,7 @@
     try{rc=await getAuthed("/api/promo/recap");}catch(e){}
     if(pv&&pv.error==="forbidden"){list.innerHTML='<div class="pm-wrap"><div class="pm-empty">This is the owner-only promotion panel.</div></div>';return;}
     if(!pv||!pv.x){list.innerHTML='<div class="pm-wrap"><div class="pm-empty">Couldn\u2019t load posts. Make sure you\u2019re logged in as the owner account and that ADMIN_USERNAME is set, then hard-refresh.</div></div>';return;}
-    var h='<div class="pm-wrap"><div class="pm-intro">Ready-to-post content from your real data \u2014 it leads with your public track record, the account\u2019s real edge. Copy to X, or push straight to Discord.</div>';
+    var h='<div class="pm-wrap"><div class="pm-intro">Ready-to-post content from your real data, it leads with your public track record, the account\u2019s real edge. Copy to X, or push straight to Discord.</div>';
     h+='<div class="pm-sec">Today\u2019s picks</div>';
     h+=_card("x-picks","X / Twitter",(pv.x||"").length+"/280",pv.x||"",false);
     h+=_card("d-picks","Discord","",pv.discord||"",true);
@@ -265,7 +265,7 @@
       h+=_card("x-recap","X / Twitter",(rc.x||"").length+"/280",rc.x||"",false);
       h+=_card("d-recap","Discord","",rc.discord||"",true);
     }
-    h+='<div class="pm-tip">The recap is your highest-value post \u2014 people follow accounts that show results, win or lose. Post picks in the morning, the recap the next day, at a consistent time.</div></div>';
+    h+='<div class="pm-tip">The recap is your highest-value post, people follow accounts that show results, win or lose. Post picks in the morning, the recap the next day, at a consistent time.</div></div>';
     list.innerHTML=h;
     list.querySelectorAll(".pm-copy").forEach(function(b){b.addEventListener("click",function(){
       var el=document.getElementById(b.dataset.t);copyText(el?el.textContent:"",b);});});
@@ -398,7 +398,7 @@
   function stat(k,v,sub){if(v==null||v==="")return "";return '<div class="tp-stat"><div class="tp-stat-v">'+esc(v)+'</div><div class="tp-stat-k">'+esc(k)+(sub?' <span>'+esc(sub)+'</span>':"")+'</div></div>';}
   function renderTeamProfile(d){
     var list=document.getElementById("list");
-    if(!d||d.unsupported){list.innerHTML='<div class="tp-wrap"><div class="tp-empty">Team profiles for this sport are coming next \u2014 it runs on a different data provider.</div></div>';return;}
+    if(!d||d.unsupported){list.innerHTML='<div class="tp-wrap"><div class="tp-empty">Team profiles for this sport are coming next, it runs on a different data provider.</div></div>';return;}
     if(d.error||!d.games){list.innerHTML='<div class="tp-wrap"><div class="tp-empty">No completed games on record yet for '+esc(d.name||"this team")+'.</div></div>';return;}
     var _fc={W:"w",L:"l",D:"d"};
     var formBits=(d.form||"").split("").map(function(c){return '<span class="tp-f '+(_fc[c]||"l")+'">'+c+'</span>';}).join("");
@@ -422,7 +422,7 @@
         stat("Biggest win",d.adv.biggest_win)+stat("Biggest loss",d.adv.biggest_loss)+'</div>'+
         (d.adv.formations&&d.adv.formations.length?'<div class="tp-forms">Formations: '+d.adv.formations.map(esc).join(" \u00b7 ")+'</div>':"")+
         '<div class="tp-src">via api-football</div></div>'):"")+
-      '<div class="tp-foot">Every figure here is computed from actual game results \u2014 no projected or fabricated ratings.</div></div>';
+      '<div class="tp-foot">Every figure here is computed from actual game results, no projected or fabricated ratings.</div></div>';
   }
 })();
 /* ===== New-visitor welcome hero (shows once) ===== */
@@ -434,9 +434,9 @@
     try{var d=await getJSON("/api/results/recent?days=7");if(d&&d.summary&&(d.summary.w+d.summary.l)>0)stat=d.summary.record;}catch(e){}
     var ov=document.createElement("div");ov.id="ll-hero";ov.className="hero-ov";
     ov.innerHTML='<div class="hero-card">'+
-      '<img class="hero-logo" src="/icon-180.png" alt="Line Logic">'+
+      '<img class="hero-logo" src="/logo.PNG" alt="Line Logic" onerror="this.onerror=null;this.src=\'/icon-180.png\'">'+
       '<div class="hero-h">Model sports predictions.<br>Every pick tracked.</div>'+
-      '<div class="hero-p">A calibrated model across MLB, NBA, NFL, NHL, tennis, soccer &amp; college \u2014 graded in public. No deleted losers, no hype.</div>'+
+      '<div class="hero-p">A calibrated model across MLB, NBA, NFL, NHL, tennis, soccer &amp; college. Graded in public, no deleted losers, no hype.</div>'+
       (stat?'<div class="hero-stat">Model went <b>'+esc(stat)+'</b> the last 7 days</div>':"")+
       '<div class="hero-btns"><button class="hero-btn" id="hero-results">See the track record</button>'+
       '<button class="hero-btn hero-alt" id="hero-go">Explore the board</button></div></div>';

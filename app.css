@@ -1820,3 +1820,90 @@ a{color:var(--gold)}
 /* Header wordmark: give "Line Logic" more presence (was looking bleak). */
 h1{font-weight:800}
 h1 .dot{color:var(--gold)}
+
+/* Welcome hero (first visit) — force on-brand gold regardless of saved accent. */
+.hero-stat b{color:var(--gold) !important;}
+.hero-btn{background:var(--gold) !important;color:#151515 !important;}
+.hero-btn.hero-alt{background:var(--panel-3) !important;color:var(--ink) !important;}
+.hero-logo{background:#0b0b0b;object-fit:cover;}
+
+/* ============================================================
+   QUALITY-OF-LIFE polish (v43) — small touches that make it feel
+   hand-built and native, not templated.
+   ============================================================ */
+/* Smooth in-page scrolling + iOS momentum. */
+html{scroll-behavior:smooth;}
+body{-webkit-overflow-scrolling:touch;}
+/* Kill the ugly grey tap-flash on mobile; use a subtle scale instead. */
+*{-webkit-tap-highlight-color:transparent;}
+.game,.ha,.hl,.menu-item,.sport-card,.hc-log,.rcpt-cta,button{
+  transition:transform .12s ease, border-color .15s ease, opacity .15s ease;}
+.game:active,.ha:active,.sport-card:active{transform:scale(.985);}
+button:active{transform:scale(.97);}
+/* Selection color on-brand instead of default blue. */
+::selection{background:rgba(232,176,75,.28);color:var(--ink);}
+/* Nicer, thinner scrollbars on desktop. */
+*::-webkit-scrollbar{width:9px;height:9px;}
+*::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+*::-webkit-scrollbar-thumb:hover{background:var(--muted-2);}
+*::-webkit-scrollbar-track{background:transparent;}
+/* Focus ring for keyboard users (accessibility) without showing on mouse tap. */
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+/* Links/buttons never show a text-selection cursor. */
+button,.ha,.hl,.game,.menu-item,.sport-card{cursor:pointer;}
+/* Slightly tighten oversized emoji in labels so text aligns cleanly. */
+.menu-item{display:flex;align-items:center;gap:8px;}
+
+/* ============================================================
+   QUALITY-OF-LIFE v2 (v44) — deeper polish for a premium, hand-built feel.
+   ============================================================ */
+/* 1. Gentle fade-in for content as views load (no jarring pop-in). */
+@keyframes ll-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#list > *, #home > *, #detail > *{animation:ll-fade .28s ease both;}
+/* stagger the first several cards so a board "cascades" in subtly */
+#list > *:nth-child(1){animation-delay:.02s}
+#list > *:nth-child(2){animation-delay:.05s}
+#list > *:nth-child(3){animation-delay:.08s}
+#list > *:nth-child(4){animation-delay:.11s}
+#list > *:nth-child(5){animation-delay:.14s}
+@media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important;scroll-behavior:auto !important}}
+
+/* 2. Sticky header shadow once you scroll, so the top bar reads as a layer. */
+header.top{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,var(--bg) 70%,transparent);
+  backdrop-filter:saturate(1.1) blur(2px);padding-top:env(safe-area-inset-top,0);}
+
+/* 3. Bigger, comfier tap targets on the market/tab pills (mobile ergonomics). */
+.mkt-tab,.subtab,.tab,.pill{min-height:40px;}
+
+/* 4. Consistent card hover lift on desktop (subtle, not floaty). */
+@media(hover:hover){
+  .game:hover,.sport-card:hover,.ha:hover{border-color:color-mix(in srgb,var(--gold) 45%,var(--line));}
+}
+
+/* 5. Win/loss chips read instantly with a soft tint, not just colored text. */
+.res-w,.pill-w,.chip.win{background:color-mix(in srgb,var(--win) 15%,transparent);}
+.res-l,.pill-l,.chip.loss{background:color-mix(in srgb,var(--loss) 15%,transparent);}
+
+/* 6. Empty states centered + calmer (less "error"-looking). */
+.empty,.no-data,.sload-msg{color:var(--muted);text-align:center;line-height:1.6;}
+
+/* 7. Numbers use tabular figures everywhere so columns of odds/records align. */
+.mono,.od,.tb-rec,.hc-big,.recordbig .big,.pct,.vv{font-variant-numeric:tabular-nums;}
+
+/* 8. Prevent long team names from breaking layout; ellipsize gracefully. */
+.team,.matchup .team{overflow-wrap:anywhere;}
+
+/* 9. Back button gets a clearer affordance. */
+.back{transition:transform .12s;} .back:active{transform:translateX(-2px);}
+
+/* 10. Soft divider under section labels for rhythm. */
+.home-seclab{border-bottom:1px solid var(--line);padding-bottom:10px;}
+
+/* Back-to-top button (QoL) — sits above the chat bubble, fades in on scroll. */
+#to-top-btn{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0));
+  width:44px;height:44px;border-radius:50%;border:1px solid var(--line);
+  background:var(--panel-2);color:var(--gold);font-size:20px;font-weight:700;
+  z-index:60;cursor:pointer;opacity:0;pointer-events:none;transform:translateY(8px);
+  transition:opacity .2s ease, transform .2s ease;box-shadow:0 4px 14px rgba(0,0,0,.4);}
+#to-top-btn.show{opacity:1;pointer-events:auto;transform:none;}
+#to-top-btn:active{transform:scale(.92);}

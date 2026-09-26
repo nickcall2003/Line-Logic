@@ -278,7 +278,7 @@ if _loaded_from is None:
         import threading
         threading.Thread(target=_build_surface_records_bg, daemon=True).start()
         print("[surface] no data on disk; attempting background self-build (note: "
-              "GitHub/jsDelivr block this host, so this may yield 0 \u2014 the "
+              "GitHub/jsDelivr block this host, so this may yield 0, the "
               "GitHub Actions workflow is the reliable source).")
     else:
         print("[surface] no surface_records.json on disk; Surface tab hidden until "
@@ -447,12 +447,12 @@ async def lifespan(app: FastAPI):
         import os as _os
         from db import DATABASE_URL as _DBU
         if _DBU.startswith("postgresql"):
-            print("[storage] OK: external Postgres \u2014 data persists across redeploys.")
+            print("[storage] OK: external Postgres, data persists across redeploys.")
         else:
             _p = _DBU.replace("sqlite:///", "")
             _mounted = _os.path.ismount(_os.path.dirname(_p) or ".") or _os.path.ismount("/data")
             if _mounted:
-                print(f"[storage] OK: SQLite on a mounted volume ({_p}) \u2014 survives redeploys.")
+                print(f"[storage] OK: SQLite on a mounted volume ({_p}), survives redeploys.")
             else:
                 print("=" * 70)
                 print("[storage] !!! WARNING: SQLite is on EPHEMERAL disk at "
@@ -585,53 +585,31 @@ async def lifespan(app: FastAPI):
             import time as _t
             _t.sleep(150)
             every = max(1, int(os.environ.get("ODDS_SNAPSHOT_HOURS", "12") or 12)) * 3600
-            # How many days AHEAD to snapshot. Capturing upcoming games (not just
-            # today) is what freezes a real OPENING line — a game gets its first
-            # spread recorded days before kickoff, close to the market open,
-            # instead of on game-day morning after the line has already moved.
-            ahead = max(0, int(os.environ.get("ODDS_SNAPSHOT_AHEAD_DAYS", "7") or 7))
             while True:
                 try:
                     import odds_api
                     if odds_api.enabled():
-                        # Build the list of dates to cover: today .. today+ahead.
-                        base = dt.date.today()
-                        dates = [(base + dt.timedelta(days=i)).isoformat()
-                                 for i in range(ahead + 1)]
-                        # Per-sport builders take a date; calling each across the
-                        # forward window snapshots every upcoming game's line via
-                        # the normal _attach_odds path. UFC/soccer handle their own
-                        # windows, so they're called once.
-                        per_day = [
-                            ("mlb", lambda d: mlb_games(date=d)),
-                            ("ncaabb", lambda d: ncaabb_games(date=d)),
-                            ("nba", lambda d: team_games("nba", date=d)),
-                            ("nfl", lambda d: team_games("nfl", date=d)),
-                            ("nhl", lambda d: team_games("nhl", date=d)),
-                            ("ncaaf", lambda d: team_games("ncaaf", date=d)),
-                            ("ncaab", lambda d: team_games("ncaab", date=d)),
-                        ]
-                        once = [
+                        today = dt.date.today().isoformat()
+                        jobs = [
+                            ("mlb", lambda: mlb_games(date=today)),
+                            ("ncaabb", lambda: ncaabb_games(date=today)),
                             ("ufc", lambda: ufc_games(date=None)),
-                            ("soccer", lambda: soccer_games(date=dt.date.today().isoformat(), league="all")),
+                            ("nba", lambda: team_games("nba", date=today)),
+                            ("nfl", lambda: team_games("nfl", date=today)),
+                            ("nhl", lambda: team_games("nhl", date=today)),
+                            ("ncaaf", lambda: team_games("ncaaf", date=today)),
+                            ("ncaab", lambda: team_games("ncaab", date=today)),
+                            ("soccer", lambda: soccer_games(date=today, league="all")),
                         ]
                         n = 0
-                        for name, fn in per_day:
-                            for d in dates:
-                                try:
-                                    fn(d)
-                                    n += 1
-                                except Exception as e:
-                                    print(f"[odds-snapshot] {name} {d} failed: {e}")
-                                _t.sleep(1)
-                        for name, fn in once:
+                        for name, fn in jobs:
                             try:
                                 fn()
                                 n += 1
                             except Exception as e:
                                 print(f"[odds-snapshot] {name} failed: {e}")
-                            _t.sleep(2)
-                        print(f"[odds-snapshot] cycle done ({n} board-days, {ahead}d ahead)")
+                            _t.sleep(3)
+                        print(f"[odds-snapshot] cycle done ({n} boards)")
                 except Exception as e:
                     print(f"[odds-snapshot] loop error: {e}")
                 _t.sleep(every)
@@ -1219,9 +1197,9 @@ def _run_ratings_build_inner(start, chunk_days=1):
                 report["live_loaded"] = n2
         except Exception as e:
             report["load_error"] = str(e)
-        report["status"] = "DONE \u2014 ratings.json saved + loaded; tennis model is now surface-Elo"
+        report["status"] = "DONE, ratings.json saved + loaded; tennis model is now surface-Elo"
     else:
-        report["status"] = f"too few players ({len(eng.model.overall)}) \u2014 not saved"
+        report["status"] = f"too few players ({len(eng.model.overall)}), not saved"
     _RATINGS_BUILD["report"] = report
 
 
@@ -1524,7 +1502,7 @@ def models_diag():
                     return {"file": p, "teams": teams, "age_hours": age_h, "status": status}
             except Exception:
                 continue
-        return {"file": None, "status": "FALLBACK (no ratings file \u2014 records-only)"}
+        return {"file": None, "status": "FALLBACK (no ratings file, records-only)"}
 
     out = {}
     out["tennis"] = dict(globals().get("_MODEL_STATUS",
@@ -1558,8 +1536,8 @@ def models_diag():
                        else "FALLBACK (DataGolf not configured)"}
     except Exception as e:
         out["golf"] = {"status": f"unknown ({e})"}
-    out["mlb"] = {"status": "live (MLB Stats API records/Elo \u2014 no static ratings file)"}
-    out["soccer"] = {"status": "live (provider form/odds \u2014 no static ratings file)"}
+    out["mlb"] = {"status": "live (MLB Stats API records/Elo, no static ratings file)"}
+    out["soccer"] = {"status": "live (provider form/odds, no static ratings file)"}
     out["_legend"] = ("full = real ratings loaded; FALLBACK = running on records/win% "
                       "only (weaker, like tennis ranking-only was); STALE = file too old, re-run refresh")
     return JSONResponse(out, headers={"Cache-Control": "no-store"})
@@ -2229,7 +2207,7 @@ def admin_regrade(result: str, ref: str = "", player: str = "", opponent: str = 
                 m = cands[0]
                 ref = str(m.id)
         if m is None:
-            return {"error": "no tennis match found \u2014 pass ?player=<name>&opponent=<name> or ?ref=<id>"}
+            return {"error": "no tennis match found, pass ?player=<name>&opponent=<name> or ?ref=<id>"}
         matchup = (getattr(m, "player_a", "") or "?") + " vs " + (getattr(m, "player_b", "") or "?")
         # RESET: remove any existing result (un-grade). Use for a wrongly graded or
         # not-yet-played match.
@@ -2277,53 +2255,34 @@ def _attach_odds(sport, games):
     """Attach real market odds to each game and snapshot the pick's line.
 
     Load-balances two free odds sources: SportsGameOdds (SGO) covers the major
-    team leagues + UFC on its own quota, so for those sports we try SGO FIRST to
-    reserve the Odds API's limited monthly quota for the sports SGO can't do
-    (tennis, golf, NCAA baseball, WNBA). BUT if SGO returns no line for a game
-    (common early-season / smaller matchups), we fall back to the Odds API so the
-    card shows a market instead of 'Awaiting market' — and so the SPREAD is
-    captured (SGO doesn't give spreads; the Odds API does, which the ATS opener
-    tracking needs)."""
-    sgo = None
+    team leagues + UFC on its own quota, so for those sports we DON'T spend a
+    scarce Odds API call — we reserve the Odds API's limited monthly quota for
+    the sports SGO can't do (tennis, golf, NCAA baseball, WNBA). Falls through to
+    SGO below so the model-vs-market edge renders on either source."""
+    book = {}
     sgo_covers = False
+    try:
+        import sgo_api
+        sgo_covers = (sgo_api.available() and sport in getattr(sgo_api, "SGO_LEAGUE", {}))
+    except Exception:
+        sgo_covers = False
+    try:
+        import odds_api
+        if odds_api.enabled() and not sgo_covers:
+            book = odds_api.get_odds(sport) or {}
+    except Exception as e:
+        print(f"[odds] odds-api {sport} skipped: {e}")
+    sgo = None
     try:
         import sgo_api
         if sgo_api.enabled():
             sgo = sgo_api
-            sgo_covers = sport in getattr(sgo_api, "SGO_LEAGUE", {})
     except Exception:
         sgo = None
-        sgo_covers = False
-    # Load the Odds API book lazily: always for sports SGO can't cover, and as a
-    # per-game fallback for SGO-covered sports (fetched once, cached 15 min, so it
-    # costs at most one call per sport per cycle).
-    _oa = None
-    _oa_book = None
-
-    def _oa_get():
-        nonlocal _oa, _oa_book
-        if _oa_book is not None:
-            return _oa_book
-        try:
-            import odds_api as _m
-            if _m.enabled():
-                _oa = _m
-                _oa_book = _m.get_odds(sport) or {}
-            else:
-                _oa_book = {}
-        except Exception as e:
-            print(f"[odds] odds-api {sport} skipped: {e}")
-            _oa_book = {}
-        return _oa_book
-
-    # For sports SGO does NOT cover, prime the Odds API book up front.
-    book = {} if sgo_covers else _oa_get()
-
     for g in games:
         if g.get("odds"):
             continue                          # provider already attached (soccer)
-        key = _norm_team(g["home"]["name"]) + "|" + _norm_team(g["away"]["name"])
-        o = book.get(key) if book else None
+        o = book.get(_norm_team(g["home"]["name"]) + "|" + _norm_team(g["away"]["name"])) if book else None
         if o:
             mlh, mla = _odds_rec_sides(g["home"]["name"], o)
             g["odds"] = {"ml_home": mlh, "ml_away": mla,
@@ -2336,26 +2295,15 @@ def _attach_odds(sport, games):
                 so = None
             if so and (so.get("ml_home") is not None or so.get("ml_away") is not None):
                 g["odds"] = {"ml_home": so.get("ml_home"), "ml_away": so.get("ml_away"),
-                             "spread_home": so.get("spread_home"), "total": so.get("total"),
+                             "spread_home": None, "total": None,
                              "books": ["SportsGameOdds"]}
-            # SGO had no line -> fall back to the Odds API so the game isn't left
-            # 'Awaiting market' and we capture a spread for ATS.
-            if not g.get("odds"):
-                ob = _oa_get()
-                o2 = ob.get(key) if ob else None
-                if o2:
-                    mlh, mla = _odds_rec_sides(g["home"]["name"], o2)
-                    g["odds"] = {"ml_home": mlh, "ml_away": mla,
-                                 "spread_home": o2.get("spread_home"),
-                                 "total": o2.get("total"), "books": o2.get("books")}
         if g.get("odds"):                     # snapshot the side we pick (CLV)
             side = "home" if g["prob_home"] >= 0.5 else "away"
             taken = g["odds"]["ml_home"] if side == "home" else g["odds"]["ml_away"]
             if taken is not None:
                 try:
                     _snapshot_odds(sport, str(g["id"]), side, int(round(taken)),
-                                   prob=(g["prob_home"] if side == "home" else g.get("prob_away", 1 - g["prob_home"])),
-                                   spread=g["odds"].get("spread_home"))
+                                   prob=(g["prob_home"] if side == "home" else g.get("prob_away", 1 - g["prob_home"])))
                 except Exception:
                     pass
     return games
@@ -2394,39 +2342,10 @@ def _attach_odds_one(sport, g):
     return g
 
 
-def _grade_ats(db, sport, g):
-    """Grade one finished team game ATS vs its OPENING spread. Pulls the frozen
-    open_spread from the game's OddsSnapshot, computes the final home-relative
-    margin from the score, and records the cover/no/push. No-op (returns None) if
-    there's no opening spread or no final score — those simply aren't ATS-graded.
-    Never raises into the caller."""
-    from models import OddsSnapshot
-    import ats
-    ref = str(g.get("id"))
-    snap = db.query(OddsSnapshot).filter_by(sport=sport, ref=ref).first()
-    if not snap or snap.open_spread is None:
-        return None                            # no opener captured -> not gradable
-    score = g.get("score") or {}
-    hs, as_ = score.get("home"), score.get("away")
-    if hs is None or as_ is None:
-        return None
-    actual_margin = float(hs) - float(as_)     # home-relative
-    model_margin = g.get("exp_margin")
-    if model_margin is None:
-        return None
-    return ats.record_ats(db, sport, ref, float(snap.open_spread),
-                          float(model_margin), actual_margin,
-                          subcat=getattr(snap, "subcat", None))
-
-
-def _snapshot_odds(sport, ref, side, odds, prob=None, subcat=None, gate=None,
-                   spread=None):
+def _snapshot_odds(sport, ref, side, odds, prob=None, subcat=None, gate=None):
     """Record/refresh the market line for a pick (open = first seen, last = now).
     Also captures the model's probability and sub-league tag (tennis tour) for the
     picked side so every settled game carries them for edge/wager/tour tracking.
-
-    `spread`: the current HOME-RELATIVE spread. Frozen as open_spread on first
-    sighting (the opening line ATS grades against) and tracked as last_spread.
 
     `gate`: a skip-reason string means "do not OPEN a wager on this pick". An
     EXISTING snapshot is still refreshed, because a wager already taken must keep
@@ -2442,8 +2361,7 @@ def _snapshot_odds(sport, ref, side, odds, prob=None, subcat=None, gate=None,
             if row is None:
                 db.add(OddsSnapshot(sport=sport, ref=ref, side=side,
                                     open_odds=odds, last_odds=odds, prob=prob,
-                                    subcat=subcat, first_seen=now, last_seen=now,
-                                    open_spread=spread, last_spread=spread))
+                                    subcat=subcat, first_seen=now, last_seen=now))
             else:
                 row.last_odds = odds
                 row.last_seen = now
@@ -2452,11 +2370,6 @@ def _snapshot_odds(sport, ref, side, odds, prob=None, subcat=None, gate=None,
                     row.prob = prob
                 if subcat is not None:
                     row.subcat = subcat
-                if spread is not None:
-                    row.last_spread = spread
-                    # Backfill the opener if we somehow never captured it.
-                    if row.open_spread is None:
-                        row.open_spread = spread
             db.commit()
     except Exception:
         pass
@@ -2487,7 +2400,7 @@ STALE_TENNIS_HOURS = int(os.environ.get("TENNIS_STALE_HOURS", "48"))
 
 def _reinfer_tennis_surfaces():
     """Correct stored tennis surfaces for upcoming matches (and re-run their
-    predictions on the corrected surface). Fixes stale/wrong values \u2014 e.g. clay
+    predictions on the corrected surface). Fixes stale/wrong values, e.g. clay
     ITF events that were mislabeled grass before the surface-logic fix."""
     try:
         from apitennis import _infer_surface
@@ -2557,7 +2470,7 @@ def _settle_stale_tennis(hours=None):
                 except Exception:
                     return None
 
-            # 1) settle newly-stale tracked picks \u2014 re-fetch the real result before voiding
+            # 1) settle newly-stale tracked picks, re-fetch the real result before voiding
             for m in stale:
                 if str(m.id) in have:
                     continue
@@ -3819,7 +3732,7 @@ def parlays_record(days: int = 30):
 def _short_reason(p):
     pct = round(p["prob"] * 100)
     name = p["pick"].replace(" to win", "")
-    return f"{name} \u2014 {pct}% to win, {p['confidence']} confidence."
+    return f"{name}, {pct}% to win, {p['confidence']} confidence."
 
 
 def _long_reason(p):
@@ -4345,7 +4258,7 @@ def value_board(date: str | None = None, min_edge: float = 2.0):
 def best_bets(date: str | None = None, sport: str | None = None,
               min_prob: float = 0.0, min_edge: float = 0.0):
     """Larger, filterable board with in-depth rationale (premium-style).
-    Filterable by sport, model win% (min_prob) and market edge% (min_edge) \u2014 all
+    Filterable by sport, model win% (min_prob) and market edge% (min_edge), all
     of which work for every sport including tennis."""
     target = dt.date.fromisoformat(date) if date else dt.date.today()
     _ensure_day(target)
@@ -4499,9 +4412,9 @@ def _nhl_writeup(g):
                      + xg_fact + (f" Projected total: about {total} goals." if total else ""))
     else:
         paras.append("Note: team goal stats weren't available for this matchup, so the projection "
-                     "rests on records alone \u2014 treat the edge as lower-confidence.")
+                     "rests on records alone, treat the edge as lower-confidence.")
 
-    paras.append("Hockey is high-variance \u2014 a hot goalie or an OT bounce swings games \u2014 so weigh the "
+    paras.append("Hockey is high-variance, a hot goalie or an OT bounce swings games, so weigh the "
                  "edge accordingly. The model uses team goals-for/against and home ice; it does not "
                  "yet account for the starting goalie, injuries, or rest, so confirm the projected "
                  f"starter yourself. Model confidence: {g['confidence']}.")
@@ -4553,11 +4466,12 @@ def sports_meta():
     out-of-season sports."""
     meta = sports.public_meta()
     mo = dt.date.today().month
-    # Force-hide sports regardless of season. Defaults to NBA + NHL (seasons over);
-    # set the HIDDEN_SPORTS env var (comma-separated keys, or empty) to change.
+    # Force-hide sports regardless of season. NHL is now in season, so the
+    # default only hides NBA (starts late Oct). Override with the HIDDEN_SPORTS
+    # env var (comma-separated keys, or empty to show all).
     _hs = os.environ.get("HIDDEN_SPORTS")
     hidden = {s.strip().lower() for s in
-              ((_hs if _hs is not None else "nba,nhl").split(",")) if s.strip()}
+              ((_hs if _hs is not None else "nba").split(",")) if s.strip()}
     for entry in meta:
         in_season = mo in SPORT_SEASON.get(entry["key"], set(range(1, 13)))
         entry["active"] = in_season and entry["key"] not in hidden
@@ -4831,12 +4745,6 @@ def team_games(sport: str, date: str | None = None, debug: int = 0):
                     predicted = "home" if g["prob_home"] >= 0.5 else "away"
                     _record_result(db, sport, g["id"], predicted, g["winner"])
                     wrote = True
-                    # ATS vs the opening line: grade the model's projected margin
-                    # against the frozen opening spread using the final score.
-                    try:
-                        _grade_ats(db, sport, g)
-                    except Exception as _e:
-                        print(f"[ats] {sport}/{g.get('id')} skipped: {_e}")
             if wrote:
                 db.commit()
     except Exception as e:
@@ -5978,7 +5886,7 @@ def hoops_adv_diag(sport: str = "wnba"):
             return {"uploaded": up, "reachable": False, "elapsed_sec": elapsed,
                     "health": dict(HA._health), "season": HA._season(sport),
                     "meaning": ("stats.nba.com is NOT reachable from this server "
-                                "(datacenter IP likely blocked). Props still work \u2014 "
+                                "(datacenter IP likely blocked). Props still work, "
                                 "they fall back to the ESPN proxy.")}
         pu = HA.player_usage(sport)
         return {"uploaded": up, "reachable": True, "elapsed_sec": elapsed, "teams": len(ta),
@@ -6057,19 +5965,6 @@ def sport_news(sport: str, date: str | None = None):
     except Exception as e:
         print(f"[news] {sport} yardbarker failed: {e}")
     return {"sport": sport, "news": news, "injuries": injuries, "headlines": headlines}
-
-
-@app.get("/api/ats")
-def ats_record(sport: str | None = None, days: int = 0):
-    """The model's against-the-spread record vs the OPENING line (first spread we
-    recorded per game). Its own metric, separate from straight-up accuracy.
-    ?sport= filters to one sport; ?days= limits to a recent window."""
-    import ats
-    try:
-        with SessionLocal() as db:
-            return ats.record(db, sport=sport or None, days=(days or None))
-    except Exception as e:
-        return {"error": str(e), "by_sport": {}, "overall": {}}
 
 
 @app.get("/api/clv")
