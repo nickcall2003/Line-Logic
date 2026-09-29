@@ -2303,7 +2303,8 @@ def _attach_odds(sport, games):
             if taken is not None:
                 try:
                     _snapshot_odds(sport, str(g["id"]), side, int(round(taken)),
-                                   prob=(g["prob_home"] if side == "home" else g.get("prob_away", 1 - g["prob_home"])))
+                                   prob=(g["prob_home"] if side == "home" else g.get("prob_away", 1 - g["prob_home"])),
+                                   spread=(g.get("odds") or {}).get("spread_home"))
                 except Exception:
                     pass
     return games
@@ -2342,10 +2343,14 @@ def _attach_odds_one(sport, g):
     return g
 
 
-def _snapshot_odds(sport, ref, side, odds, prob=None, subcat=None, gate=None):
+def _snapshot_odds(sport, ref, side, odds, prob=None, subcat=None, gate=None,
+                   spread=None):
     """Record/refresh the market line for a pick (open = first seen, last = now).
     Also captures the model's probability and sub-league tag (tennis tour) for the
     picked side so every settled game carries them for edge/wager/tour tracking.
+
+    `spread`: current HOME-RELATIVE spread; frozen as open_spread on first sighting
+    (the opening line ATS grades against) and tracked as last_spread.
 
     `gate`: a skip-reason string means "do not OPEN a wager on this pick". An
     EXISTING snapshot is still refreshed, because a wager already taken must keep
@@ -2361,7 +2366,8 @@ def _snapshot_odds(sport, ref, side, odds, prob=None, subcat=None, gate=None):
             if row is None:
                 db.add(OddsSnapshot(sport=sport, ref=ref, side=side,
                                     open_odds=odds, last_odds=odds, prob=prob,
-                                    subcat=subcat, first_seen=now, last_seen=now))
+                                    subcat=subcat, first_seen=now, last_seen=now,
+                                    open_spread=spread, last_spread=spread))
             else:
                 row.last_odds = odds
                 row.last_seen = now
@@ -2370,9 +2376,35 @@ def _snapshot_odds(sport, ref, side, odds, prob=None, subcat=None, gate=None):
                     row.prob = prob
                 if subcat is not None:
                     row.subcat = subcat
+                if spread is not None:
+                    row.last_spread = spread
+                    if row.open_spread is None:
+                        row.open_spread = spread
             db.commit()
     except Exception:
         pass
+
+
+def _grade_ats(db, sport, g):
+    """Grade one finished team game ATS vs its OPENING spread. Pulls the frozen
+    open_spread from the game's OddsSnapshot, computes the final home-relative
+    margin from the score, records cover/no/push. No-op if no opener or score."""
+    from models import OddsSnapshot
+    import ats
+    ref = str(g.get("id"))
+    snap = db.query(OddsSnapshot).filter_by(sport=sport, ref=ref).first()
+    if not snap or snap.open_spread is None:
+        return None
+    score = g.get("score") or {}
+    hs, as_ = score.get("home"), score.get("away")
+    if hs is None or as_ is None:
+        return None
+    model_margin = g.get("exp_margin")
+    if model_margin is None:
+        return None
+    return ats.record_ats(db, sport, ref, float(snap.open_spread),
+                          float(model_margin), float(hs) - float(as_),
+                          subcat=getattr(snap, "subcat", None))
 
 
 def _is_soccer_push(r):
@@ -4745,6 +4777,10 @@ def team_games(sport: str, date: str | None = None, debug: int = 0):
                     predicted = "home" if g["prob_home"] >= 0.5 else "away"
                     _record_result(db, sport, g["id"], predicted, g["winner"])
                     wrote = True
+                    try:
+                        _grade_ats(db, sport, g)     # grade ATS vs opening spread
+                    except Exception as _e:
+                        print(f"[ats] {sport}/{g.get('id')} skipped: {_e}")
             if wrote:
                 db.commit()
     except Exception as e:
@@ -5965,6 +6001,19 @@ def sport_news(sport: str, date: str | None = None):
     except Exception as e:
         print(f"[news] {sport} yardbarker failed: {e}")
     return {"sport": sport, "news": news, "injuries": injuries, "headlines": headlines}
+
+
+@app.get("/api/ats")
+def ats_record(sport: str | None = None, days: int = 0):
+    """The model's against-the-spread record vs the OPENING line (first spread we
+    recorded per game). Its own metric, separate from straight-up accuracy.
+    ?sport= filters to one sport; ?days= limits to a recent window."""
+    import ats
+    try:
+        with SessionLocal() as db:
+            return ats.record(db, sport=sport or None, days=(days or None))
+    except Exception as e:
+        return {"error": str(e), "by_sport": {}, "overall": {}}
 
 
 @app.get("/api/clv")
