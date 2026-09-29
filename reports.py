@@ -27,6 +27,25 @@ router = APIRouter()
 # chart on the record page disagreed with the rows underneath it.
 TENNIS_UNIT_TOURS = ("ATP", "WTA")
 
+# Realistic-staking cap: at flat 1-unit stakes, a single huge-underdog win pays
+# out its full price (a +2500 dog = +25u on one bet), which lets one lucky
+# longshot masquerade as a repeatable edge and inflates units/ROI into
+# not-believable territory (e.g. CFB showing +121u / 552% on 22 bets). We cap the
+# profit any single winning bet can contribute so the headline numbers stay
+# credible. Env-overridable. Applied consistently to /api/accuracy and
+# /api/edges/wagers so both tell the same story.
+import os as _os
+_WIN_CAP = float(_os.environ.get("UNIT_WIN_CAP", "10.0"))
+
+
+def _capped_profit(american, won):
+    """Profit (in units) for a 1u flat stake at `american` odds, with wins capped
+    at _WIN_CAP so a single longshot can't dominate the totals. Loss = -1u."""
+    if not won:
+        return -1.0
+    prof = (american / 100.0) if american > 0 else (100.0 / abs(american))
+    return min(prof, _WIN_CAP)
+
 
 
 def _is_push(r):
@@ -96,8 +115,7 @@ def accuracy(days: int = 30):
                     s["today_correct"] += 1
                     tot_tc += 1
             if r.taken_odds is not None and abs(r.taken_odds) >= 100:  # valid line -> ROI
-                prof = (r.taken_odds / 100.0) if r.taken_odds > 0 else (100.0 / (-r.taken_odds))
-                pl = prof if r.correct else -1.0
+                pl = _capped_profit(float(r.taken_odds), bool(r.correct))
                 # Headline Tennis units/ROI count ONLY the three main tours
                 # (ATP, WTA, Challenger). ITF/futures and untagged historical picks
                 # ("EARLIER") are excluded from the money line — they still appear
@@ -181,8 +199,7 @@ def recent_results(days: int = 5):
             return None
         if r.sport == "tennis" and (r.subcat or "").upper() not in TENNIS_UNIT_TOURS:
             return None
-        prof = (r.taken_odds / 100.0) if r.taken_odds > 0 else (100.0 / (-r.taken_odds))
-        return round(prof if r.correct else -1.0, 4)
+        return round(_capped_profit(float(r.taken_odds), bool(r.correct)), 4)
 
     def _pick_beat_close(r):
         """True/False if we can compare the taken line to the close, else None.
@@ -503,7 +520,7 @@ def edges_simulate(days: int = 3650, sport: str | None = None):
             continue
         imp = _implied(float(r.taken_odds))
         won = bool(r.correct)
-        pl = (1.0 / imp - 1.0) if won else -1.0
+        pl = _capped_profit(float(r.taken_odds), won)
         beat = None
         if r.close_odds is not None and abs(r.close_odds) >= 100:
             beat = imp < _implied(float(r.close_odds))
@@ -609,7 +626,7 @@ def edges_wagers(days: int = 3650, min_edge: float = 0.03, min_sample: int = 25)
         if _calibrate(r.sport, prob) - imp < min_edge:
             continue
         won = bool(r.correct)
-        pl = (1.0 / imp - 1.0) if won else -1.0
+        pl = _capped_profit(float(r.taken_odds), won)
         s = by.setdefault(r.sport, blank())
         for b in (s, ov):
             b["n"] += 1; b["wins"] += won; b["units"] += pl

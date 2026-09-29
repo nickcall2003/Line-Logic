@@ -2307,6 +2307,31 @@ def _attach_odds(sport, games):
                                    spread=(g.get("odds") or {}).get("spread_home"))
                 except Exception:
                     pass
+            # ATS side pick: compare the model's projected margin to the market
+            # spread and recommend the side with value. Model Georgia -7.4 vs a
+            # market of -10.5 => value is the OTHER side (+10.5). Attached as
+            # g["ats"] for the UI; None when we lack a margin or a spread.
+            try:
+                mm = g.get("exp_margin")
+                sp = (g.get("odds") or {}).get("spread_home")
+                if mm is not None and sp is not None:
+                    import ats as _ats
+                    _side = _ats.pick_side(float(mm), float(sp))   # 'home'/'away'/None
+                    if _side:
+                        h = g["home"]; a = g["away"]
+                        pick_team = (h if _side == "home" else a)
+                        pick_ab = pick_team.get("abbr") or pick_team.get("short") or pick_team.get("name")
+                        # the line the bettor takes on that side (home line = sp; away = -sp)
+                        line = sp if _side == "home" else -sp
+                        line_str = ("+" if line > 0 else "") + str(round(line, 1))
+                        # edge = how many points the model disagrees with the market
+                        edge_pts = round(abs(float(mm) - (-float(sp))), 1)
+                        g["ats"] = {"side": _side, "team": pick_ab,
+                                    "line": round(line, 1), "line_str": line_str,
+                                    "edge_pts": edge_pts,
+                                    "pick_str": pick_ab + " " + line_str}
+            except Exception:
+                pass
     return games
 
 
