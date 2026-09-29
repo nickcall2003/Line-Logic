@@ -584,32 +584,63 @@ async def lifespan(app: FastAPI):
         def _odds_snapshot_bg():
             import time as _t
             _t.sleep(150)
-            every = max(1, int(os.environ.get("ODDS_SNAPSHOT_HOURS", "12") or 12)) * 3600
+            # Every 3h by default. On the $30 Odds API tier (~667 credits/day) this
+            # runs ~8 sports x ~3 markets x 8 cycles = ~192 credits/day (~29% of
+            # budget), leaving ample headroom for on-view pulls. Env-overridable.
+            every = max(1, int(os.environ.get("ODDS_SNAPSHOT_HOURS", "3") or 3)) * 3600
+            # Per-sport LOOKAHEAD (days ahead to snapshot). Capturing a game's line
+            # as far ahead as the book posts it = freezing a real OPENING line, which
+            # is what the ATS/CLV tracking grades against. Football books post the
+            # next week's lines Sun night/Mon, so NFL/NCAAF look a full week ahead;
+            # other sports open closer to game day, so 1-2 days is enough. The odds
+            # feed is cached per sport, so looking N days ahead costs ~1 API call per
+            # sport per cycle, not N calls. Env-overridable per sport.
+            def _ahead(sport, default):
+                try:
+                    return max(0, int(os.environ.get("ODDS_AHEAD_" + sport.upper(), str(default))))
+                except Exception:
+                    return default
+            LOOKAHEAD = {
+                "nfl": _ahead("nfl", 7), "ncaaf": _ahead("ncaaf", 7),
+                "mlb": _ahead("mlb", 2), "nba": _ahead("nba", 2),
+                "nhl": _ahead("nhl", 2), "ncaab": _ahead("ncaab", 2),
+                "ncaabb": _ahead("ncaabb", 2), "soccer": _ahead("soccer", 2),
+            }
+            def _dates(sport):
+                base = dt.date.today()
+                return [(base + dt.timedelta(days=i)).isoformat()
+                        for i in range(LOOKAHEAD.get(sport, 1) + 1)]
             while True:
                 try:
                     import odds_api
                     if odds_api.enabled():
-                        today = dt.date.today().isoformat()
-                        jobs = [
-                            ("mlb", lambda: mlb_games(date=today)),
-                            ("ncaabb", lambda: ncaabb_games(date=today)),
-                            ("ufc", lambda: ufc_games(date=None)),
-                            ("nba", lambda: team_games("nba", date=today)),
-                            ("nfl", lambda: team_games("nfl", date=today)),
-                            ("nhl", lambda: team_games("nhl", date=today)),
-                            ("ncaaf", lambda: team_games("ncaaf", date=today)),
-                            ("ncaab", lambda: team_games("ncaab", date=today)),
-                            ("soccer", lambda: soccer_games(date=today, league="all")),
-                        ]
                         n = 0
-                        for name, fn in jobs:
+                        # date-driven sports: walk each sport's own lookahead window
+                        per_day = [
+                            ("mlb", lambda d: mlb_games(date=d)),
+                            ("ncaabb", lambda d: ncaabb_games(date=d)),
+                            ("nba", lambda d: team_games("nba", date=d)),
+                            ("nhl", lambda d: team_games("nhl", date=d)),
+                            ("ncaaf", lambda d: team_games("ncaaf", date=d)),
+                            ("ncaab", lambda d: team_games("ncaab", date=d)),
+                            ("nfl", lambda d: team_games("nfl", date=d)),
+                        ]
+                        for name, fn in per_day:
+                            for d in _dates(name):
+                                try:
+                                    fn(d); n += 1
+                                except Exception as e:
+                                    print(f"[odds-snapshot] {name} {d} failed: {e}")
+                                _t.sleep(1)
+                        # sports that manage their own window
+                        for name, fn in (("ufc", lambda: ufc_games(date=None)),
+                                          ("soccer", lambda: soccer_games(date=dt.date.today().isoformat(), league="all"))):
                             try:
-                                fn()
-                                n += 1
+                                fn(); n += 1
                             except Exception as e:
                                 print(f"[odds-snapshot] {name} failed: {e}")
-                            _t.sleep(3)
-                        print(f"[odds-snapshot] cycle done ({n} boards)")
+                            _t.sleep(2)
+                        print(f"[odds-snapshot] cycle done ({n} board-days; NFL/CFB {LOOKAHEAD['nfl']}d ahead)")
                 except Exception as e:
                     print(f"[odds-snapshot] loop error: {e}")
                 _t.sleep(every)
