@@ -2282,6 +2282,30 @@ def _odds_rec_sides(home_name, o):
     return o.get("ml_away"), o.get("ml_home")
 
 
+def _fuzzy_odds_match(book, home_name, away_name):
+    """Find a book entry for a game even when names don't match exactly. ESPN
+    includes mascots ("North Texas Mean Green", "Tulsa Golden Hurricane") while
+    the Odds API often uses just the school ("North Texas", "Tulsa"), so an exact
+    key lookup misses most college games. This matches when the two normalized
+    names overlap (one starts-with or contains the other) on BOTH teams. Returns
+    the matched record or None."""
+    hn, an = _norm_team(home_name), _norm_team(away_name)
+    if not hn or not an:
+        return None
+    def _sim(a, b):
+        if not a or not b:
+            return False
+        return a == b or a.startswith(b) or b.startswith(a) or a in b or b in a
+    for key, rec in book.items():
+        # key is "normhome|normaway", but home/away can be flipped vs ours, so
+        # match against the record's own team names both ways.
+        rh = _norm_team(rec.get("home_team", ""))
+        ra = _norm_team(rec.get("away_team", ""))
+        if (_sim(hn, rh) and _sim(an, ra)) or (_sim(hn, ra) and _sim(an, rh)):
+            return rec
+    return None
+
+
 def _attach_odds(sport, games):
     """Attach real market odds to each game and snapshot the pick's line.
 
@@ -2313,6 +2337,8 @@ def _attach_odds(sport, games):
         if g.get("odds"):
             continue                          # provider already attached (soccer)
         o = book.get(_norm_team(g["home"]["name"]) + "|" + _norm_team(g["away"]["name"])) if book else None
+        if not o and book:                    # exact key missed (mascot names) -> fuzzy
+            o = _fuzzy_odds_match(book, g["home"]["name"], g["away"]["name"])
         if o:
             mlh, mla = _odds_rec_sides(g["home"]["name"], o)
             g["odds"] = {"ml_home": mlh, "ml_away": mla,
@@ -6208,6 +6234,28 @@ def _odds_diag():
             out["sgo_game_odds_sample"] = {"note": "no MLB games today to sample"}
     except Exception as e:
         out["sgo_game_odds_sample"] = {"error": str(e)}
+    # RAW Odds API book probe: how many games does get_odds return per sport, and
+    # a sample of the team names it uses (so we can tell "empty fetch" from
+    # "name mismatch"). This is the definitive check for the missing-market issue.
+    try:
+        import odds_api
+        probe = {}
+        for sp in ("nfl", "ncaaf", "mlb", "nba"):
+            try:
+                bk = odds_api.get_odds(sp) or {}
+                # unique records (the book stores each under 2 keys)
+                recs = {id(v): v for v in bk.values()}.values()
+                sample = None
+                for v in recs:
+                    sample = {"home_team": v.get("home_team"), "away_team": v.get("away_team"),
+                              "spread_home": v.get("spread_home"), "ml_home": v.get("ml_home")}
+                    break
+                probe[sp] = {"games": len(recs), "sample": sample}
+            except Exception as e:
+                probe[sp] = {"error": str(e)}
+        out["oddsapi_book_probe"] = probe
+    except Exception as e:
+        out["oddsapi_book_probe"] = {"error": str(e)}
     return JSONResponse(out, headers={"Cache-Control": "no-store"})
 
 
