@@ -2290,16 +2290,15 @@ def _attach_odds(sport, games):
     scarce Odds API call — we reserve the Odds API's limited monthly quota for
     the sports SGO can't do (tennis, golf, NCAA baseball, WNBA). Falls through to
     SGO below so the model-vs-market edge renders on either source."""
+    # PRIMARY = the Odds API (paid tier, includes spreads + totals, reliable).
+    # SGO is the FALLBACK for any game the Odds API doesn't return — and since SGO
+    # is prone to 429 rate-limiting, we never DEPEND on it. This ordering fixes the
+    # bug where SGO-covered sports got NO odds when SGO was rate-limited, even
+    # though the paid Odds API had quota to spare.
     book = {}
-    sgo_covers = False
-    try:
-        import sgo_api
-        sgo_covers = (sgo_api.available() and sport in getattr(sgo_api, "SGO_LEAGUE", {}))
-    except Exception:
-        sgo_covers = False
     try:
         import odds_api
-        if odds_api.enabled() and not sgo_covers:
+        if odds_api.enabled():
             book = odds_api.get_odds(sport) or {}
     except Exception as e:
         print(f"[odds] odds-api {sport} skipped: {e}")
@@ -2319,14 +2318,15 @@ def _attach_odds(sport, games):
             g["odds"] = {"ml_home": mlh, "ml_away": mla,
                          "spread_home": o.get("spread_home"), "total": o.get("total"),
                          "books": o.get("books")}
-        elif sgo is not None:
+        # Fall back to SGO only if the Odds API had nothing for this game.
+        if not g.get("odds") and sgo is not None:
             try:
                 so = sgo.get_game_odds(sport, g["home"]["name"], g["away"]["name"])
             except Exception:
                 so = None
             if so and (so.get("ml_home") is not None or so.get("ml_away") is not None):
                 g["odds"] = {"ml_home": so.get("ml_home"), "ml_away": so.get("ml_away"),
-                             "spread_home": None, "total": None,
+                             "spread_home": so.get("spread_home"), "total": so.get("total"),
                              "books": ["SportsGameOdds"]}
         if g.get("odds"):                     # snapshot the side we pick (CLV)
             side = "home" if g["prob_home"] >= 0.5 else "away"
