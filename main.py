@@ -6085,6 +6085,99 @@ def sport_news(sport: str, date: str | None = None):
     return {"sport": sport, "news": news, "injuries": injuries, "headlines": headlines}
 
 
+@app.get("/api/ncaaf/roster-impact")
+def ncaaf_roster_impact(limit: int = 0, team: str = ""):
+    """Transfer-portal impact board: every team ranked by roster change, with key
+    transfers in/out. Reads ncaaf_roster.json (built by the GitHub Action).
+    ?team= filters to one team's full transfer list."""
+    import json as _json, os as _os
+    _cands = [p for p in [
+        _os.environ.get("NCAAF_ROSTER_PATH"),
+        "/data/ncaaf_roster.json",
+        _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "ncaaf_roster.json"),
+        "ncaaf_roster.json",
+    ] if p]
+    blob = None
+    for _p in _cands:
+        try:
+            with open(_p) as f:
+                blob = _json.load(f)
+            break
+        except Exception:
+            continue
+    if blob is None:
+        return {"ok": False, "error": "no roster file found. Run the 'Refresh "
+                "efficiency ratings' GitHub Action to build ncaaf_roster.json.",
+                "teams": []}
+    teams = list((blob.get("teams") or {}).values())
+    if team:
+        tn = team.strip().lower()
+        hit = [t for t in teams if tn in (t.get("name", "").lower())]
+        return {"ok": True, "updated": blob.get("updated"),
+                "season": blob.get("year"), "matches": hit}
+    teams.sort(key=lambda t: -(t.get("impact") or 0))
+    rows = []
+    for t in teams:
+        if not t.get("moves"):
+            continue
+        rows.append({"team": t.get("name"), "impact": t.get("impact"),
+                     "adj_sp": t.get("adj_sp"), "moves": t.get("moves"),
+                     "in_value": t.get("in_value"), "out_value": t.get("out_value"),
+                     "key_in": t.get("key_in", []), "key_out": t.get("key_out", [])})
+    if limit and limit > 0:
+        rows = rows[:limit]
+    return {"ok": True, "updated": blob.get("updated"), "season": blob.get("year"),
+            "count": len(rows), "teams": rows}
+
+
+@app.get("/portal")
+def portal_board():
+    """Self-contained Transfer Portal Impact board. Fetches /api/ncaaf/roster-impact
+    and renders every team ranked by roster change with key transfers in/out."""
+    html = """<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Transfer Portal Impact \u2014 Line Logic</title>
+<style>
+:root{--bg:#111211;--panel:#171817;--panel2:#1E1F1D;--ink:#EDEBE6;--line:#2A2B29;
+--gain:#5FCF86;--loss:#EE6A54;--gold:#E8B04B;--muted:#8E8F8A;--muted2:#57584F}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:16px;max-width:900px;margin:0 auto}
+h1{font-size:22px;margin:8px 0 2px}.sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.row1{display:flex;align-items:center;gap:12px}
+.rank{color:var(--muted2);font:600 13px/1 monospace;min-width:26px}
+.team{font-weight:700;font-size:17px;flex:1}
+.impact{font:700 15px/1 monospace;padding:4px 8px;border-radius:8px}
+.adj{color:var(--muted);font:600 13px/1 monospace;margin-left:8px}
+.tx{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.txcol h4{margin:0 0 4px;font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+.in h4{color:var(--gain)}.out h4{color:var(--loss)}
+.p{font-size:13px;padding:2px 0;display:flex;gap:6px}
+.pos{color:var(--muted2);font:600 11px/1.4 monospace;min-width:26px}
+.pn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv{color:var(--muted);font:600 12px/1.4 monospace}
+.none{color:var(--muted2);font-size:12px;font-style:italic}
+.err{color:var(--loss);padding:20px;text-align:center}
+.foot{color:var(--muted2);font-size:11px;margin:18px 0 40px;text-align:center}
+@media(max-width:520px){.tx{grid-template-columns:1fr}}
+</style></head><body>
+<h1>Transfer Portal Impact</h1><div class="sub" id="sub">Loading\u2026</div><div id="list"></div>
+<div class="foot">Impact 0\u2013100 (50 = no net change). Ranks roster change by portal moves + recruiting,
+valuing each player by the better of last-season production or talent grade. Not betting advice.</div>
+<script>
+function col(x){if(x>=50){var t=(x-50)/50;return 'rgba(95,200,138,'+(0.12+t*0.28)+')';}var t=(50-x)/50;return 'rgba(226,104,95,'+(0.12+t*0.28)+')';}
+function esc(s){return (s||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+function plist(arr,dir){if(!arr||!arr.length)return '<div class="none">none tracked</div>';
+return arr.map(function(p){return '<div class="p"><span class="pos">'+esc(p.pos||'')+'</span><span class="pn">'+esc(p.name)+'</span><span class="pv">'+(dir==='in'?(p.from?('\u2190 '+esc(p.from)):''):(p.to?('\u2192 '+esc(p.to)):''))+'</span></div>';}).join('');}
+fetch('/api/ncaaf/roster-impact').then(function(r){return r.json();}).then(function(d){
+if(!d.ok){document.getElementById('sub').innerHTML='';document.getElementById('list').innerHTML='<div class="err">'+esc(d.error||'No data yet.')+'</div>';return;}
+var up=new Date(d.updated);document.getElementById('sub').textContent=d.count+' teams \u00b7 '+(d.season||'')+' cycle \u00b7 updated '+(isNaN(up)?d.updated:up.toLocaleDateString());
+document.getElementById('list').innerHTML=d.teams.map(function(t,i){return '<div class="card"><div class="row1"><span class="rank">'+(i+1)+'</span><span class="team">'+esc(t.team)+'</span><span class="impact" style="background:'+col(t.impact)+'">'+t.impact+'</span><span class="adj">'+(t.adj_sp>=0?'+':'')+t.adj_sp+' pts</span></div><div class="tx"><div class="txcol in"><h4>Added ('+(t.moves||0)+' moves)</h4>'+plist(t.key_in,'in')+'</div><div class="txcol out"><h4>Lost</h4>'+plist(t.key_out,'out')+'</div></div></div>';}).join('');
+}).catch(function(e){document.getElementById('list').innerHTML='<div class="err">Failed to load: '+e+'</div>';});
+</script></body></html>"""
+    return Response(content=html, media_type="text/html")
+
+
 @app.get("/api/ats")
 def ats_record(sport: str | None = None, days: int = 0):
     """The model's against-the-spread record vs the OPENING line (first spread we
