@@ -34,7 +34,7 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();win
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Hanken+Grotesque:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=45">
+<link rel="stylesheet" href="/app.css?v=35">
 </head>
 <body>
 <div class="shell">
@@ -45,21 +45,21 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();win
         <div class="tb-rec" id="tb-rec">&mdash;</div>
         <div class="lab">Today</div>
       </div>
-      <div class="acc-badge" id="acc-badge" title="Model accuracy, last 30 days">
-        <div class="ring" id="acc-ring">&mdash;</div>
-        <div class="acc-col">
-          <div class="lab" id="acc-lab">30-day accuracy</div>
-          <div class="alltime" id="acc-alltime"></div>
-          <div class="alltime" id="acc-clv" style="display:none"></div>
+      <div class="acc-badge statbox" id="acc-badge" title="Model track record">
+        <div class="sb-head">
+          <span class="sb-sport" id="sb-sport">Overall</span>
+          <span class="sb-clv" id="sb-clv"></span>
         </div>
+        <div class="sb-grid" id="sb-grid"></div>
       </div>
       <div class="menu-wrap">
         <button class="menu-btn" id="menu-btn" aria-label="Switch sport">&#9776;</button>
         <div class="menu" id="menu">
           <div class="menu-item" data-view="home">&#127968; Home</div>
           <div class="menu-item" data-view="record">&#128202; Track Record</div>
-          <div class="menu-sec menu-gear" id="sports-toggle" onclick="var s=document.getElementById('sports-body');var o=s.style.display==='none';s.style.display=o?'':'none';this.classList.toggle('open',o);">&#127942; Sports</div>
-          <div id="sports-body" style="display:none">
+          <div class="menu-item" data-view="help">&#10067; How to use</div>
+          <div class="menu-sec menu-gear open" id="sports-toggle" onclick="var s=document.getElementById('sports-body');var o=s.style.display==='none';s.style.display=o?'':'none';this.classList.toggle('open',o);">&#127942; Sports</div>
+          <div id="sports-body">
           <div class="menu-item" data-sport="mlb">&#9918; MLB</div>
           <div class="menu-item" data-sport="tennis">&#127934; Tennis</div>
           <div class="menu-item" data-sport="nba">&#127936; NBA</div>
@@ -74,24 +74,29 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();win
           <div class="menu-item" data-sport="soccer">&#9917; Soccer</div>
           <div class="menu-item" data-sport="ufc">&#129354; UFC</div>
           </div>
+          <div class="menu-sec menu-gear" id="offseason-toggle" style="display:none" onclick="var s=document.getElementById('offseason-body');var o=s.style.display==='none';s.style.display=o?'':'none';this.classList.toggle('open',o);">&#128197; Off-season leagues</div>
           <div id="offseason-body" style="display:none"></div>
-          <div class="menu-sec menu-gear" onclick="var s=document.getElementById('picks-body');var o=s.style.display==='none';s.style.display=o?'':'none';this.classList.toggle('open',o);">&#128081; Picks</div>
-          <div id="picks-body" style="display:none">
+          <div class="menu-sec menu-gear open" onclick="var s=document.getElementById('picks-body');var o=s.style.display==='none';s.style.display=o?'':'none';this.classList.toggle('open',o);">&#128081; Picks</div>
+          <div id="picks-body">
           <div class="menu-item" data-view="free">&#11088; Free Picks</div>
           <div class="menu-item" data-view="best">&#128081; Best Bets</div>
+          <div class="menu-item" data-view="results">&#128203; Recent Results</div>
           <div class="menu-item" data-view="ladder">&#129948; Ladder Challenge</div>
-          <div class="menu-item" data-view="wintotals">&#127942; Win Totals</div>
           <div class="menu-item" data-view="myboard">&#11088; My Board</div>
           <div class="menu-item" data-view="promote" id="promote-nav" style="display:none">&#128227; Promote</div>
           </div>
           <div class="menu-sec menu-gear" onclick="var s=document.getElementById('more-body');var o=s.style.display==='none';s.style.display=o?'':'none';this.classList.toggle('open',o);">&#8943; More</div>
           <div id="more-body" style="display:none">
+          <div class="menu-item" data-view="wintotals">&#127942; Win Totals</div>
           <div class="menu-item" data-view="news">&#128240; News &amp; Injuries</div>
-          <div class="menu-item" data-view="stocks">&#128200; Markets</div>
-          <div class="menu-item" data-view="transparency">&#128270; How it works</div>
+          <div class="menu-item" data-view="transparency">&#128270; How the model works</div>
+          <div class="menu-item" data-view="bets">&#128176; My Bets</div>
           <div class="menu-item" id="menu-account" data-view="auth">&#128100; Sign in</div>
+          <div class="menu-item" data-view="stocks">&#128200; Markets</div>
+          <div class="menu-item menu-adv" data-view="calibration">&#128208; Model Accuracy</div>
+          <div class="menu-item menu-adv" data-view="simulator">&#129514; Edge Backtest</div>
           </div>
-          <div class="menu-sec menu-gear" id="settings-toggle" onclick="var s=document.getElementById('settings-body');var o=s.style.display==='none';s.style.display=o?'block':'none';this.classList.toggle('open',o);">&#9881;&#65039; Settings</div>
+          <div class="menu-sec menu-gear" id="settings-toggle" onclick="var s=document.getElementById('settings-body');var o=s.style.display==='none';s.style.display=o?'block':'none';this.classList.toggle('open',o);">&#9881;&#65039; Display &amp; settings</div>
           <div id="settings-body" style="display:none">
           <div class="menu-sec">Text size</div>
           <div class="ts-row" id="ts-row">
@@ -109,18 +114,12 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();win
           </div>
           <div class="menu-sec">Accent</div>
           <div class="ac-row" id="ac-row">
-            <button class="ac-opt" data-ac="#E8B04B" style="--sw:#E8B04B" title="Gold"></button>
             <button class="ac-opt" data-ac="#3ad17a" style="--sw:#3ad17a" title="Green"></button>
             <button class="ac-opt" data-ac="#4c8dff" style="--sw:#4c8dff" title="Blue"></button>
             <button class="ac-opt" data-ac="#b56bff" style="--sw:#b56bff" title="Violet"></button>
             <button class="ac-opt" data-ac="#ff6b6b" style="--sw:#ff6b6b" title="Red"></button>
+            <button class="ac-opt" data-ac="#ffb020" style="--sw:#ffb020" title="Amber"></button>
           </div>
-          <div class="menu-sec">Advanced</div>
-          <div class="menu-item menu-adv" data-view="calibration">&#128208; Model Accuracy</div>
-          <div class="menu-item menu-adv" data-view="simulator">&#129514; Edge Backtest</div>
-          <div class="menu-item menu-adv" data-view="results">&#128203; Recent Results</div>
-          <div class="menu-item menu-adv" data-view="bets">&#128176; My Bets</div>
-          <div class="menu-item menu-adv" data-view="help">&#10067; How to use</div>
           </div>
         </div>
       </div>
@@ -143,12 +142,6 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();win
 <script>
 window.addEventListener("error",function(e){
   try{
-    // Ignore the generic cross-origin "Script error." — the browser strips its
-    // detail for security, it carries no message/line, and it's almost always a
-    // harmless external-script load hiccup, not a real fault. Also ignore errors
-    // with no usable message. Real errors (with a message + line) still show.
-    var msg=(e&&e.message)||"";
-    if(!msg || /^Script error\.?$/i.test(msg) || (!e.lineno && !e.filename)) return;
     var box=document.getElementById("crash-box");
     if(!box){box=document.createElement("div");box.id="crash-box";
       box.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#2a1416;color:#ffd9d4;font:12px/1.5 monospace;padding:12px 14px;border-top:2px solid #e2685f;max-height:45vh;overflow:auto";
@@ -241,7 +234,7 @@ function netFailHTML(what, retryFn){
     '<div class="neterr-ic">'+(off?"\uD83D\uDCF6":"\u26A0\uFE0F")+'</div>'+
     '<div class="neterr-h">'+(off?"You\u2019re offline":"Couldn\u2019t load "+(what||"this"))+'</div>'+
     '<div class="neterr-p">'+(off
-      ? "Check your connection, your picks are still here when you\u2019re back."
+      ? "Check your connection \u2014 your picks are still here when you\u2019re back."
       : "The server didn\u2019t respond. This is usually temporary.")+'</div>'+
     '<button class="neterr-btn" onclick="'+(retryFn||"location.reload()")+'">Try again</button>'+
     '</div>';
@@ -259,7 +252,7 @@ if (typeof window !== "undefined") {
     if(document.getElementById("offline-bar")) return;
     var b=document.createElement("div");
     b.id="offline-bar"; b.className="offline-bar";
-    b.textContent="\uD83D\uDCF6 You\u2019re offline, showing the last loaded data";
+    b.textContent="\uD83D\uDCF6 You\u2019re offline \u2014 showing the last loaded data";
     document.body.appendChild(b);
   });
 }
@@ -294,60 +287,39 @@ async function loadTournaments(){
 }
 let _accData=null,_clvData=null,_wagData=null,_toursData=null,_atsData=null;
 async function loadAccuracy(){try{_accData=await getJSON("/api/accuracy?days=30");}catch(e){}try{_clvData=await getJSON("/api/clv?days=30");}catch(e){}try{_wagData=await getJSON("/api/edges/wagers?days=3650&min_edge=0.03&min_sample=25");}catch(e){}try{_toursData=await getJSON("/api/tennis/tours");}catch(e){}try{_atsData=await getJSON("/api/ats");}catch(e){}renderAccuracy();}
+function _recCell(w,l){w=w||0;l=l||0;var cls=(w>l?"pos":(l>w?"neg":""));return '<span class="sb-v '+cls+'">'+w+"–"+l+'</span>';}
+function _uCell(u){if(u==null)return '<span class="sb-dash">—</span>';var cls=(u>=0?"pos":"neg");return '<span class="sb-v '+cls+'">'+(u>=0?"+":"")+u+'u</span>';}
+function _rCell(r){if(r==null)return '<span class="sb-dash">—</span>';var cls=(r>=0?"pos":"neg");return '<span class="sb-v '+cls+'">'+(r>=0?"+":"")+r+'%</span>';}
 function renderAccuracy(){if(!_accData)return;
-  // On a sport tab, ALWAYS show that sport's own number (never all-sports).
-  // If it has no settled picks yet, show its label with a dash rather than
-  // silently falling back to the overall figure (which caused MLB to look wrong).
-  let stat,label;
-  if(view==="sport"){
-    stat=(_accData.by_sport&&_accData.by_sport[sport])||{accuracy:null,correct:0,picks:0,today_wins:0,today_losses:0,wins_30d:0,losses_30d:0,alltime_wins:0,alltime_losses:0};
-    label=SPORT_LABEL[sport]+" \u00b7 30d";
-  }else{stat=_accData.overall;label="All sports \u00b7 30d";}
-  const ring=document.getElementById("acc-ring"),lab=document.getElementById("acc-lab");
-  if(ring)ring.textContent=(!stat||stat.accuracy==null)?"\u2014":stat.accuracy+"%";
-  if(lab)lab.textContent=label;
-  const tb=document.getElementById("tb-rec");
-  if(tb){const tw=(stat&&stat.today_wins)||0,tl=(stat&&stat.today_losses)||0;tb.textContent=(tw||tl)?(tw+"\u2013"+tl):"\u2014";tb.className="tb-rec "+(tw>tl?"pos":(tl>tw?"neg":""));}
-  const at=document.getElementById("acc-alltime");
-  if(at){
-    if(stat){
-      const tw=stat.today_wins||0,tl=stat.today_losses||0;
-      const w30=(stat.wins_30d!=null?stat.wins_30d:(stat.correct||0));
-      const l30=(stat.losses_30d!=null?stat.losses_30d:((stat.picks||0)-(stat.correct||0)));
-      const aw=stat.alltime_wins||0,al=stat.alltime_losses||0;
-      const u=stat.units_30d,priced=stat.priced_30d,roi=stat.roi_30d;
-      const uStr=(priced&&u!=null&&sport!=="tennis")?' <span class="acc-u '+(u>=0?"pos":"neg")+'" title="Net units at a flat 1u stake over '+priced+' priced picks (last 30d)'+(roi!=null?", ROI "+roi+"%":"")+'">'+(u>=0?"+":"")+u+'u'+(roi!=null?' \u00b7 '+(roi>=0?"+":"")+roi+'% ROI':'')+'</span>':'';
-      const parts=['<span class="ar-i">30d '+w30+"\u2013"+l30+uStr+'</span>'];
-      if(aw+al)parts.push('<span class="ar-i">All-time '+aw+"\u2013"+al+'</span>');
-      // ATS record vs the opening line — its own metric alongside straight-up.
-      // Shown per-sport on a sport tab, overall otherwise. Only when there's a
-      // graded sample, so it never shows an empty "0-0".
-      try{
-        let a=null;
-        if(_atsData){
-          if(view==="sport"&&_atsData.by_sport)a=_atsData.by_sport[sport];
-          else a=_atsData.overall;
-        }
-        if(a&&a.graded>0&&a.ats_pct!=null){
-          parts.push('<span class="ar-i" title="Against the opening spread. Covers-noncovers'+(a.pushes?", "+a.pushes+" pushes":"")+'">ATS '+a.record+' \u00b7 '+a.ats_pct+'%</span>');
-        }
-      }catch(e){}
-      at.innerHTML=parts.join(" \u00b7 ");
-    }else{at.textContent="";}
+  // Compact top-right track-record box (Option A): 2-column grid of all-time and
+  // last-30d record / units / ROI, with CLV in the header. One source
+  // (/api/accuracy), same +10u cap and tour rules as the Track Record page.
+  var stat,sportLab;
+  if(view==="sport"){stat=(_accData.by_sport&&_accData.by_sport[sport])||null;sportLab=SPORT_LABEL[sport]||sport.toUpperCase();}
+  else{stat=_accData.overall;sportLab="Overall";}
+  var tb=document.getElementById("tb-rec");
+  if(tb){var tw=(stat&&stat.today_wins)||0,tl=(stat&&stat.today_losses)||0;tb.textContent=(tw||tl)?(tw+"–"+tl):"—";tb.className="tb-rec "+(tw>tl?"pos":(tl>tw?"neg":""));}
+  var sp=document.getElementById("sb-sport");if(sp)sp.textContent=sportLab;
+  var clvEl=document.getElementById("sb-clv");
+  if(clvEl){var c=stat?stat.clv_at_pct:null;
+    if(c!=null){clvEl.innerHTML='CLV <b>'+c+'%</b>';clvEl.title="Share of priced picks that beat the closing line (all-time)";clvEl.style.display="";}
+    else{clvEl.style.display="none";}}
+  var grid=document.getElementById("sb-grid");
+  if(grid){
+    if(!stat){grid.innerHTML='<span class="sb-colh first"></span><span class="sb-colh">All-time</span><span class="sb-colh">30d</span><span class="sb-rowh">Record</span><span class="sb-dash">—</span><span class="sb-dash">—</span>';}
+    else{
+      var aw=stat.alltime_wins||0,al=stat.alltime_losses||0;
+      var w30=(stat.wins_30d!=null?stat.wins_30d:(stat.correct||0));
+      var l30=(stat.losses_30d!=null?stat.losses_30d:((stat.picks||0)-(stat.correct||0)));
+      grid.innerHTML=
+        '<span class="sb-colh first"></span><span class="sb-colh">All-time</span><span class="sb-colh">30d</span>'+
+        '<span class="sb-rowh">Record</span>'+_recCell(aw,al)+_recCell(w30,l30)+
+        '<span class="sb-rowh">Units</span>'+_uCell(stat.units_at)+_uCell(stat.units_30d)+
+        '<span class="sb-rowh">ROI</span>'+_rCell(stat.roi_at)+_rCell(stat.roi_30d);
+    }
   }
-  const clvEl=document.getElementById("acc-clv");
-  if(clvEl){
-    let c=null;
-    if(view==="sport"&&sport!=="tennis"&&_clvData&&_clvData.by_sport)c=_clvData.by_sport[sport];
-    else if(view!=="sport"&&_clvData)c=_clvData.overall;
-    if(c&&c.clv_sample){
-      const sg=(c.avg_clv!=null&&c.avg_clv>0)?"+":"";
-      clvEl.textContent="CLV "+(c.avg_clv!=null?sg+c.avg_clv+"%":"\u2014")+" \u00b7 beat close "+(c.beat_close_pct!=null?c.beat_close_pct+"%":"\u2014")+" (n="+c.clv_sample+")";
-      clvEl.style.display="";
-    }else{clvEl.style.display="none";}
-  }
-  const badge=document.getElementById("acc-badge");
-  if(badge&&stat)badge.title="Model: "+(stat.correct||0)+"/"+(stat.picks||0)+" correct over last 30 days ("+label+")";}
+  var badge=document.getElementById("acc-badge");
+  if(badge&&stat)badge.title=sportLab+" model: all-time "+(stat.alltime_wins||0)+"–"+(stat.alltime_losses||0)+", last 30d "+((stat.wins_30d||0))+"–"+((stat.losses_30d||0));}
 function filteredMatches(){return current.filter(m=>{
   if(tFilter!==null&&(m.tournament_key||m.tournament)!==tFilter)return false;
   if(tabMode==="live"&&m.status!=="live")return false;return true;});}
@@ -447,14 +419,12 @@ function render(){renderTabs();renderBubbles();loadTournaments();
 function showView(detail){document.getElementById("main").style.display=detail?"none":"";
   const useSide=(sport==="tennis"||sport==="soccer");
   document.getElementById("side").style.display=(detail||!useSide)?"none":"";document.getElementById("detail").style.display=detail?"block":"none";}
-let _boardScroll=0;
-async function openDetail(id){_boardScroll=window.scrollY||0;detailId=id;detailTab="analysis";showView(true);toTop();
+async function openDetail(id){detailId=id;detailTab="analysis";showView(true);
   document.getElementById("detail").innerHTML='<div class="skel-wrap"><div class="skel-card" style="height:130px"></div><div class="skel-card"></div><div class="skel-card"></div></div>';await refreshDetail();
   if(detailTimer)clearInterval(detailTimer);detailTimer=setInterval(()=>{if(detailId)refreshDetail(true);},10000);}
 function closeDetail(){detailId=null;if(detailTimer)clearInterval(detailTimer);
-  if(view==="home"){document.getElementById("detail").style.display="none";document.getElementById("home").classList.add("show");_restoreScroll();return;}
-  showView(false);renderCurrent();_restoreScroll();}
-function _restoreScroll(){try{var y=_boardScroll;requestAnimationFrame(function(){window.scrollTo(0,y);});}catch(e){}}
+  if(view==="home"){document.getElementById("detail").style.display="none";document.getElementById("home").classList.add("show");return;}
+  showView(false);renderCurrent();}
 function renderCurrent(){if(view==="free"||view==="best")renderPicks();else if(view==="parlays")renderParlays();else if(view==="news")renderNews();else if(sport==="soccer")renderSoccer();else if(sport==="ufc")renderUFC();else if(sport==="golf")renderGolf();else if(isTeam(sport))renderTeam();else render();}
 async function refreshDetail(){let m;try{m=await getJSON("/api/match/"+detailId);}catch(e){return;}if(detailId!==m.id)return;renderDetail(m);}
 function formPills(arr){if(!arr||!arr.length)return "";return '<span class="form-pills">'+arr.slice(0,5).map(r=>{const w=r[0]==="W";return '<span class="fp '+(w?'w':'l')+'" title="'+r+'">'+r[0]+'</span>';}).join("")+'</span>';}
@@ -636,7 +606,7 @@ async function loadOfficials(sport,gameId,baseTotal){
       '<div class="ump-nums">'+rv+' runs/gm \u00b7 '+kv+' K/gm <span>vs avg, '+t.games+' games</span></div>'+adj+'</div>';}
   host.innerHTML='<div class="stat-sec" style="margin-top:16px">'+(isMLB?"\u26BE Umpires":"\u{1F3C1} Officials")+(hp?' &middot; HP: '+hp:"")+'</div>'+
     '<div class="off-chips">'+chips+'</div>'+tend+
-    '<div class="off-note">'+(isMLB&&d.hp_tendency?"Umpire run/strikeout tendency is computed from the season\u2019s completed games. A modest, capped nudge, shown for context.":"Assignment only, shown for context. No public feed has official tendency data, so this isn\u2019t factored into the model.")+'</div>';}
+    '<div class="off-note">'+(isMLB&&d.hp_tendency?"Umpire run/strikeout tendency is computed from the season\u2019s completed games. A modest, capped nudge \u2014 shown for context.":"Assignment only \u2014 shown for context. No public feed has official tendency data, so this isn\u2019t factored into the model.")+'</div>';}
 function sportLoader(sp,msg){
   const icons={tennis:"\u{1F3BE}",mlb:"\u26BE",ncaabb:"\u26BE",nba:"\u{1F3C0}",ncaab:"\u{1F3C0}",wncaab:"\u{1F3C0}",nfl:"\u{1F3C8}",ncaaf:"\u{1F3C8}",nhl:"\u{1F3D2}",soccer:"\u26BD",golf:"\u26F3",ufc:"\u{1F94A}"};
   const ic=icons[sp]||"\u{1F3BE}";
@@ -849,7 +819,7 @@ function ncaabbLiveBarHTML(g){
   }
   return '<div class="d-pred"><div class="bar a" style="width:'+pa+'%">'+g.away.abbr+' '+pa+'%</div>'+
     '<div class="bar b" style="width:'+ph+'%">'+ph+'% '+g.home.abbr+'</div></div>'+
-    '<div class="live-prob-note"><span class="pulse"></span> Live win probability, updates with the game'+edgeTxt+'</div>';
+    '<div class="live-prob-note"><span class="pulse"></span> Live win probability \u2014 updates with the game'+edgeTxt+'</div>';
 }
 function nflLivePred(g){
   if(!g||!g.score||g.score.home==null||g.score.away==null) return null;
@@ -880,7 +850,7 @@ function nflLiveBarHTML(g){
   }
   return '<div class="d-pred"><div class="bar a" style="width:'+pa+'%">'+g.away.abbr+' '+pa+'%</div>'+
     '<div class="bar b" style="width:'+ph+'%">'+ph+'% '+g.home.abbr+'</div></div>'+
-    '<div class="live-prob-note"><span class="pulse"></span> Live win probability, updates with the game'+edgeTxt+'</div>';
+    '<div class="live-prob-note"><span class="pulse"></span> Live win probability \u2014 updates with the game'+edgeTxt+'</div>';
 }
 function nflFieldHTML(g){
   var s=g.situation; if(!s) return "";
@@ -941,7 +911,7 @@ function _liveBarHTML(g, lp){
   }
   return '<div class="d-pred"><div class="bar a" style="width:'+pa+'%">'+g.away.abbr+' '+pa+'%</div>'+
     '<div class="bar b" style="width:'+ph+'%">'+ph+'% '+g.home.abbr+'</div></div>'+
-    '<div class="live-prob-note"><span class="pulse"></span> Live win probability, updates with the game'+edgeTxt+'</div>';
+    '<div class="live-prob-note"><span class="pulse"></span> Live win probability \u2014 updates with the game'+edgeTxt+'</div>';
 }
 function nbaLiveBarHTML(g){ return _liveBarHTML(g, nbaLivePred(g)); }
 function nhlLiveBarHTML(g){ return _liveBarHTML(g, nhlLivePred(g)); }
@@ -964,7 +934,7 @@ function mlbLiveBarHTML(g){
   }
   return '<div class="d-pred"><div class="bar a" style="width:'+pa+'%">'+g.away.abbr+' '+pa+'%</div>'+
     '<div class="bar b" style="width:'+ph+'%">'+ph+'% '+g.home.abbr+'</div></div>'+
-    '<div class="live-prob-note"><span class="pulse"></span> Live win probability, updates with the game'+edgeTxt+'</div>';
+    '<div class="live-prob-note"><span class="pulse"></span> Live win probability \u2014 updates with the game'+edgeTxt+'</div>';
 }
 function mlbSituationHTML(g){
   var s=g.score&&g.score.situation; if(!s) return "";
@@ -1051,7 +1021,7 @@ async function loadTennisWinProb(id){
   host.innerHTML='<div class="twp"><div class="twp-h">Live win probability'+(d.best_of?' \u00b7 Bo'+d.best_of:'')+'</div>'+
     '<div class="twp-bar"><div class="twp-a" style="width:'+a+'%">'+an+' '+a+'%</div>'+
     '<div class="twp-b" style="width:'+b+'%">'+b+'% '+bn+'</div></div>'+spark+
-    '<div class="twp-note">From the current score, assuming evenly-matched serve, a read on the match state, not a player forecast.</div></div>';}
+    '<div class="twp-note">From the current score, assuming evenly-matched serve \u2014 a read on the match state, not a player forecast.</div></div>';}
 function tennisLiveBarHTML(m){
   var aN=lastName(m.player_a), bN=lastName(m.player_b);
   var lp=tennisLivePred(m);
@@ -1069,7 +1039,7 @@ function tennisLiveBarHTML(m){
   }
   return '<div class="d-pred"><div class="bar a" style="width:'+pa+'%">'+aN+' '+pa+'%</div>'+
     '<div class="bar b" style="width:'+pb+'%">'+pb+'% '+bN+'</div></div>'+
-    '<div class="live-prob-note"><span class="pulse"></span> Live win probability, updates with the match'+edgeTxt+'</div>';
+    '<div class="live-prob-note"><span class="pulse"></span> Live win probability \u2014 updates with the match'+edgeTxt+'</div>';
 }
 function dPredBar(la,lp,ra,rp){
   return '<div class="d-pred"><div class="bar a" style="width:'+lp+'%">'+la+' '+lp+'%</div>'+
@@ -1144,7 +1114,7 @@ function renderTeam(){renderDatebar();renderTabsTeam();
   if(!shown.length){
     let diag="";
     if(window._ncaaDiag){const d=window._ncaaDiag;
-      if(d.stale_backend)diag="\u26a0 BACKEND IS STALE, main.py did not redeploy (got array, not debug obj). Check Render deploy/logs.";
+      if(d.stale_backend)diag="\u26a0 BACKEND IS STALE \u2014 main.py did not redeploy (got array, not debug obj). Check Render deploy/logs.";
       else diag="source="+d.source+" · HL("+(d.hl_enabled?"on":"off")+")="+d.hl_count+(d.hl_error?" err:"+d.hl_error:"")+" · ESPN="+d.espn_count+(d.espn_error?" err:"+d.espn_error:"");}
     else if(window._lastTeamLoad){diag="loaded "+window._lastTeamLoad.count+" for "+window._lastTeamLoad.date;}
     list.innerHTML = _netFail
@@ -1234,7 +1204,7 @@ function driverSide(d,accentPos){
     '<div class="dv-team">'+d.team+'<span class="dv-total">'+d.total.toFixed(2)+' runs</span></div>'+
     rows+
     (d.reconciles===false
-      ? '<div class="dv-warn">\u26a0\ufe0f This breakdown doesn\u2019t reconcile to the model\u2019s number, treat it as indicative only.</div>'
+      ? '<div class="dv-warn">\u26a0\ufe0f This breakdown doesn\u2019t reconcile to the model\u2019s number \u2014 treat it as indicative only.</div>'
       : '<div class="dv-ok">\u2713 multiplies out to '+d.total.toFixed(2)+'</div>')+
     '</div>';
 }
@@ -1255,7 +1225,7 @@ function driversHTML(g){
     '</button>'+
     '<div class="dv-body" hidden>'+
       '<div class="dv-intro">Every number below is a multiplier the model actually applied, in order. '+
-      'Multiply the chain and you get the projection, nothing hidden, nothing rounded away.</div>'+
+      'Multiply the chain and you get the projection \u2014 nothing hidden, nothing rounded away.</div>'+
       '<div class="dv-wrap">'+driverSide(d.away)+driverSide(d.home)+'</div>'+
     '</div>'+
     '</div>';
@@ -1317,7 +1287,7 @@ function rawStatsHTML(g,sA,sH){
       '<span class="rs-v">'+pit(sA)+'</span></div>'+
     '<div class="rs-row"><span class="rs-k">'+g.home.abbr+'</span>'+
       '<span class="rs-v">'+pit(sH)+'</span></div>'+
-    '<div class="rs-note">The model projects from <b>FIP</b> (fielding-independent) rather than ERA, it predicts future runs better. Season ERA shown for reference.</div>'+
+    '<div class="rs-note">The model projects from <b>FIP</b> (fielding-independent) rather than ERA \u2014 it predicts future runs better. Season ERA shown for reference.</div>'+
   '</div>';
 }
 function injuriesHTML(){
@@ -1326,7 +1296,7 @@ function injuriesHTML(){
   const i=mlbInjuries;
   return '<div class="panel"><div class="stat-sec">Injury report</div>'+
     injSide(i.away_team,i.away)+injSide(i.home_team,i.home)+
-    '<div class="note">Players on an injured list or otherwise inactive, from team roster status. The win model doesn\u2019t auto-adjust for injuries yet, use this as context alongside the prediction. Not betting advice.</div></div>';}
+    '<div class="note">Players on an injured list or otherwise inactive, from team roster status. The win model doesn\u2019t auto-adjust for injuries yet \u2014 use this as context alongside the prediction. Not betting advice.</div></div>';}
 function bvpLine(line){if(!line)return '<span class="bvp-none">no history</span>';
   const avg=line.avg||(line.ab?("."+String(Math.round(1000*line.h/line.ab)).padStart(3,"0")):"\u2014");
   return '<span class="bvp-stat"><b>'+line.h+'-for-'+line.ab+'</b> '+avg+' &middot; '+line.hr+' HR &middot; '+line.rbi+' RBI'+
@@ -1480,16 +1450,9 @@ function heroStatHTML(g,sp){
       var _ms=g.odds.spread_home, _mfav=(_ms<0)?H:A, _mn=Math.abs(_ms);
       mktBit=' <span class="pl-note">\u00b7 market '+_mfav+' -'+(Math.round(_mn*10)/10)+'</span>';
     }
-    // ATS side pick — the value side vs the market spread (from g.ats).
-    var atsBit='';
-    if(g.ats&&g.ats.pick_str){
-      var hot=(g.ats.edge_pts>=3)?' ats-hot':'';
-      atsBit='<div class="ats-pick'+hot+'">ATS pick <b>'+g.ats.pick_str+'</b>'+
-        (g.ats.edge_pts>=1?' <span class="ats-edge">'+g.ats.edge_pts+'pt edge</span>':'')+'</div>';
-    }
     return '<div class="proj-line">projected margin <span class="pr">'+fav+
       ' by <b>'+m.toFixed(1)+'</b></span>'+mktBit+
-      (g.avg_total!=null?' <span class="pl-note">\u00b7 total '+g.avg_total+'</span>':'')+'</div>'+atsBit;
+      (g.avg_total!=null?' <span class="pl-note">\u00b7 total '+g.avg_total+'</span>':'')+'</div>';
   }
   // last resort — a win probability is still one number worth leading with
   if(g.prob_home!=null){
@@ -1598,7 +1561,7 @@ function gProjModelTabs(){const L={baseline:"Baseline",fit:"Course-fit",compare:
 function renderGolfProj(){
   const pj=golfProj;
   if(!pj)return '<div class="empty">Loading projections\u2026</div>';
-  if(!pj.ready)return '<div class="empty">'+(pj.reason==="complete"?"Tournament complete, no live projections.":"Projections begin once play is underway. Check back after tee-off.")+'</div>';
+  if(!pj.ready)return '<div class="empty">'+(pj.reason==="complete"?"Tournament complete \u2014 no live projections.":"Projections begin once play is underway. Check back after tee-off.")+'</div>';
   // ---- DataGolf pre-tournament: Baseline / Course-fit / Compare ----
   if(pj.source==="datagolf"){
     const hasFit=!!pj.has_fit, mode=hasFit?golfProjModel:"baseline";
@@ -1656,7 +1619,7 @@ async function loadGolfMatchup(){
   if(golfMatchSel.length<2)return;
   golfMatchLoading=true;renderGolf();
   try{golfMatchResult=await getJSON("/api/golf/matchup?tour="+golfTour+"&ids="+golfMatchSel.join(",")+"&scope="+golfMatchScope);}
-  catch(e){golfMatchResult={ready:false,reason:"Could not simulate, try again."};}
+  catch(e){golfMatchResult={ready:false,reason:"Could not simulate \u2014 try again."};}
   golfMatchLoading=false;renderGolf();
 }
 function setMatchMode(m){if(m===golfMatchMode)return;golfMatchMode=m;
@@ -1688,10 +1651,10 @@ function clearBoardSearch(){
 function renderGolfMatchBoard(){
   const mb=golfMatchBoard;
   if(!mb)return '<div class="empty">Loading matchups\u2026</div>';
-  if(!mb.ready){const M={no_datagolf_key:"DataGolf isn\u2019t configured.",no_market:"No matchups posted yet, books usually post 3-balls once Round 1 pairings are set, then 2-balls on the weekend. Check back closer to tee-off.",error:(mb.error||"Matchups unavailable right now.")};return '<div class="empty">'+(M[mb.reason]||"Matchups unavailable right now.")+'</div>';}
+  if(!mb.ready){const M={no_datagolf_key:"DataGolf isn\u2019t configured.",no_market:"No matchups posted yet \u2014 books usually post 3-balls once Round 1 pairings are set, then 2-balls on the weekend. Check back closer to tee-off.",error:(mb.error||"Matchups unavailable right now.")};return '<div class="empty">'+(M[mb.reason]||"Matchups unavailable right now.")+'</div>';}
   const legend='<div class="mb-legend">'+
     '<div><span class="favstar">\u2605</span> = the player the model favors to win the matchup.</div>'+
-    '<div><b>Model</b> = the model\u2019s win% &amp; fair price. <b>Best book</b> = best market price (book shown). <b>Edge</b> = model% \u2212 market%, <span style="color:#3fd07a">green</span> means the model rates that player higher than the price implies (value).</div>'+
+    '<div><b>Model</b> = the model\u2019s win% &amp; fair price. <b>Best book</b> = best market price (book shown). <b>Edge</b> = model% \u2212 market% \u2014 <span style="color:#3fd07a">green</span> means the model rates that player higher than the price implies (value).</div>'+
     '<div>When the round finishes, the card turns <span style="color:#3fd07a">green \u2713</span> if the \u2605 pick won the matchup, <span style="color:#e0563f">red \u2717</span> if it lost.</div>'+
     '</div>';
   const note='<div class="ge-sub" style="padding:2px 2px 8px">'+(mb.event||"")+' \u00b7 R'+(mb.round||"")+(mb.live?' \u00b7 live':'')+' \u00b7 sorted by biggest edge in the group</div>';
@@ -1747,7 +1710,7 @@ function renderGolfMatchup(){
 function renderGolfMatchCustom(){
   const b=golfBoard;
   if(!b||!b.players||!b.players.length)return '<div class="empty">No field available yet.</div>';
-  if(b.event&&b.event.is_complete)return '<div class="empty">Tournament complete, matchups are for live/upcoming play.</div>';
+  if(b.event&&b.event.is_complete)return '<div class="empty">Tournament complete \u2014 matchups are for live/upcoming play.</div>';
   const live=!!(b.event&&b.event.is_live);
   const players=b.players.filter(p=>p.pos!=="CUT");
   const scope='<div class="ltabs" style="padding:2px 0 6px"><button class="ltab'+(golfMatchScope==="tournament"?" on":"")+'" onclick="setMatchScope(\'tournament\')">Tournament</button>'+
@@ -1759,7 +1722,7 @@ function renderGolfMatchCustom(){
   if(golfMatchSel.length>=2)action='<button class="mbtn" onclick="loadGolfMatchup()"'+(golfMatchLoading?' disabled':'')+'>'+(golfMatchLoading?"Simulating\u2026":("Compare "+golfMatchSel.length+" players \u2192"))+'</button>';
   let result='';
   if(golfMatchResult){
-    if(!golfMatchResult.ready){const MMSG={no_field:"Matchup projections open once play is underway, the field needs to be on the course. Check back after R1 tee-off.",need_2_in_field:"At least two of the selected players aren\u2019t in the active field (withdrawn or missed cut). Try different players.",complete:"Tournament complete, matchups are for live or upcoming play."};result='<div class="empty">'+(MMSG[golfMatchResult.reason]||golfMatchResult.reason||"Not available")+'</div>';}
+    if(!golfMatchResult.ready){const MMSG={no_field:"Matchup projections open once play is underway \u2014 the field needs to be on the course. Check back after R1 tee-off.",need_2_in_field:"At least two of the selected players aren\u2019t in the active field (withdrawn or missed cut). Try different players.",complete:"Tournament complete \u2014 matchups are for live or upcoming play."};result='<div class="empty">'+(MMSG[golfMatchResult.reason]||golfMatchResult.reason||"Not available")+'</div>';}
     else{
       const max=Math.max.apply(null,golfMatchResult.players.map(p=>p.prob))||1;
       const _msc=golfMatchResult.scope==="round"?("Round "+golfMatchResult.round+" \u00b7 chance of lowest score"):(golfMatchResult.scope==="pretourney"?"Pre-tournament \u00b7 DataGolf model \u00b7 chance to finish best of the group":"Rest of tournament \u00b7 chance of lowest score");
@@ -1775,7 +1738,7 @@ function renderGolfEdge(){
   const e=golfEdge;
   if(!e)return '<div class="empty">Loading market edge\u2026</div>';
   if(!e.ready){
-    const msg={no_datagolf_key:"DataGolf isn\u2019t configured, market edge unavailable.",
+    const msg={no_datagolf_key:"DataGolf isn\u2019t configured \u2014 market edge unavailable.",
       no_market:"No outright market posted for this event yet. Check back closer to the start.",
       complete:"Tournament complete.",error:(e.error||"Market edge unavailable right now.")}[e.reason]||"Market edge unavailable right now.";
     return '<div class="empty">'+msg+'</div>';
@@ -1826,7 +1789,7 @@ function golfWeatherHTML(){
   const loc=(w.venue||w.city||"")+(w.region?", "+w.region:"");
   return '<div class="wx-card"><div class="wx-h">\u26C5 Tournament weather'+(loc?' \u00b7 '+loc:'')+'</div>'+
     '<div class="wx-row">'+cells+'</div>'+
-    '<div class="wx-note">Wind is the big mover in golf, sustained 20+ mph (orange) reshuffles scoring and favors ball-strikers.</div></div>';
+    '<div class="wx-note">Wind is the big mover in golf \u2014 sustained 20+ mph (orange) reshuffles scoring and favors ball-strikers.</div></div>';
 }
 function toggleMatchWhy(i){golfMatchExpanded[i]=!golfMatchExpanded[i];renderGolf();}
 function matchWhyHTML(g){
@@ -1845,7 +1808,7 @@ function matchWhyHTML(g){
   }
   if(fav.fit_delta!=null&&fav.fit_delta>0.3)why+=' The venue suits their game (+'+fav.fit_delta+'% vs a neutral course).';
   else if(fav.fit_delta!=null&&fav.fit_delta<-0.3)why+=' The course is a slightly weaker fit for them ('+fav.fit_delta+'%).';
-  return '<div class="mb-why" onclick="event.stopPropagation()"><div class="mw-head">Why, skill (tournament win% / top-20%) &amp; course fit</div>'+rows+'<div class="mw-sum">'+why+'</div></div>';
+  return '<div class="mb-why" onclick="event.stopPropagation()"><div class="mw-head">Why \u2014 skill (tournament win% / top-20%) &amp; course fit</div>'+rows+'<div class="mw-sum">'+why+'</div></div>';
 }
 function renderGolf(){
   document.getElementById("datebar").innerHTML="";
@@ -1856,7 +1819,7 @@ function renderGolf(){
     const ne=b&&b.next_event;
     bub.innerHTML='<div class="bubble"><div class="num">\u26f3</div><div class="lab">'+tname+'</div></div>'+
       (ne?'<div class="bubble acc"><div class="num" style="font-size:12px;line-height:1.9">'+golfDate(ne.start)+'</div><div class="lab">Next up</div></div>':'');
-    list.innerHTML='<div class="empty">No tournament in progress on the '+tname+'.'+(ne?' Next: <b>'+ne.name+'</b>, '+golfDate(ne.start)+'.':' Try another tour above.')+'</div>';
+    list.innerHTML='<div class="empty">No tournament in progress on the '+tname+'.'+(ne?' Next: <b>'+ne.name+'</b> \u2014 '+golfDate(ne.start)+'.':' Try another tour above.')+'</div>';
     return;
   }
   const ev=b.event,players=b.players||[];
@@ -1871,7 +1834,7 @@ function renderGolf(){
   if(b.tour_name)sub+=" \u00b7 "+b.tour_name;
   if(b.cut_line)sub+=" \u00b7 Cut "+b.cut_line;
   const evhdr='<div class="glf-event"><div class="ge-name">'+ev.name+'</div><div class="ge-sub">'+sub+'</div>'+
-    (ev.is_complete&&b.next_event?'<div class="ge-next">Next: '+b.next_event.name+', '+golfDate(b.next_event.start)+'</div>':'')+'</div>'+golfWeatherHTML();
+    (ev.is_complete&&b.next_event?'<div class="ge-next">Next: '+b.next_event.name+' \u2014 '+golfDate(b.next_event.start)+'</div>':'')+'</div>'+golfWeatherHTML();
   const toggle='<div class="gtog"><button class="gtog-b'+(golfView==="board"?" on":"")+'" onclick="setGolfView(\'board\')">Board</button><button class="gtog-b'+(golfView==="proj"?" on":"")+'" onclick="setGolfView(\'proj\')">Projections</button><button class="gtog-b'+(golfView==="matchup"?" on":"")+'" onclick="setGolfView(\'matchup\')">Matchups</button><button class="gtog-b'+(golfView==="edge"?" on":"")+'" onclick="setGolfView(\'edge\')">Edge</button></div>';
   if(golfView==="proj"){list.innerHTML=evhdr+toggle+renderGolfProj();return;}
   if(golfView==="matchup"){list.innerHTML=evhdr+toggle+renderGolfMatchup();return;}
@@ -1913,7 +1876,7 @@ function renderUFC(){
     rec+
     '<div class="bubble acc"><div class="num" style="font-size:14px;line-height:1.7">'+(ufcEvent||"UFC")+'</div><div class="lab">Card</div></div>';
   const list=document.getElementById("list");
-  if(!ufcGames.length){list.innerHTML='<div class="empty">No UFC card for '+ymd(selected)+'. The next card appears here automatically, try the date arrows.</div>';return;}
+  if(!ufcGames.length){list.innerHTML='<div class="empty">No UFC card for '+ymd(selected)+'. The next card appears here automatically \u2014 try the date arrows.</div>';return;}
   list.innerHTML="";
   ufcGames.forEach(g=>{const el=document.createElement("div");let cls="card";
     if(g.status==="live")cls+=" live";
@@ -2027,7 +1990,7 @@ function soccerProjDetailHTML(g){
   return '<div class="stat-sec">Projected score</div>'+
     '<div class="pscore-main">'+aa+' <b>'+ps.away+"\u2013"+ps.home+'</b> '+ha+' <span class="pl-note">'+ps.p+'% \u00b7 most likely line</span></div>'+
     '<div class="pscore-alts">'+alts+'</div>'+
-    '<div class="note" style="margin-top:6px">Most probable exact scorelines from a Poisson goal model ('+aa+' '+g.exp_goals_away+' xG, '+ha+' '+g.exp_goals_home+' xG). Result split, '+aa+' '+ps.result_away+'% \u00b7 Draw '+ps.result_draw+'% \u00b7 '+ha+' '+ps.result_home+'%.</div>';
+    '<div class="note" style="margin-top:6px">Most probable exact scorelines from a Poisson goal model ('+aa+' '+g.exp_goals_away+' xG, '+ha+' '+g.exp_goals_home+' xG). Result split \u2014 '+aa+' '+ps.result_away+'% \u00b7 Draw '+ps.result_draw+'% \u00b7 '+ha+' '+ps.result_home+'%.</div>';
 }
 function soccerCardHTML(g){
   const fin=g.status==="finished",live=g.status==="live";
@@ -2112,7 +2075,7 @@ function soccerProbExplain(g){
   return '<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin-bottom:16px">'+
     (live?("At "+(g.clock||"")+". "+lead):"")+
     "The model gives "+g.home.name+" "+ph+"%, the draw "+pd+"%, and "+g.away.name+" "+pa+"%"+
-    (live?" to win, recomputed from the current score and time remaining with a Poisson goals model.":" from a Poisson goals model with home advantage. A neutral prior until kickoff.")+'</div>';
+    (live?" to win \u2014 recomputed from the current score and time remaining with a Poisson goals model.":" from a Poisson goals model with home advantage. A neutral prior until kickoff.")+'</div>';
 }
 function soccerEventsHTML(g){
   const ev=g.events||[];
@@ -2126,7 +2089,7 @@ function soccerEventsHTML(g){
 function soccerStatsHTML(box){
   if(box==="loading"||box==null)return '<div class="panel"><div class="empty">Loading match stats&hellip;</div></div>';
   const rows=(box&&box.stats)||[];
-  if(!rows.length)return '<div class="panel"><div class="empty">No live match stats yet, these appear once the match is underway.</div></div>';
+  if(!rows.length)return '<div class="panel"><div class="empty">No live match stats yet \u2014 these appear once the match is underway.</div></div>';
   let html='<div class="panel"><div class="stat-sec">'+(box.away||"Away")+" vs "+(box.home||"Home")+'</div><div class="soc-cmp">';
   rows.forEach(r=>{
     const hv=parseFloat(String(r.home).replace("%",""))||0,av=parseFloat(String(r.away).replace("%",""))||0,tot=hv+av;
@@ -2210,7 +2173,7 @@ let propStatFilter=prefGet("propfilter","all"),propProjCache={},propHitCache={},
 function boxscoreHTML(box){
   if(box==="loading"||box==null) return '<div class="panel"><div class="empty">Loading box score&hellip;</div></div>';
   var teams=(box&&box.teams)||[];
-  if(!teams.length) return '<div class="panel"><div class="empty">No live player stats yet, these appear once the game is underway.</div></div>';
+  if(!teams.length) return '<div class="panel"><div class="empty">No live player stats yet \u2014 these appear once the game is underway.</div></div>';
   var html='<div class="panel">';
   teams.forEach(function(t){
     html+='<div class="bx-team">'+t.name+'</div>';
@@ -2240,7 +2203,7 @@ function propsPanelHTML(data){
   const all=data.props||[];
   if(!all.length){
     const why=propsSport==="soccer"
-      ?"Soccer player props depend on a sportsbook posting them, typically only for marquee matches and usually close to kickoff."
+      ?"Soccer player props depend on a sportsbook posting them \u2014 typically only for marquee matches and usually close to kickoff."
       :propsSport==="mlb"
       ?"Props appear once the starting pitchers and lineups are announced."
       :"Props appear once the books post lines for the game (usually game-day).";
@@ -2253,10 +2216,10 @@ function propsPanelHTML(data){
   chips+=stats.map(s=>'<button class="pf-chip'+(propStatFilter.toLowerCase()===s.toLowerCase()?" active":"")+'" onclick="setPropFilter(\''+s.replace(/'/g,"\\'")+'\')">'+s+'</button>').join("");
   let rows=all.map((p,i)=>({p,i})).filter(o=>propStatFilter==="all"||((o.p.label||o.p.stat||"").toLowerCase()===propStatFilter.toLowerCase())).map(o=>propRowHTML(o.p,o.i)).join("");
   if(!rows)rows='<div class="empty">No '+propStatFilter+' props.</div>';
-  const hdr=isBook?"Player props, projected / line / actual":"Player props, model projections";
+  const hdr=isBook?"Player props \u2014 projected / line / actual":"Player props \u2014 model projections";
   const note=isBook
     ? "Projected = recent-form average \u00b7 Line = sportsbook consensus (median) \u00b7 Actual fills in once the game is live or final, with a hit/miss vs the line. Tap a row for the last-10 game log. Not betting advice."
-    : "Projected = model \u00b7 Line = model line \u00b7 Actual fills in live/final. Tap a row for the last-10 log. High variance, not betting advice.";
+    : "Projected = model \u00b7 Line = model line \u00b7 Actual fills in live/final. Tap a row for the last-10 log. High variance \u2014 not betting advice.";
   setTimeout(()=>fillProjections(all),30);
   return '<div class="panel"><div class="stat-sec">'+hdr+'</div><div class="pf-bar">'+chips+'</div>'+rows+'<div class="note">'+note+'</div></div>';}
 function _poissonOver(lam,line){
@@ -2426,7 +2389,7 @@ function pumpProj(){
 function hitChip(v){
   if(v==null)return '<span class="pf-load">\u2026</span>';
   if(v==="miss"||!v.total)return "";
-  return '<span class="pc-hitr" title="Times the player went OVER this line in their last '+v.total+' games, historical context, not a graded bet">L'+v.total+' '+v.hits+'/'+v.total+' over \u00b7 '+v.pct+'%</span>';}
+  return '<span class="pc-hitr" title="Times the player went OVER this line in their last '+v.total+' games \u2014 historical context, not a graded bet">L'+v.total+' '+v.hits+'/'+v.total+' over \u00b7 '+v.pct+'%</span>';}
 function updateHitCells(){
   (propsCurrent||[]).forEach((p,i)=>{
     const key=(p.player||"")+"|"+(p.stat||p.label||"");
@@ -2520,7 +2483,7 @@ function profitBySportHTML(rows,minN){
   return '<div class="chart-card">'+
     '<div class="chart-h">Profit by sport <span>net units, graded wagers only</span></div>'+
     '<div class="pb-wrap">'+bars+'</div>'+
-    '<div class="chart-foot">Only sports past '+minN+' graded wagers appear, small samples aren\u2019t a track record.</div>'+
+    '<div class="chart-foot">Only sports past '+minN+' graded wagers appear \u2014 small samples aren\u2019t a track record.</div>'+
     '</div>';
 }
 
@@ -2555,7 +2518,7 @@ function winRateTrendHTML(res){
     '</svg>'+
     '<div class="wr-meta"><span>'+Math.round(last.pct)+'% over '+last.n+' graded picks</span>'+
       (showRef?'<span class="wr-key">\u2014 50% coin flip</span>':'')+'</div>'+
-    '<div class="chart-foot">Cumulative across the window, so late swings move it less than early ones, that\u2019s intentional.</div>'+
+    '<div class="chart-foot">Cumulative across the window, so late swings move it less than early ones \u2014 that\u2019s intentional.</div>'+
     '</div>';
 }
 // Cumulative units — the chart bettors actually care about. Only renders once
@@ -2587,7 +2550,7 @@ function unitsTrendHTML(res){
     '</svg>'+
     '<div class="wr-meta"><span class="'+(up?"u-pos":"u-neg")+'">'+(up?"+":"")+end.toFixed(2)+'u over '+pts.length+' days</span>'+
       '<span class="wr-key">\u2014 break even</span></div>'+
-    '<div class="chart-foot">Counts only picks with a real taken line, one unit risked each. Tennis counts ATP/WTA/Challenger only, the same rule as the headline record.</div>'+
+    '<div class="chart-foot">Counts only picks with a real taken line, one unit risked each. Tennis counts ATP/WTA/Challenger only \u2014 the same rule as the headline record.</div>'+
     '</div>';
 }
 // CLV as a single honest number, not a daily line. Day-level CLV on a handful
@@ -2605,7 +2568,7 @@ function clvSummaryHTML(res){
     '<div class="chart-h">Closing line value <span>did we get a better number than the close?</span></div>'+
     '<div class="clv-big '+(good?"pos":"neg")+'">'+pct+'%</div>'+
     '<div class="clv-sub">beat the closing line on '+beat+' of '+tot+' priced picks</div>'+
-    '<div class="chart-foot">CLV is the strongest evidence a model has real signal, it shows up in dozens of bets, where win/loss takes hundreds. Above 50% means we\u2019re consistently getting the better side of the number.</div>'+
+    '<div class="chart-foot">CLV is the strongest evidence a model has real signal \u2014 it shows up in dozens of bets, where win/loss takes hundreds. Above 50% means we\u2019re consistently getting the better side of the number.</div>'+
     '</div>';
 }
 function openRecord(){view="record";if(detailId)closeDetail();
@@ -2629,8 +2592,6 @@ async function renderRecord(){
   let tours=null;try{tours=await getJSON("/api/tennis/tours");}catch(e){}
   // same feed the Discord graded channel reads, so chart and feed agree
   let _res=null;try{_res=await getJSON("/api/results/recent?days=30");}catch(e){}
-  let _ats={by_sport:{},overall:{}};try{_ats=await getJSON("/api/ats");}catch(e){}
-  const atsBy=_ats.by_sport||{};
   const ws=wag.by_sport||{},accs=acc.by_sport||{},ov=acc.overall||{},wov=wag.overall||{};
   const minN=wag.min_sample||25;
   const keys={};Object.keys(accs).forEach(k=>keys[k]=1);Object.keys(ws).forEach(k=>keys[k]=1);
@@ -2642,7 +2603,7 @@ async function renderRecord(){
       wager_n:(w.wagers||0),mature:!!w.mature,
       units:(w.mature?w.units:null),roi:(w.mature?w.roi_pct:null),clv:(w.clv_beat_pct!=null?w.clv_beat_pct:null)};
   }).filter(r=>(r.wins+r.losses)>0);
-  if(!rows.length){list.innerHTML='<div class="empty">No graded picks yet, your record builds as picks settle.</div>';return;}
+  if(!rows.length){list.innerHTML='<div class="empty">No graded picks yet \u2014 your record builds as picks settle.</div>';return;}
   let tU=0,hasU=false;rows.forEach(r=>{if(r.units!=null){tU+=r.units;hasU=true;}});
   const tW=(ov.alltime_wins!=null?ov.alltime_wins:rows.reduce((s,r)=>s+r.wins,0));
   const tL=(ov.alltime_losses!=null?ov.alltime_losses:rows.reduce((s,r)=>s+r.losses,0));
@@ -2665,7 +2626,7 @@ async function renderRecord(){
   });
   let h='<div class="rec-hero"><div class="rec-hero-u">'+tPct+'%</div>'+
     '<div class="rec-hero-sub">'+tW+'-'+tL+' all-time across '+rows.length+' sports'+(hasU?' &middot; '+sg(tU)+' on graded wagers':'')+'</div></div>'+
-    '<div class="rec-note">Verified prediction accuracy across every graded pick. <b>Betting units are tracked separately, only on recommended +EV wagers</b>, and each sport posts its ROI once it clears '+minN+' graded wagers, so the units you see are real plays, never \u201Cbet every favorite.\u201D</div>'+
+    '<div class="rec-note">Verified prediction accuracy across every graded pick. <b>Betting units are tracked separately, only on recommended +EV wagers</b>, and each sport posts its ROI once it clears '+minN+' graded wagers \u2014 so the units you see are real plays, never \u201Cbet every favorite.\u201D</div>'+
     unitsTrendHTML(_res)+clvSummaryHTML(_res)+winRateTrendHTML(_res)+profitBySportHTML(rows,minN);
   rows.forEach(function(r){
     if(r.sport==="golf")return;  // golf removed from the record
@@ -2682,14 +2643,8 @@ async function renderRecord(){
     }
     const isTennis=(r.sport==="tennis"&&tours&&tours.tours);
     const caret=isTennis?'<span class="rec-caret" id="ten-caret">\u203A</span>':'';
-    // Per-sport ATS line (own metric, separate from ML units above).
-    var _a=atsBy[r.sport];var atsLine='';
-    if(_a&&_a.graded>0&&_a.ats_pct!=null){
-      atsLine='<div class="rec-row-sub rec-ats"><span class="rec-rec">ATS '+_a.record+'</span>'+
-        '<span class="rec-roi'+(_a.ats_pct>=52.4?' u-pos':'')+'">'+_a.ats_pct+'% cover</span></div>';
-    }
     h+='<div class="rec-row'+(isTennis?' rec-exp" onclick="toggleTours()"':'"')+'><div class="rec-row-top"><span class="rec-sport">'+caret+lbl+'</span>'+right+'</div>'+
-       '<div class="rec-row-sub"><span class="rec-rec">'+r.wins+'-'+r.losses+' record</span>'+sub+clv+'</div>'+atsLine+'</div>';
+       '<div class="rec-row-sub"><span class="rec-rec">'+r.wins+'-'+r.losses+' record</span>'+sub+clv+'</div></div>';
     if(isTennis){
       const order=["ATP","WTA","CHALLENGER","ITF","EARLIER"];
       const nm={ATP:"ATP",WTA:"WTA",CHALLENGER:"Challenger",ITF:"ITF",EARLIER:"Earlier (untagged)"};
@@ -2784,7 +2739,7 @@ function marketBrowserHTML(){
     }
     h+='</div>';
   });
-  return h+'<div class="mkt-foot">'+(_mktSport==="tennis"?'Moneylines from api-tennis. Tennis has no spread or total, moneyline only.':'Lines from ESPN. Favorite moneylines are live; a \u201C~\u201D marks an estimated underdog price, and spread/total default to \u2212110, tweak the odds on the next screen before saving.')+'</div></div>';
+  return h+'<div class="mkt-foot">'+(_mktSport==="tennis"?'Moneylines from api-tennis. Tennis has no spread or total \u2014 moneyline only.':'Lines from ESPN. Favorite moneylines are live; a \u201C~\u201D marks an estimated underdog price, and spread/total default to \u2212110 \u2014 tweak the odds on the next screen before saving.')+'</div></div>';
 }
 function openBets(){view="bets";if(detailId)closeDetail();
   document.getElementById("home").classList.remove("show");
@@ -2843,7 +2798,7 @@ function betFormHTML(){
     '<div class="bf-row"><input id="bf-book" class="bf-in" placeholder="Book (optional)">'+
       '<input id="bf-closing" class="bf-in" type="number" inputmode="numeric" placeholder="Closing odds (opt)"></div>'+
     '<button class="bet-save" onclick="saveBet()">Save bet</button>'+
-    '<div class="bf-hint">Stake is in units (1u = 1% of your bankroll). Add the closing line later to track CLV, the sharpest measure of a good bet.</div></div>';
+    '<div class="bf-hint">Stake is in units (1u = 1% of your bankroll). Add the closing line later to track CLV \u2014 the sharpest measure of a good bet.</div></div>';
 }
 function toggleBetForm(){_betFormOpen=!_betFormOpen;renderBets();}
 async function saveBet(){
@@ -2971,10 +2926,10 @@ function renderAuth(mode){
   if(mode==="recovery"&&_recoveryShown){
     list.innerHTML='<div class="auth-wrap"><div class="auth-card">'+
       '<div class="auth-h">Save your recovery code</div>'+
-      '<div class="auth-sub">This is the <b>only</b> way to reset your password, there\u2019s no email recovery. Write it down or screenshot it now. We can\u2019t show it again.</div>'+
+      '<div class="auth-sub">This is the <b>only</b> way to reset your password \u2014 there\u2019s no email recovery. Write it down or screenshot it now. We can\u2019t show it again.</div>'+
       '<div class="rec-code">'+_recoveryShown+'</div>'+
       '<button class="auth-btn" onclick="copyRecovery()">Copy code</button>'+
-      '<button class="auth-btn ghost" onclick="_recoveryShown=null;openBets()">I\u2019ve saved it, continue</button>'+
+      '<button class="auth-btn ghost" onclick="_recoveryShown=null;openBets()">I\u2019ve saved it \u2014 continue</button>'+
       '</div></div>';
     return;}
   if(mode==="forgot"){
@@ -2999,7 +2954,7 @@ function renderAuth(mode){
     '<div id="au-err" class="auth-err"></div>'+
     '<button class="auth-btn" onclick="doAuth(\''+(login?"login":"signup")+'\')">'+(login?"Sign in":"Create account")+'</button>'+
     '<div class="auth-switch">'+(login?'New here? <a onclick="renderAuth(\'signup\')">Create an account</a> &middot; <a onclick="renderAuth(\'forgot\')">Forgot password?</a>':'Already have one? <a onclick="renderAuth(\'login\')">Sign in</a>')+'</div>'+
-    '<div class="auth-priv">Passwords are stored only as a salted hash, never in plain text. Bets are private to your account.</div>'+
+    '<div class="auth-priv">Passwords are stored only as a salted hash \u2014 never in plain text. Bets are private to your account.</div>'+
     '</div></div>';}
 let _recoveryShown=null;
 async function doAuth(mode){
@@ -3028,7 +2983,7 @@ async function doForgot(){
     if(d.recovery_code){_recoveryShown=d.recovery_code;renderAuth("recovery");}
     else renderAuth("login");
   }catch(e){if(err)err.textContent=(typeof e==="string"?e:"Could not reset.");}}
-function copyRecovery(){if(!_recoveryShown)return;try{navigator.clipboard.writeText(_recoveryShown);alert("Recovery code copied.");}catch(e){alert("Copy failed, please write it down.");}}
+function copyRecovery(){if(!_recoveryShown)return;try{navigator.clipboard.writeText(_recoveryShown);alert("Recovery code copied.");}catch(e){alert("Copy failed \u2014 please write it down.");}}
 async function doLogout(){
   // Easy to fat-finger on mobile, and signing back in is a real chore on a
   // phone keyboard. Cheap guard.
@@ -3069,7 +3024,7 @@ async function renderCalibration(){
   let d;try{d=await getJSON("/api/calibration?days=365");}catch(e){list.innerHTML='<div class="empty">Couldn\u2019t load calibration.</div>';return;}
   if(!d||!d.n){
     list.innerHTML='<div class="rec-hero"><div class="rec-hero-u">\u2014</div><div class="rec-hero-sub">Gathering data</div></div>'+
-      '<div class="rec-note">This page proves the model is honest, it needs settled picks that were logged with a probability. It starts filling in the day after this deploys and sharpens with every graded pick.'+(d&&d.logged_with_prob?(' So far '+d.logged_with_prob+' picks logged, awaiting results.'):'')+'</div>';
+      '<div class="rec-note">This page proves the model is honest \u2014 it needs settled picks that were logged with a probability. It starts filling in the day after this deploys and sharpens with every graded pick.'+(d&&d.logged_with_prob?(' So far '+d.logged_with_prob+' picks logged, awaiting results.'):'')+'</div>';
     return;}
   const P=44,W=320,H=300,plot=W-P*2,ploth=H-P*2;
   const sx=function(v){return P+(v-50)/50*plot;};
@@ -3123,10 +3078,10 @@ async function renderParlays(){
   try{d=await getJSON("/api/parlays?date="+ymd(selected));}catch(e){d={parlays:[]};}
   try{rec=await getJSON("/api/parlays/record?days=30");}catch(e){rec=null;}
   if(view!=="parlays")return;
-  let html='<div class="picks-head">\u{1F3B2} Auto Parlays</div><div class="picks-sub">Locked for the day, the legs and prices don\u2019t change once posted. Staked by size: 2 legs 1u, 3 legs 0.75u, 4 legs 0.5u. Not betting advice.</div>';
+  let html='<div class="picks-head">\u{1F3B2} Auto Parlays</div><div class="picks-sub">Locked for the day \u2014 the legs and prices don\u2019t change once posted. Staked by size: 2 legs 1u, 3 legs 0.75u, 4 legs 0.5u. Not betting advice.</div>';
   html+=parlayRecordHTML(rec);
   const ps=d.parlays||[];
-  if(!ps.length)html+='<div class="empty">No parlays for this date yet, they build from games with model edges and posted odds, then lock for the day. Check back closer to game time.</div>';
+  if(!ps.length)html+='<div class="empty">No parlays for this date yet \u2014 they build from games with model edges and posted odds, then lock for the day. Check back closer to game time.</div>';
   else html+=ps.map(parlayCardHTML).join("");
   list.innerHTML=html;
 }
@@ -3171,7 +3126,7 @@ function parlayCardHTML(p){
       '<div class="pc-stat"><span>$10 returns</span><b>$'+p.payout_10+'</b></div>'+
       '<div class="pc-stat"><span>Model EV</span><b class="'+evCls+'">'+(ev>0?"+":"")+ev+'%</b></div>'+
     '</div>'+
-    (p.any_model_priced?'<div class="pc-note">Some legs are priced from the model (no posted book line), payout shown is the fair, no-vig estimate.</div>':"")+
+    (p.any_model_priced?'<div class="pc-note">Some legs are priced from the model (no posted book line) \u2014 payout shown is the fair, no-vig estimate.</div>':"")+
     '</div>';
 }
 function renderPicksDatebar(){const bar=document.getElementById("datebar");bar.innerHTML="";
@@ -3198,19 +3153,19 @@ function renderTransparency(){
   const sec=(t,b)=>'<div class="tp-sec"><div class="tp-h">'+t+'</div>'+b+'</div>';
   const li=a=>'<ul class="tp-ul">'+a.map(x=>'<li>'+x+'</li>').join("")+'</ul>';
   let h='<div class="tp-wrap">'+
-    '<div class="tp-intro">LineLogic is a sports <b>intelligence platform</b>, not a picks feed. Every number on the site is computed from real data by a transparent model, here is exactly how it works, what it uses, and what it deliberately refuses to fake.</div>';
-  h+=sec("The model","<p>At its core is an <b>Elo rating system</b>, the same family of math used to rate chess players, extended for each sport. Tennis uses a <b>surface-aware Elo</b> built from years of match history, a player's overall rating blended with how they perform specifically on hard, clay, or grass. Team sports use an Elo seeded from season records with a home-court / home-field adjustment.</p><p>On top of the base rating, the model applies <b>conservative, data-backed adjustments</b> so the proven rating stays dominant; these refine the edge rather than override it.</p>"+
+    '<div class="tp-intro">LineLogic is a sports <b>intelligence platform</b>, not a picks feed. Every number on the site is computed from real data by a transparent model \u2014 here is exactly how it works, what it uses, and what it deliberately refuses to fake.</div>';
+  h+=sec("The model","<p>At its core is an <b>Elo rating system</b>, the same family of math used to rate chess players, extended for each sport. Tennis uses a <b>surface-aware Elo</b> built from years of match history \u2014 a player's overall rating blended with how they perform specifically on hard, clay, or grass. Team sports use an Elo seeded from season records with a home-court / home-field adjustment.</p><p>On top of the base rating, the model applies <b>conservative, data-backed adjustments</b> so the proven rating stays dominant; these refine the edge rather than override it.</p>"+
     li(["Recent form (last ~10 results)","Fatigue and recent match/game load","Head-to-head history","Rest days between games","Injuries and key absences","Pitcher matchups (MLB)","The market's own implied probability"]));
-  h+=sec("What you see on each game","<p>Every game gets a <b>Prediction Report</b>: the predicted winner, win probability, the model's confidence, an expected score, and, when a sportsbook line exists, the model's fair odds versus the market, the resulting edge, and a recommended bet. A bet is only recommended when the model genuinely beats the market price; otherwise it plainly says <i>no play</i>.</p>");
-  h+=sec("Calibration","<p>Raw models tend to be <b>overconfident on favorites</b>. We measure this and correct for it, tennis probabilities, for example, are shrunk toward even so a stated 70% really means 70%. You can audit this yourself on the <b>Model Accuracy</b> page, which plots predicted probability against how often those picks actually win.</p>");
+  h+=sec("What you see on each game","<p>Every game gets a <b>Prediction Report</b>: the predicted winner, win probability, the model's confidence, an expected score, and \u2014 when a sportsbook line exists \u2014 the model's fair odds versus the market, the resulting edge, and a recommended bet. A bet is only recommended when the model genuinely beats the market price; otherwise it plainly says <i>no play</i>.</p>");
+  h+=sec("Calibration","<p>Raw models tend to be <b>overconfident on favorites</b>. We measure this and correct for it \u2014 tennis probabilities, for example, are shrunk toward even so a stated 70% really means 70%. You can audit this yourself on the <b>Model Accuracy</b> page, which plots predicted probability against how often those picks actually win.</p>");
   h+=sec("How performance is tracked","<p>This is where most \u201CAI picks\u201D sites quietly cheat. We don't.</p>"+
-    li(["<b>Every settled pick is logged permanently.</b> Losses are never deleted.","<b>Track Record shows all-time prediction accuracy</b> for every sport, winners and losers alike.","<b>Betting units count only recommended +EV wagers</b>, not \u201Cbet every favorite.\u201D A sport only posts an ROI once it has 25+ graded wagers, so a hot streak can't masquerade as a proven edge.","<b>Closing Line Value (CLV) is tracked.</b> Beating the closing line is the honest leading indicator that a model truly beats the market, it matters more than raw win rate.","Impossible or junk odds are excluded so they can't inflate the numbers."]));
-  h+=sec("Where the data comes from",li(["ESPN public feeds, scores, team stats, injuries, officials, depth charts","api-tennis, live tennis fixtures, scores and odds","Jeff Sackmann's public ATP/WTA datasets, tennis match history for ratings","The Odds API, sportsbook lines for edge and CLV","League data for probable pitchers and lineups"]));
-  h+=sec("How often it updates","<p>Live games refresh continuously. Tennis ratings are rebuilt monthly from updated match data; team Elo ratings are rebuilt each season. Calibration and umpire tendencies build forward from live results, the model gets a little sharper the longer it runs.</p>");
+    li(["<b>Every settled pick is logged permanently.</b> Losses are never deleted.","<b>Track Record shows all-time prediction accuracy</b> for every sport \u2014 winners and losers alike.","<b>Betting units count only recommended +EV wagers</b>, not \u201Cbet every favorite.\u201D A sport only posts an ROI once it has 25+ graded wagers, so a hot streak can't masquerade as a proven edge.","<b>Closing Line Value (CLV) is tracked.</b> Beating the closing line is the honest leading indicator that a model truly beats the market \u2014 it matters more than raw win rate.","Impossible or junk odds are excluded so they can't inflate the numbers."]));
+  h+=sec("Where the data comes from",li(["ESPN public feeds \u2014 scores, team stats, injuries, officials, depth charts","api-tennis \u2014 live tennis fixtures, scores and odds","Jeff Sackmann's public ATP/WTA datasets \u2014 tennis match history for ratings","The Odds API \u2014 sportsbook lines for edge and CLV","League data for probable pitchers and lineups"]));
+  h+=sec("How often it updates","<p>Live games refresh continuously. Tennis ratings are rebuilt monthly from updated match data; team Elo ratings are rebuilt each season. Calibration and umpire tendencies build forward from live results \u2014 the model gets a little sharper the longer it runs.</p>");
   h+=sec("What we refuse to fake","<p>Honesty means saying what we <i>don't</i> have:</p>"+
     li(["<b>No \u201Csharp money\u201D or public betting %.</b> That requires paid data feeds; we won't invent it.","<b>No NBA/NFL referee tendencies.</b> There's no reliable free source, so we don't pretend to have one. (MLB umpire data is real and is used.)","Predictions are analytics, <b>not betting advice</b>, and no model wins every time."]));
   h+=sec("Changelog","<p>Model changes that move a number, newest first. The version in the header is the one running right now.</p>"+changelogHTML());
-  h+='<div class="tp-foot">The whole point: a prediction you can interrogate, an edge measured against the market, and a permanent, honest record of how it\u2019s done, wins and losses.</div></div>';
+  h+='<div class="tp-foot">The whole point: a prediction you can interrogate, an edge measured against the market, and a permanent, honest record of how it\u2019s done \u2014 wins and losses.</div></div>';
   list.innerHTML=h;}
 // Public changelog. Ties directly to MODEL_VERSION in the hero — a version
 // number with nothing behind it is decoration. This makes "actively maintained"
@@ -3218,22 +3173,22 @@ function renderTransparency(){
 // actually move a number; a changelog padded with cosmetics stops being read.
 var CHANGELOG=[
   {v:"3.3", date:"2026-07-24", items:[
-    "Win Totals now layer injuries and strength-of-schedule on top of the rating model, an opponent missing a key player shifts that game\u2019s projection, and each team shows whether its slate is hard or soft.",
-    "New Win Totals page: model-projected season wins for every team, walked game by game with a win probability on each. Book lines coming next, for now it\u2019s the pure projection.",
+    "Win Totals now layer injuries and strength-of-schedule on top of the rating model \u2014 an opponent missing a key player shifts that game\u2019s projection, and each team shows whether its slate is hard or soft.",
+    "New Win Totals page: model-projected season wins for every team, walked game by game with a win probability on each. Book lines coming next \u2014 for now it\u2019s the pure projection.",
   ]},
   {v:"3.2", date:"2026-07-23", items:[
-    "Recommended bets now include a bankroll calculator, enter your bankroll once and every unit recommendation shows the exact dollar stake and to-win. Stays on your device.",
+    "Recommended bets now include a bankroll calculator \u2014 enter your bankroll once and every unit recommendation shows the exact dollar stake and to-win. Stays on your device.",
     "The sports list in the mobile menu is now collapsible, so the phone menu no longer opens to a wall of links.",
-    "The MLB driver breakdown now leads with the projected margin and expands to the full multiplier chain on tap, the proof is all still there, just no longer the first thing you scroll past.",
-    "Every sport now leads its matchup page with one headline projection, margin for team sports, goals for soccer, instead of burying it in a stats table the way only MLB avoided.",
-    "Your starred teams now order the homepage, follow three MLB teams and MLB leads your board. Sport, board sort and prop filter are also remembered between visits.",
+    "The MLB driver breakdown now leads with the projected margin and expands to the full multiplier chain on tap \u2014 the proof is all still there, just no longer the first thing you scroll past.",
+    "Every sport now leads its matchup page with one headline projection \u2014 margin for team sports, goals for soccer \u2014 instead of burying it in a stats table the way only MLB avoided.",
+    "Your starred teams now order the homepage \u2014 follow three MLB teams and MLB leads your board. Sport, board sort and prop filter are also remembered between visits.",
     "Added an operations health endpoint so odds-provider outages, quota exhaustion and unloaded model files surface immediately instead of quietly degrading picks.",
-    "Added a <b>Share</b> button to every pick, copies the model number, the market number and the edge, so what gets shared is a receipt rather than a hype line.",
-    "Tennis units and ROI now count <b>ATP and WTA only</b>. Challenger pricing is thin and moves hard, so including it described a market you can\u2019t reliably bet. Challenger and ITF results are still shown in full, they just no longer move the tracked bankroll.",
+    "Added a <b>Share</b> button to every pick \u2014 copies the model number, the market number and the edge, so what gets shared is a receipt rather than a hype line.",
+    "Tennis units and ROI now count <b>ATP and WTA only</b>. Challenger pricing is thin and moves hard, so including it described a market you can\u2019t reliably bet. Challenger and ITF results are still shown in full \u2014 they just no longer move the tracked bankroll.",
     "Fixed a mismatch where the profit chart and the per-sport rows below it could show different tennis numbers.",
     "Added per-pick units and closing-line value to the results feed, which unlocked the units and CLV charts on this record."]},
   {v:"3.1", date:"2026-07-22", items:[
-    "MLB projections now publish a full <b>driver breakdown</b>, every multiplier the model applied, in order, which multiplies out to the projection itself.",
+    "MLB projections now publish a full <b>driver breakdown</b> \u2014 every multiplier the model applied, in order, which multiplies out to the projection itself.",
     "Fixed the offence factor being reported from season-only run rate while the model actually used a 70/30 blend with recent form (a ~0.3-run gap on hot teams).",
     "Pitching lines now label <b>FIP</b> where FIP is what the model consumed, rather than mislabelling it as ERA.",
     "Added model notes: when confidence drops, the reason is stated (unannounced starter, thin innings sample, tired bullpen)."]},
@@ -3281,7 +3236,7 @@ async function renderWinTotals(){
   var head='<div class="wt-head">'+
     '<div class="wt-title">Season Win Totals</div>'+
     '<div class="wt-sub">Model-projected wins, every game on the schedule walked one by one. '+
-    'Book lines coming soon, for now this is the pure projection.</div>'+
+    'Book lines coming soon \u2014 for now this is the pure projection.</div>'+
     '<div class="wt-chips">'+chips+'</div></div>';
   list.innerHTML=head+'<div id="wt-body">'+sportLoader(_wtSport,"Projecting the season")+'</div>';
   var body=document.getElementById("wt-body");
@@ -3289,7 +3244,7 @@ async function renderWinTotals(){
   if(!body||!body.isConnected)return;
   if(!d||d.error||!d.teams||!d.teams.length){
     body.innerHTML='<div class="empty">No projections available for '+_wtSport.toUpperCase()+
-      ' right now, this fills in once the season schedule is posted.</div>';
+      ' right now \u2014 this fills in once the season schedule is posted.</div>';
     return;
   }
   var teams=d.teams.slice();
@@ -3303,7 +3258,7 @@ async function renderWinTotals(){
     banner='<div style="background:rgba(224,138,60,0.08);border:1px solid rgba(224,138,60,0.28);'+
       'border-radius:12px;padding:12px 14px;margin:0 0 14px;color:#a9b7cc;font-size:13px;line-height:1.45;">'+
       '<b style="color:#e08a3c;">Preseason projection.</b> Based on last season\u2019s ratings and each '+
-      'team\u2019s schedule strength, <b>not a power ranking</b>. A team with an easy schedule projects '+
+      'team\u2019s schedule strength \u2014 <b>not a power ranking</b>. A team with an easy schedule projects '+
       'more wins than a stronger team in a tougher one, and roster/coaching changes aren\u2019t reflected until '+
       '2026 games are played. Listed A\u2013Z; the numbers sharpen as the season starts.</div>';
   }
@@ -3397,7 +3352,7 @@ async function renderSimulator(){
   let chips='<div class="sim-chips">'+chipsDef.map(function(c){return '<button class="sim-chip'+(simSport===c[0]?" on":"")+'" onclick="setSimSport(\''+c[0]+'\')">'+c[1]+'</button>';}).join("")+'</div>';
   let best=null;rows.forEach(function(r){if(r.wagers>=10&&r.roi_pct!=null&&(best==null||r.roi_pct>best.roi_pct))best=r;});
   let h='<div class="sim-wrap">'+
-    '<div class="sim-intro">If you had bet <b>only</b> the picks whose model edge cleared each threshold, here\u2019s how you\u2019d have done. Same real, settled results, just filtered by how far the model beat the closing market price.</div>'+
+    '<div class="sim-intro">If you had bet <b>only</b> the picks whose model edge cleared each threshold, here\u2019s how you\u2019d have done. Same real, settled results \u2014 just filtered by how far the model beat the closing market price.</div>'+
     chips+
     '<div class="sim-pool">Pool: <b>'+d.pool+'</b> graded picks with a recorded model probability'+(simSport?' \u00b7 '+(SPORT_LABEL[simSport]||simSport.toUpperCase()):"")+'</div>';
   if(!d.pool){h+='<div class="empty" style="margin-top:14px">No graded picks with a stored model probability yet for this filter. The pool fills in as picks settle.</div></div>';list.innerHTML=h;return;}
@@ -3415,8 +3370,8 @@ async function renderSimulator(){
       '<td>'+(r.clv_beat_pct!=null?r.clv_beat_pct+"%":"\u2014")+'</td></tr>';
   });
   h+='</tbody></table></div>';
-  if(best)h+='<div class="sim-best">Best backtested filter: <b>\u2265'+best.threshold_pct+'% edge</b>, '+(best.roi_pct>0?"+":"")+best.roi_pct+'% ROI on '+best.wagers+' bets.</div>';
-  h+='<div class="sim-note">A backtest is not a promise. A filter that looks great on a thin sample (under ~25 bets) can regress hard, treat those rows as suggestive, not proven. CLV above 50% is the signal that an edge is real rather than lucky.</div></div>';
+  if(best)h+='<div class="sim-best">Best backtested filter: <b>\u2265'+best.threshold_pct+'% edge</b> \u2014 '+(best.roi_pct>0?"+":"")+best.roi_pct+'% ROI on '+best.wagers+' bets.</div>';
+  h+='<div class="sim-note">A backtest is not a promise. A filter that looks great on a thin sample (under ~25 bets) can regress hard \u2014 treat those rows as suggestive, not proven. CLV above 50% is the signal that an edge is real rather than lucky.</div></div>';
   list.innerHTML=h;}
 function openValueBoard(){view="value";if(detailId)closeDetail();
   document.getElementById("home").classList.remove("show");
@@ -3437,13 +3392,13 @@ async function renderValueBoard(){
   let d;try{d=await getJSON("/api/value?min_edge=2");}catch(e){list.innerHTML='<div class="empty">Couldn\u2019t load the value board.</div>';return;}
   const plays=d.plays||[];
   const proven=d.proven_sports||[];
-  let h='<div class="vb-wrap"><div class="vb-intro">Every game the model rates today, filtered to just the spots where it beats a live market price, ranked by edge. This is the \u201Cwhat\u2019s actually worth betting\u201D view. No edge, no entry.</div>';
+  let h='<div class="vb-wrap"><div class="vb-intro">Every game the model rates today, filtered to just the spots where it beats a live market price \u2014 ranked by edge. This is the \u201Cwhat\u2019s actually worth betting\u201D view. No edge, no entry.</div>';
   if(!proven.length){
     h+='<div class="vb-gate"><div class="vb-gate-h">No sport has proven it beats the market yet</div>'+
-       '<p>The model predicts every game, but it only earns a spot on this board once it has beaten the <b>closing line (CLV \u2265 50%)</b> over a real sample, the honest proof an edge is real and not luck. Right now no sport clears that bar, so we\u2019re not recommending any wagers.</p>'+
-       '<p>That\u2019s deliberate. Steering you toward \u201Cvalue\u201D the model hasn\u2019t earned is how pick services lose people money. We\u2019d rather show you nothing than show you a losing bet dressed up as an edge. Watch the <b>Model Accuracy</b> page, when a sport\u2019s CLV crosses 50%, its plays start appearing here automatically.</p></div></div>';
+       '<p>The model predicts every game, but it only earns a spot on this board once it has beaten the <b>closing line (CLV \u2265 50%)</b> over a real sample \u2014 the honest proof an edge is real and not luck. Right now no sport clears that bar, so we\u2019re not recommending any wagers.</p>'+
+       '<p>That\u2019s deliberate. Steering you toward \u201Cvalue\u201D the model hasn\u2019t earned is how pick services lose people money. We\u2019d rather show you nothing than show you a losing bet dressed up as an edge. Watch the <b>Model Accuracy</b> page \u2014 when a sport\u2019s CLV crosses 50%, its plays start appearing here automatically.</p></div></div>';
     list.innerHTML=h;return;}
-  if(!plays.length){h+='<div class="empty" style="margin-top:8px">No +EV plays right now in '+proven.map(function(s){return (SPORT_LABEL[s]||s.toUpperCase());}).join(", ")+'. The market\u2019s efficient today, forcing bets with no edge is how bankrolls die. Check back as lines post.</div></div>';list.innerHTML=h;return;}
+  if(!plays.length){h+='<div class="empty" style="margin-top:8px">No +EV plays right now in '+proven.map(function(s){return (SPORT_LABEL[s]||s.toUpperCase());}).join(", ")+'. The market\u2019s efficient today \u2014 forcing bets with no edge is how bankrolls die. Check back as lines post.</div></div>';list.innerHTML=h;return;}
   plays.forEach(function(p){
     const lbl=(typeof SPORT_LABEL!=="undefined"&&SPORT_LABEL[p.sport])||p.sport.toUpperCase();
     const wp=Math.round((p.prob||0)*100);
@@ -3458,7 +3413,7 @@ async function renderValueBoard(){
       '<div class="vb-r"><div class="vb-edge">+'+p.edge_pct+'%</div>'+
       '<div class="vb-nums">'+wp+'% model \u00b7 '+fmtOdds(p.market_odds)+' mkt'+(p.stake?' \u00b7 '+p.stake+'u':'')+'</div></div></div>';
   });
-  h+='<div class="vb-note">Edge = model probability minus the market\u2019s implied probability. Stakes are quarter-Kelly suggestions, not instructions, size to your own bankroll and risk.</div></div>';
+  h+='<div class="vb-note">Edge = model probability minus the market\u2019s implied probability. Stakes are quarter-Kelly suggestions, not instructions \u2014 size to your own bankroll and risk.</div></div>';
   list.innerHTML=h;}
 function openHelp(){view="help";if(detailId)closeDetail();
   document.getElementById("home").classList.remove("show");
@@ -3476,19 +3431,19 @@ function renderHelp(){
     ["\u{1F3DF}\uFE0F","The board","Pick a sport from the menu or the home grid. Each game shows the model\u2019s predicted winner, a win-probability bar, and the projected score. A pulsing \u201CLive\u201D tag means it\u2019s in progress."],
     ["\u{1F4CA}","Model \u00b7 Market \u00b7 Edge","Every game shows the model\u2019s fair price, the sportsbook market price, how many books are in, and the edge (model % minus the market\u2019s implied %). A positive edge means the model likes the side more than the market does. \u201CAwaiting market\u201D means no book has posted odds."],
     ["\u2b50","Free Picks &amp; Best Bets","Free Picks are the day\u2019s few highest-confidence plays. Best Bets is the fuller board with deeper AI write-ups. Both show a green check or red x as games finish, plus a rolling 30-day record."],
-    ["\u{1F3AB}","Parlays","One locked set of model parlays per day, a safer two-leg, a value three-leg, and a longshot. Each shows its stake in units and settles win/loss, with a 30-day unit profit/loss and ROI. They lock when first viewed so they don\u2019t drift."],
+    ["\u{1F3AB}","Parlays","One locked set of model parlays per day \u2014 a safer two-leg, a value three-leg, and a longshot. Each shows its stake in units and settles win/loss, with a 30-day unit profit/loss and ROI. They lock when first viewed so they don\u2019t drift."],
     ["\u{1F3AF}","Player props","Open a game and tap Props. Each row shows Projected (model) \u00b7 Line (book) \u00b7 Actual (after the game), a HIT/MISS badge, and the model\u2019s over/under lean. Use the stat buttons to filter (Points, Strikeouts, Rushing Yds\u2026) and tap a row for the player\u2019s last-10 game log."],
-    ["\u26A1","Live scores","Scores and win probabilities refresh automatically every ~10\u201315 seconds while a game is live, no need to reload. Open a live game for the fastest updates."],
+    ["\u26A1","Live scores","Scores and win probabilities refresh automatically every ~10\u201315 seconds while a game is live \u2014 no need to reload. Open a live game for the fastest updates."],
     ["\u{1F50E}","Game detail","Tap any game for its detail page: Prediction (why the model leans a side), Live Stats (box score), Match Events (soccer), and Props."],
     ["\u{1F4C5}","Dates","Use the date bar to look back at finished games and their results, or ahead to upcoming slates."],
     ["\u{1F4C8}","Accuracy","The 30-day model accuracy appears on the home screen and per sport, built from graded picks as games finish."],
-    ["\u26BD","Soccer leagues","On the soccer board, pick a league, or \u26A1 Live Today, from the panel on the left."],
+    ["\u26BD","Soccer leagues","On the soccer board, pick a league \u2014 or \u26A1 Live Today \u2014 from the panel on the left."],
     ["\u{1F4F0}","News &amp; Injuries","Headlines and the injury report for the day\u2019s games, by sport."],
   ];
   const cards=items.map(it=>'<div class="help-card"><div class="help-ic">'+it[0]+'</div><div class="help-body"><div class="help-t">'+it[1]+'</div><div class="help-d">'+it[2]+'</div></div></div>').join("");
   document.getElementById("list").innerHTML=
     '<div class="picks-head">\u2753 How to use Line Logic</div>'+
-    '<div class="picks-sub">A quick tour of every feature. Everything here is a model estimate for informational purposes, not betting advice.</div>'+
+    '<div class="picks-sub">A quick tour of every feature. Everything here is a model estimate for informational purposes \u2014 not betting advice.</div>'+
     '<div class="help-wrap">'+cards+'</div>'+
     '<div class="home-foot">Tip: tap any game to dig into the prediction, props, and live stats. Use the date bar to review how past picks did.</div>';}
 let newsSport="nba";
@@ -3519,7 +3474,7 @@ async function renderNews(){
   let body="";
   // Injuries first (most actionable)
   if(d.injuries&&d.injuries.length){
-    body+='<div class="news-sec">\u{1F3E5} Injury report, today\u2019s games</div>';
+    body+='<div class="news-sec">\u{1F3E5} Injury report \u2014 today\u2019s games</div>';
     d.injuries.forEach(t=>{
       body+='<div class="inj-team"><div class="inj-team-name">'+t.team+'</div>';
       t.players.forEach(p=>{
@@ -3708,7 +3663,7 @@ async function renderLadder(){
   const st=(d&&d.state)||{},rec=(st.record)||{};
   let html='<div class="ladder-page">';
   html+='<h2 class="lp-title">\ud83e\udea2 Line Logic Ladder Challenge</h2>';
-  html+='<p class="lp-sub">One pick a day, the best model edge on a market line between \u2212110 and +110. Win rolls the bankroll forward; a loss resets to $10. Its own record.</p>';
+  html+='<p class="lp-sub">One pick a day \u2014 the best model edge on a market line between \u2212110 and +110. Win rolls the bankroll forward; a loss resets to $10. Its own record.</p>';
   html+='<div class="lp-rec">'+
     '<div class="lp-stat"><b>'+(rec.wins||0)+'\u2013'+(rec.losses||0)+'</b><span>Record</span></div>'+
     '<div class="lp-stat"><b>'+(rec.win_pct!=null?rec.win_pct+'%':'\u2014')+'</b><span>Win %</span></div>'+
@@ -3723,7 +3678,7 @@ async function renderLadder(){
       (g.result?'<div class="lh-res '+g.result+'">'+(g.result==="win"?"\u2713 won":g.result==="loss"?"\u2717 lost":g.result)+'</div>':'')+
       '</div>';
   }else{
-    html+='<div class="lp-today lp-hold">No qualifying pick yet today, the run holds at rung '+(st.current_rung||1)+'. We never force a leg. Check back as lines post.</div>';
+    html+='<div class="lp-today lp-hold">No qualifying pick yet today \u2014 the run holds at rung '+(st.current_rung||1)+'. We never force a leg. Check back as lines post.</div>';
     var dg=d&&d.debug;
     if(dg){
       html+='<div class="lp-diag"><b>Why:</b> '+(dg.src||0)+' picks scanned \u00b7 '+(dg.with_market||0)+' had a market line \u00b7 '+(dg.in_band||0)+' in band ('+((dg.band&&dg.band[0])||-110)+' to +'+((dg.band&&dg.band[1])||110)+') \u00b7 '+(dg.qualifying||0)+' cleared '+(dg.min_edge||3)+'% edge';
@@ -3756,7 +3711,7 @@ async function loadLadderCard(){
   if(!d||!d.leg){
     host.innerHTML='<div class="ladder-home" onclick="openLadder()"><div class="lh-top"><span class="lh-badge">\ud83e\udea2 Ladder Challenge</span>'+
       '<span class="lh-rung">Rung '+(st.current_rung||1)+'/10</span></div>'+
-      '<div class="lh-skip">No qualifying play yet today, the run holds. We never force a leg. Resets at midnight; check back as lines post.</div></div>';
+      '<div class="lh-skip">No qualifying play yet today \u2014 the run holds. We never force a leg. Resets at midnight; check back as lines post.</div></div>';
     return;
   }
   const g=d.leg,o=(g.odds>0?"+":"")+g.odds;
@@ -3794,25 +3749,39 @@ function renderHome(){
   document.getElementById("home").innerHTML=
     '<img class="home-logo" src="logo.PNG" alt="Line Logic Sports" onerror="this.style.display=\'none\'">'+
     heroProofHTML(ov)+
-    // Primary actions, right under the hero. Two clear paths in, no clutter.
-    '<div class="home-actions">'+
-      '<button class="ha ha-primary" onclick="openPicks(\'best\')">'+
-        '<span class="ha-t">Today\u2019s board</span>'+
-        '<span class="ha-s">Every game, every edge</span></button>'+
-      '<button class="ha" onclick="openPicks(\'free\')">'+
-        '<span class="ha-t">Best bet</span>'+
-        '<span class="ha-s">Highest confidence play</span></button>'+
+    // Three gateways, right under the hero. A first-time visitor shouldn't have
+    // to parse a 15-sport directory to find what they came for — segment them
+    // by intent in one tap.
+    '<div class="gateways">'+
+      '<button class="gw gw-1" onclick="openPicks(\'free\')">'+
+        '<span class="gw-ic">\uD83C\uDFAF</span>'+
+        '<span class="gw-t">Just give me today\u2019s best bet</span>'+
+        '<span class="gw-s">One play, highest confidence</span></button>'+
+      '<button class="gw gw-2" onclick="openPicks(\'best\')">'+
+        '<span class="gw-ic">\uD83D\uDCCA</span>'+
+        '<span class="gw-t">Show me the full model board</span>'+
+        '<span class="gw-s">Every edge, every sport</span></button>'+
+      '<button class="gw gw-3" onclick="gotoDiscord()">'+
+        '<span class="gw-ic">\uD83D\uDCAC</span>'+
+        '<span class="gw-t">Join the community</span>'+
+        '<span class="gw-s">Live alerts in Discord</span></button>'+
     '</div>'+
+    '<div id="yesterday"></div>'+
     '<div id="ladder-card"></div>'+
-    // Pick your sport — the grid, with live 30-day accuracy on each.
-    '<div class="home-seclab">Pick a sport</div>'+
+    '<div id="hotpick"></div>'+
+    discordCtaHTML()+
     '<div class="sport-grid">'+tileHTML+'</div>'+
-    // Quieter secondary links, one compact row.
-    '<div class="home-links">'+
-      '<a class="hl" onclick="openNews()">News &amp; injuries</a>'+
-      '<a class="hl" onclick="if(typeof openStocks===\'function\')openStocks()">Markets</a>'+
-      '<a class="hl" onclick="openHelp()">How to use</a>'+
+    '<div class="home-picks">'+
+      '<div class="home-pick-btn free" onclick="openPicks(\'free\')"><div class="nm">\u2b50 Free Picks</div><div class="sub">Today\u2019s highest-confidence plays, across every sport.</div></div>'+
+      '<div class="home-pick-btn best" onclick="openPicks(\'best\')"><div class="nm">\u{1f451} Best Bets</div><div class="sub">The full model board, filterable and in-depth.</div></div>'+
     '</div>'+
+    '<div class="home-picks" style="margin-top:13px">'+
+      '<div class="home-pick-btn" style="background:var(--panel-2)" onclick="openNews()"><div class="nm">\u{1F4F0} News &amp; Injuries</div><div class="sub">Headlines and the injury report for today\u2019s games.</div></div>'+
+    '</div>'+
+    '<div class="home-picks" style="margin-top:13px">'+
+      '<div class="home-pick-btn" style="grid-column:1/-1;background:var(--panel-2)" onclick="if(typeof openStocks===\'function\')openStocks()"><div class="nm">\u{1F4C8} Markets</div><div class="sub">Stocks, ETFs &amp; crypto \u2014 live charts, search any ticker, and the model\u2019s paper-traded signals. Educational only.</div></div>'+
+    '</div>'+
+    '<div class="home-picks" style="margin-top:13px"><div class="home-pick-btn" style="grid-column:1/-1;background:var(--panel-2)" onclick="openHelp()"><div class="nm">\u2753 How to use Line Logic</div><div class="sub">New here? A quick tour of every feature and what the numbers mean.</div></div></div>'+
     installHintHTML()+
     '<div class="home-foot">Predictions are model estimates for informational purposes only. Not betting advice. Lines shown are the model\u2019s own fair numbers, not sportsbook odds.</div>';
   loadHotPick();loadYesterday();}
@@ -3821,23 +3790,27 @@ function renderHome(){
 // all-time), laid out like a stamped, un-editable betting slip. Falls back to
 // a clean intro if accuracy data hasn't loaded yet.
 function heroProofHTML(ov){
-  // HERO C — compact stat strip. No receipt/ticket styling. Same live data as
-  // before (MLB all-time units/ROI, all-sports units with tennis normalization),
-  // just presented as: record + a gold 30-day pill, then an even 3-cell strip.
+  // Flagship framing: lead with the model's STRONGEST proof — MLB's all-time
+  // net units on graded +EV wagers — not the trailing 30-day window (which can
+  // be a rough stretch). Secondary lines: MLB all-time record, MLB all-time ROI,
+  // and the all-sports net units so the headline sport is backed by the whole
+  // book. Tennis is never shown as its own line here.
+  //
+  // Units come from the SAME source the Track Record page uses
+  // (/api/edges/wagers -> _wagData): a sport's units only count once it has
+  // matured (>=25 graded wagers), so these are real plays, not "bet every fav".
   var mlbA=(_accData&&_accData.by_sport&&_accData.by_sport.mlb)||null;
   var ws=(_wagData&&_wagData.by_sport)||null;
   var mlbW=(ws&&ws.mlb)||null;
-  var ovAcc=(ov&&ov.accuracy!=null)?Math.round(ov.accuracy):null;
+  var head='<div class="rcpt-brand"><h2>Line Logic<span class="dot">.</span></h2>'+
+    '<div class="rcpt-tag">A public model that grades every pick across every sport. Wins and losses both stay on the board.</div></div>';
   var mU=(mlbW&&mlbW.mature&&mlbW.units!=null)?mlbW.units:null;
   var mRoi=(mlbW&&mlbW.mature&&mlbW.roi_pct!=null)?mlbW.roi_pct:null;
   var mAw=(mlbA&&mlbA.alltime_wins)||0, mAl=(mlbA&&mlbA.alltime_losses)||0;
-  // 30-day featured win% + record (the pill + big number). Prefer MLB's window;
-  // fall back to overall so the hero is never empty.
-  var w30=(mlbA&&mlbA.wins_30d!=null)?mlbA.wins_30d:(mlbA&&mlbA.correct);
-  var l30=(mlbA&&mlbA.losses_30d!=null)?mlbA.losses_30d:
-          ((mlbA&&mlbA.picks!=null)?(mlbA.picks-(mlbA.correct||0)):null);
-  var pct30=(mlbA&&mlbA.accuracy!=null)?Math.round(mlbA.accuracy):ovAcc;
-  // All-sports net units (matured sports only, tennis via ITF-excluded rollup).
+  // All-sports net units: sum every matured sport's units, exactly like the
+  // Track Record hero's total — INCLUDING the tennis normalization (tennis units
+  // come from the ITF-excluded tour rollup, not the raw wager number, so the two
+  // pages can never disagree).
   var oU=null;
   if(ws){
     var t=0,any=false;
@@ -3845,35 +3818,54 @@ function heroProofHTML(ov){
     for(var k in ws){
       var wv=ws[k];
       if(k==="tennis"){
-        if(teRoll&&teRoll.units!=null&&(teRoll.priced||0)>=((_wagData&&_wagData.min_sample)||25)){t+=teRoll.units;any=true;}
-        else if(wv&&wv.mature&&wv.units!=null){t+=wv.units;any=true;}
+        // authoritative tennis figure = tour rollup excl. ITF (matches Track Record)
+        if(teRoll&&teRoll.units!=null&&(teRoll.priced||0)>=((_wagData&&_wagData.min_sample)||25)){
+          t+=teRoll.units;any=true;
+        } else if(wv&&wv.mature&&wv.units!=null){
+          t+=wv.units;any=true;
+        }
         continue;
       }
       if(wv&&wv.mature&&wv.units!=null){t+=wv.units;any=true;}
     }
     if(any)oU=Math.round(t*100)/100;
   }
-  // ATS record for the strip's third cell.
-  var ats=null;
-  if(_atsData&&_atsData.overall&&_atsData.overall.ats_pct!=null&&_atsData.overall.graded>0){
-    ats=_atsData.overall.ats_pct+'%';
+  // If the wager units haven't loaded yet, show the clean intro rather than a
+  // blank slip.
+  if(mU==null){
+    if(!mlbA||mlbA.accuracy==null){
+      return '<div class="rcpt">'+head+
+        '<div class="rcpt-sub">A public, tracked MLB betting model \u2014 plus NBA, NFL, NHL, tennis, soccer &amp; college. Loading the record\u2026</div></div>';
+    }
   }
-  function u2(x){return (x>=0?'+':'')+(Math.round(x*100)/100)+'u';}
-  var recTxt=(w30!=null&&l30!=null)?(w30+'\u2013'+l30):((mAw+mAl)?(mAw+'\u2013'+mAl):'\u2014');
-  var pill=(pct30!=null)?('<span class="hc-pill">'+pct30+'% \u00b7 30d</span>'):'';
-  // Build the 3-cell strip from whatever's available.
-  var cells='';
-  if(mU!=null) cells+='<div class="hc-si"><div class="kk">MLB net units</div><div class="vv pos">'+u2(mU)+'</div></div>';
-  if(oU!=null) cells+='<div class="hc-si"><div class="kk">All sports</div><div class="vv gold">'+u2(oU)+'</div></div>';
-  else if(mRoi!=null) cells+='<div class="hc-si"><div class="kk">MLB ROI</div><div class="vv gold">'+(mRoi>=0?'+':'')+mRoi+'%</div></div>';
-  if(ats) cells+='<div class="hc-si"><div class="kk">ATS</div><div class="vv">'+ats+'</div></div>';
-  else if(mAw+mAl) cells+='<div class="hc-si"><div class="kk">All-time</div><div class="vv">'+mAw+'\u2013'+mAl+'</div></div>';
-  return '<section class="hero-c">'+
-    '<div class="hc-claim">Every pick graded, every sport. Wins and losses both stay on the board.</div>'+
-    '<div class="hc-row"><div class="hc-big">'+recTxt+'</div>'+pill+'</div>'+
-    (cells?'<div class="hc-strip">'+cells+'</div>':'')+
-    '<button class="hc-log" onclick="openRecord()">Read the full graded log, every loss included \u2192</button>'+
-    '</section>';}
+  function leader(k,v,cls){return '<div class="rcpt-line"><span class="rcpt-k">'+k+
+    '</span><span class="rcpt-dots"></span><span class="rcpt-v'+(cls?' '+cls:'')+'">'+v+'</span></div>';}
+  function u2(x){return (x>=0?'+':'')+ (Math.round(x*100)/100) +'u';}
+  var lines="";
+  // BIG headline: MLB all-time net units.
+  if(mU!=null) lines+=leader("MLB NET UNITS \u00b7 ALL-TIME", u2(mU), "big "+(mU>=0?'pos':'neg'));
+  // MLB all-time record.
+  if(mAw+mAl) lines+=leader("MLB RECORD \u00b7 ALL-TIME", mAw+'\u2013'+mAl);
+  // MLB all-time ROI.
+  if(mRoi!=null) lines+=leader("MLB ROI \u00b7 ALL-TIME", (mRoi>=0?'+':'')+mRoi+'%', mRoi>=0?'pos':'neg');
+  // All-sports net units — the whole book behind the flagship number.
+  if(oU!=null) lines+=leader("ALL SPORTS \u00b7 NET UNITS", u2(oU), oU>=0?'pos':'neg');
+  // Absolute fallback: if wager units never loaded, at least show the all-time
+  // MLB record so the hero is never empty.
+  if(!lines && (mAw+mAl)) lines=leader("MLB RECORD \u00b7 ALL-TIME", mAw+'\u2013'+mAl, "big");
+  return '<div class="rcpt">'+head+
+    '<div class="rcpt-body">'+lines+'</div>'+
+    '<div class="rcpt-perf"></div>'+
+    '<div class="rcpt-foot"><span>graded &amp; timestamped \u2014 nothing deleted</span>'+
+      '<span class="rcpt-stamp">TRACKED</span></div>'+
+    '<div class="rcpt-meta">Model '+MODEL_VERSION+
+      (freshnessText()?' \u00b7 '+freshnessText():'')+'</div>'+
+    // The transparency claim is the whole moat — make it PROVABLE, not just
+    // stated. One tap opens the full graded log, losses included.
+    '<button class="rcpt-log" onclick="openRecord()">'+
+      '\uD83E\uDDFE Full public transparency log \u2014 every loss included \u2192</button>'+
+    '<button class="rcpt-cta" onclick="openPicks(\'best\')">Unlock the full board \u2192</button>'+
+    '</div>';}
 // ==== Discord invite — REPLACE this with your real server invite link ====
 var DISCORD_INVITE="https://discord.gg/WmpF9GdWGE";
 // ===== "How did yesterday go?" =====
@@ -3925,13 +3917,13 @@ function discordCtaHTML(){
   return '<a class="dc-cta" href="'+DISCORD_INVITE+'" target="_blank" rel="noopener">'+
     '<div class="dc-ic">\u{1F916}</div>'+
     '<div class="dc-body"><div class="dc-h">Want live edge alerts in Discord?</div>'+
-    '<div class="dc-sub">Instant notifications, custom LineBot commands, and whale alerts, straight to your phone.</div></div>'+
+    '<div class="dc-sub">Instant notifications, custom LineBot commands, and whale alerts \u2014 straight to your phone.</div></div>'+
     '<div class="dc-go">Join \u2192</div></a>';}
 function isStandalone(){return (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;}
 function installHintHTML(){
   if(isStandalone())return "";
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.MSStream;
-  if(ios)return '<div class="install-hint">\u{1F4F2} <b>Install Line Logic</b>, tap the <b>Share</b> button below, then <b>Add to Home Screen</b> to run it full-screen like an app.</div>';
+  if(ios)return '<div class="install-hint">\u{1F4F2} <b>Install Line Logic</b> \u2014 tap the <b>Share</b> button below, then <b>Add to Home Screen</b> to run it full-screen like an app.</div>';
   if(window._deferredInstall)return '<button class="install-btn" onclick="installApp()">\u2B07\uFE0F Install the Line Logic app</button>';
   return "";}
 async function installApp(){
@@ -3983,7 +3975,7 @@ async function loadHotPick(){
     resBadge+
     '<div class="hp-stats"><span class="hp-edge">+'+p.edge_pct+'% edge</span>'+
       '<span class="hp-stat">'+Math.round(p.prob*100)+'% win</span>'+
-      (mktStr?'<span class="hp-stat" title="Market price, what you\u2019d actually bet at">Mkt '+mktStr+'</span>':"")+
+      (mktStr?'<span class="hp-stat" title="Market price \u2014 what you\u2019d actually bet at">Mkt '+mktStr+'</span>':"")+
       (modelStr?'<span class="hp-stat" title="Model fair line (from the model\u2019s win %)">Model '+modelStr+'</span>':"")+k+'</div>'+
     (p.result?"":('<div class="hp-cta">Biggest gap between our model and the market today \u2192</div>'))+
     lineMoveHTML(p)+
@@ -4017,8 +4009,8 @@ async function renderPicks(){
   if(view==="free"){
     let d;try{d=await getJSON("/api/picks/free?date="+ymd(selected));}catch(e){d={picks:[]};}
     if(view!=="free")return;
-    let html='<div class="picks-head">\u2b50 Free Picks'+head30+'</div><div class="picks-sub">The four best plays of the day, the model\u2019s highest-confidence picks across every sport. Results shown as games finish.</div>'+recBanner;
-    if(!d.picks||!d.picks.length)html+='<div class="empty">No games to grade today, check back when more games are posted.</div>';
+    let html='<div class="picks-head">\u2b50 Free Picks'+head30+'</div><div class="picks-sub">The four best plays of the day \u2014 the model\u2019s highest-confidence picks across every sport. Results shown as games finish.</div>'+recBanner;
+    if(!d.picks||!d.picks.length)html+='<div class="empty">No games to grade today \u2014 check back when more games are posted.</div>';
     else html+=d.picks.map(p=>pickCardHTML(p,true)).join("");
     list.innerHTML=html;bindPickCards();celebrateWins(d.picks);
   }else{
@@ -4126,7 +4118,7 @@ function _confBits(modelProb,edge){
 }
 // Per-pick freshness. The global hero shows when data was last pulled; this
 // surfaces the same signal on an individual prediction so a stale line is
-// visible where it matters, right next to the number you might bet.
+// visible where it matters \u2014 right next to the number you might bet.
 function freshStampHTML(){
   var t=(typeof freshnessText==="function")?freshnessText():"";
   if(!t)return "";
@@ -4215,10 +4207,10 @@ function predictionReportHTML(g,sp){
       cells+='<div class="pr-cell"><div class="pr-k">Edge vs Market</div><div class="pr-v '+ec+'">'+(edge>=0?"+":"")+edge+'% <span class="pr-sub">(fair '+fmtOdds(fair)+' vs '+fmtOdds(mkt)+')</span></div></div>';
       if(edge>=3){const k=kellyUnits(modelProb,mkt);
         rec='<div class="pr-rec on"><span class="pr-rec-lab">\u2705 Recommended Bet</span><span class="pr-rec-v">'+lastName(wname)+" ML "+fmtOdds(mkt)+(k?' \u00b7 '+k+'u':"")+'</span></div>'+bankrollCalcHTML(k,mkt);
-      }else{rec='<div class="pr-rec"><span class="pr-rec-lab">No play</span><span class="pr-rec-v">model agrees with the market, no edge here</span></div>';}
+      }else{rec='<div class="pr-rec"><span class="pr-rec-lab">No play</span><span class="pr-rec-v">model agrees with the market \u2014 no edge here</span></div>';}
     }else{
-      cells+='<div class="pr-cell"><div class="pr-k">Edge vs Market</div><div class="pr-v">off-market <span class="pr-sub">(model '+Math.round(modelProb*100)+'% vs market '+Math.round(mImp*100)+'%, line too thin to trust)</span></div></div>';
-      rec='<div class="pr-rec"><span class="pr-rec-lab">No play</span><span class="pr-rec-v">model and market disagree too sharply, no confident edge</span></div>';
+      cells+='<div class="pr-cell"><div class="pr-k">Edge vs Market</div><div class="pr-v">off-market <span class="pr-sub">(model '+Math.round(modelProb*100)+'% vs market '+Math.round(mImp*100)+'% \u2014 line too thin to trust)</span></div></div>';
+      rec='<div class="pr-rec"><span class="pr-rec-lab">No play</span><span class="pr-rec-v">model and market disagree too sharply \u2014 no confident edge</span></div>';
     }
   }else{
     cells+='<div class="pr-cell"><div class="pr-k">Fair Odds</div><div class="pr-v">'+fmtOdds(fair)+' <span class="pr-sub">(awaiting market)</span></div></div>';
@@ -4244,7 +4236,7 @@ function predictionReportHTML(g,sp){
     var gapCls=gapAbs>=3?"pos":"";
     cells+='<div class="pr-cell"><div class="pr-k">Model vs Market Spread</div>'+
       '<div class="pr-v">Model '+modelLine+' <span class="pr-sub">\u00b7 Market '+mktLine+
-      (gapAbs>=0.5?', model likes '+gapTeam+' by '+gapAbs+' more':', in line with market')+'</span></div></div>';
+      (gapAbs>=0.5?' \u2014 model likes '+gapTeam+' by '+gapAbs+' more':' \u2014 in line with market')+'</span></div></div>';
   }
   if(g.exp_margin!=null&&g.avg_total>0){var _m=Math.abs(g.exp_margin),_t=g.avg_total,_hi=Math.round((_t+_m)/2),_lo=Math.round((_t-_m)/2),_hh=(g.prob_home>=0.5),_hs=_hh?_hi:_lo,_as=_hh?_lo:_hi,
       _ea=(g.home&&(g.home.abbr||g.home.short||g.home.name))||"Home",_eb=(g.away&&(g.away.abbr||g.away.short||g.away.name))||"Away";
@@ -4294,10 +4286,10 @@ function tennisReportHTML(m){
       cells='<div class="pr-cell"><div class="pr-k">Edge vs Market</div><div class="pr-v '+ec+'">'+(edge>=0?"+":"")+edge+'% <span class="pr-sub">(fair '+fmtOdds(fair)+' vs '+fmtOdds(mkt)+')</span></div></div>';
       if(edge>=3){const k=kellyUnits(modelProb,mkt);
         rec='<div class="pr-rec on"><span class="pr-rec-lab">\u2705 Recommended Bet</span><span class="pr-rec-v">'+lastName(wname)+" ML "+fmtOdds(mkt)+(k?' \u00b7 '+k+'u':"")+'</span></div>'+bankrollCalcHTML(k,mkt);
-      }else{rec='<div class="pr-rec"><span class="pr-rec-lab">No play</span><span class="pr-rec-v">model agrees with the market, no edge here</span></div>';}
+      }else{rec='<div class="pr-rec"><span class="pr-rec-lab">No play</span><span class="pr-rec-v">model agrees with the market \u2014 no edge here</span></div>';}
     }else{
-      cells='<div class="pr-cell"><div class="pr-k">Edge vs Market</div><div class="pr-v">off-market <span class="pr-sub">(model '+wpct+'% vs market '+Math.round(mImp*100)+'%, line too thin to trust)</span></div></div>';
-      rec='<div class="pr-rec"><span class="pr-rec-lab">No play</span><span class="pr-rec-v">model and market disagree too sharply, no confident edge</span></div>';
+      cells='<div class="pr-cell"><div class="pr-k">Edge vs Market</div><div class="pr-v">off-market <span class="pr-sub">(model '+wpct+'% vs market '+Math.round(mImp*100)+'% \u2014 line too thin to trust)</span></div></div>';
+      rec='<div class="pr-rec"><span class="pr-rec-lab">No play</span><span class="pr-rec-v">model and market disagree too sharply \u2014 no confident edge</span></div>';
     }
   }else{
     cells='<div class="pr-cell"><div class="pr-k">Fair Odds</div><div class="pr-v">'+fmtOdds(fair)+' <span class="pr-sub">(awaiting market)</span></div></div>';
@@ -4362,7 +4354,7 @@ function edgeTier(e){
   if(e<2)   return {k:"slim", t:"Slim edge"};
   if(e<5)   return {k:"solid",t:"Solid edge"};
   if(e<10)  return {k:"strong",t:"Strong edge"};
-  return    {k:"outlier",t:"Outlier, verify the line"};
+  return    {k:"outlier",t:"Outlier \u2014 verify the line"};
 }
 function edgeTierHTML(e){
   var t=edgeTier(e); if(!t)return "";
@@ -4398,7 +4390,7 @@ function pickCardHTML(p,isFree){const pct=Math.round(p.prob*100);const slabel=(S
     oddsLine+
     '<div class="pick-reason">'+(p.reason||"")+'</div>'+lineMoveHTML(p)+premiumBlock+
     '<div class="pick-acts">'+
-      '<button class="pick-track" data-sport="'+p.sport+'" data-odds="'+(p.market_odds!=null?p.market_odds:"")+'" data-desc="'+_attr(p.pick+(p.match?", "+p.match:""))+'" onclick="trackPickFromEl(event,this)">+ Track this pick</button>'+
+      '<button class="pick-track" data-sport="'+p.sport+'" data-odds="'+(p.market_odds!=null?p.market_odds:"")+'" data-desc="'+_attr(p.pick+(p.match?" \u2014 "+p.match:""))+'" onclick="trackPickFromEl(event,this)">+ Track this pick</button>'+
       '<button class="pick-share" title="Copy a shareable card" data-share="'+_attrNL(sharePayload(p))+'" onclick="sharePick(event,this)">\u2934 Share</button>'+
     '</div></div>';}
 // ===== Share a pick =====
@@ -4410,14 +4402,14 @@ function sharePayload(p){
   var L=[];
   var pct=Math.round((p.prob||0)*100);
   var sp=((typeof SPORT_LABEL!=="undefined"&&SPORT_LABEL[p.sport])||p.sport||"").toUpperCase();
-  L.push("\uD83D\uDCCA "+(sp?sp+", ":"")+(p.pick||""));
+  L.push("\uD83D\uDCCA "+(sp?sp+" \u2014 ":"")+(p.pick||""));
   if(p.match)L.push(p.match);
   var bits=["Model "+pct+"%"];
   if(p.market_odds!=null)bits.push("Market "+fmtOdds(p.market_odds));
   if(p.edge_pct!=null)bits.push((p.edge_pct>=0?"+":"")+p.edge_pct+"% edge");
   L.push(bits.join(" \u00b7 "));
   L.push("");
-  L.push("Every pick graded, win or lose, nothing deleted.");
+  L.push("Every pick graded, win or lose \u2014 nothing deleted.");
   L.push("thelinelogic.com");
   return L.join("\n");
 }
@@ -4685,7 +4677,7 @@ setInterval(loadAccuracy,300000);
           h += '<div class="mv-note">Model line: ' + shortNm(home) + " " +
             fmtLine(sd.line_home, true) + " (proj margin " + fmtLine(sd.exp_margin, true) + "). " +
             (sd.at_market_line ? "Model prices shown at the market line." :
-              "No market spread, model\u2019s own line priced.") + '</div>';
+              "No market spread \u2014 model\u2019s own line priced.") + '</div>';
         }
       }
     } else {  // total
@@ -4702,10 +4694,10 @@ setInterval(loadAccuracy,300000);
           tdl ? fmtOddsMV(tdl.fair_under) : "\u2014");
         if (tdl) {
           h += '<div class="mv-note">Model projects ' + tdl.proj +
-            (tdl.at_market_line ? ", model prices at the market line." :
-              ", model\u2019s own line " + tdl.line + " priced.") + '</div>';
+            (tdl.at_market_line ? " \u2014 model prices at the market line." :
+              " \u2014 model\u2019s own line " + tdl.line + " priced.") + '</div>';
         } else if (tm.line != null) {
-          h += '<div class="mv-note">Market total only, the model doesn\u2019t project a total for this sport.</div>';
+          h += '<div class="mv-note">Market total only \u2014 the model doesn\u2019t project a total for this sport.</div>';
         }
       }
     }
@@ -4751,26 +4743,8 @@ setInterval(loadAccuracy,300000);
 
 
 
-// QoL: a back-to-top button that fades in once you've scrolled down a board.
-(function(){
-  try{
-    var btn=document.createElement("button");
-    btn.id="to-top-btn";btn.setAttribute("aria-label","Back to top");
-    btn.innerHTML="\u2191";
-    btn.onclick=function(){window.scrollTo({top:0,behavior:"smooth"});};
-    document.body.appendChild(btn);
-    var ticking=false;
-    window.addEventListener("scroll",function(){
-      if(ticking)return;ticking=true;
-      requestAnimationFrame(function(){
-        btn.classList.toggle("show",(window.scrollY||0)>600);
-        ticking=false;
-      });
-    },{passive:true});
-  }catch(e){}
-})();
 </script>
-<script src="/ll-enhance.js?v=45"></script>
+<script src="/ll-enhance.js?v=34"></script>
 <script src="/ll-stocks.js?v=1"></script>
 </body>
 </html>

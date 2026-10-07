@@ -27,25 +27,25 @@ router = APIRouter()
 # chart on the record page disagreed with the rows underneath it.
 TENNIS_UNIT_TOURS = ("ATP", "WTA")
 
-# Realistic-staking cap: at flat 1-unit stakes, a single huge-underdog win pays
-# out its full price (a +2500 dog = +25u on one bet), which lets one lucky
-# longshot masquerade as a repeatable edge and inflates units/ROI into
-# not-believable territory (e.g. CFB showing +121u / 552% on 22 bets). We cap the
-# profit any single winning bet can contribute so the headline numbers stay
-# credible. Env-overridable. Applied consistently to /api/accuracy and
-# /api/edges/wagers so both tell the same story.
+# Single-bet profit cap, in units. A flat 1u stake on a +2500 longshot that hits
+# would otherwise book +25u on one game, which swings the tracked bankroll by
+# tens of units on a single lucky result and makes the headline number lurch
+# overnight. Capping the WIN side at +10u keeps the figure honest and stable;
+# the loss side is always -1u. One definition, imported by every unit calc in
+# this file so the headline, the charts, and the wagers board can never disagree.
+# Override with env UNIT_WIN_CAP if you ever want a different ceiling.
 import os as _os
 _WIN_CAP = float(_os.environ.get("UNIT_WIN_CAP", "10.0"))
 
 
 def _capped_profit(american, won):
-    """Profit (in units) for a 1u flat stake at `american` odds, with wins capped
-    at _WIN_CAP so a single longshot can't dominate the totals. Loss = -1u."""
+    """Units won/lost on one settled, flat-1u pick. Win profit is capped at
+    _WIN_CAP; a loss is always -1u. `american` must already be a valid American
+    line (|odds| >= 100)."""
     if not won:
         return -1.0
     prof = (american / 100.0) if american > 0 else (100.0 / abs(american))
     return min(prof, _WIN_CAP)
-
 
 
 def _is_push(r):
@@ -115,7 +115,7 @@ def accuracy(days: int = 30):
                     s["today_correct"] += 1
                     tot_tc += 1
             if r.taken_odds is not None and abs(r.taken_odds) >= 100:  # valid line -> ROI
-                pl = _capped_profit(float(r.taken_odds), bool(r.correct))
+                pl = _capped_profit(r.taken_odds, r.correct)   # +10u win cap, -1u loss
                 # Headline Tennis units/ROI count ONLY the three main tours
                 # (ATP, WTA, Challenger). ITF/futures and untagged historical picks
                 # ("EARLIER") are excluded from the money line — they still appear
@@ -127,27 +127,60 @@ def accuracy(days: int = 30):
                     s["units"] += pl
                     tot_priced += 1
                     tot_units += pl
-        # all-time record (no date filter), per sport and overall
+        # all-time record (no date filter), per sport and overall. We also carry
+        # all-time UNITS/ROI here so the headline money line matches the all-time
+        # W-L it sits next to. The 30-day figures above drop early-season longshot
+        # wins out of the window while the record keeps them, which is exactly what
+        # made the CFB units look like they collapsed overnight. Same cap, same
+        # tennis-tour rule, same valid-line gate as the 30-day block.
+        at_units = 0.0
+        at_priced = 0
+        at_clv_beat = at_clv_tot = 0
+
+        def _imp(o):
+            o = float(o)
+            return (-o) / ((-o) + 100.0) if o < 0 else 100.0 / (o + 100.0)
+
         allrows = db.query(PickResult).all()
         for r in allrows:
             if r.sport == "golf":
                 continue                       # golf is view-only: never tracked
             if _is_push(r):
                 continue                       # draw/canceled = push, off the record
-            a = alltime.setdefault(r.sport, {"wins": 0, "losses": 0})
+            a = alltime.setdefault(r.sport, {"wins": 0, "losses": 0, "units": 0.0,
+                                             "priced": 0, "clv_beat": 0, "clv_tot": 0})
             at_p += 1
             if r.correct:
                 a["wins"] += 1
                 at_c += 1
             else:
                 a["losses"] += 1
+            if r.taken_odds is not None and abs(r.taken_odds) >= 100:
+                skip_at = (r.sport == "tennis" and
+                           (r.subcat or "").upper() not in TENNIS_UNIT_TOURS)
+                if not skip_at:
+                    pl_at = _capped_profit(r.taken_odds, r.correct)
+                    a["units"] += pl_at
+                    a["priced"] += 1
+                    at_units += pl_at
+                    at_priced += 1
+                    # CLV: did we get a better price than the close? (lower implied
+                    # prob at our taken line than at the close = we beat the market)
+                    if r.close_odds is not None and abs(r.close_odds) >= 100:
+                        beat = _imp(r.taken_odds) < _imp(r.close_odds)
+                        a["clv_tot"] += 1
+                        at_clv_tot += 1
+                        if beat:
+                            a["clv_beat"] += 1
+                            at_clv_beat += 1
     for s, v in by_sport.items():
         v["accuracy"] = round(100 * v["correct"] / v["picks"]) if v["picks"] else None
         v["wins_30d"] = v["correct"]
         v["losses_30d"] = v["picks"] - v["correct"]
         v["today_wins"] = v.get("today_correct", 0)
         v["today_losses"] = v.get("today_picks", 0) - v.get("today_correct", 0)
-        at = alltime.get(s, {"wins": 0, "losses": 0})
+        at = alltime.get(s, {"wins": 0, "losses": 0, "units": 0.0, "priced": 0,
+                             "clv_beat": 0, "clv_tot": 0})
         v["alltime_wins"] = at["wins"]
         v["alltime_losses"] = at["losses"]
         tot = at["wins"] + at["losses"]
@@ -155,6 +188,12 @@ def accuracy(days: int = 30):
         v["units_30d"] = round(v.get("units", 0.0), 2)
         v["priced_30d"] = v.get("priced", 0)
         v["roi_30d"] = round(100 * v["units"] / v["priced"], 1) if v.get("priced") else None
+        # All-time (season-to-date) money line — matches the all-time W-L above it.
+        v["units_at"] = round(at.get("units", 0.0), 2)
+        v["priced_at"] = at.get("priced", 0)
+        v["roi_at"] = round(100 * at["units"] / at["priced"], 1) if at.get("priced") else None
+        v["clv_at_pct"] = (round(100 * at["clv_beat"] / at["clv_tot"], 1)
+                           if at.get("clv_tot") else None)
     data = {
         "days": days,
         "overall": {"picks": tot_p, "correct": tot_c,
@@ -163,6 +202,10 @@ def accuracy(days: int = 30):
                     "today_wins": tot_tc, "today_losses": tot_tp - tot_tc,
                     "units_30d": round(tot_units, 2), "priced_30d": tot_priced,
                     "roi_30d": round(100 * tot_units / tot_priced, 1) if tot_priced else None,
+                    "units_at": round(at_units, 2), "priced_at": at_priced,
+                    "roi_at": round(100 * at_units / at_priced, 1) if at_priced else None,
+                    "clv_at_pct": (round(100 * at_clv_beat / at_clv_tot, 1)
+                                   if at_clv_tot else None),
                     "alltime_wins": at_c, "alltime_losses": at_p - at_c,
                     "alltime_pct": round(100 * at_c / at_p) if at_p else None},
         "by_sport": by_sport,
@@ -199,7 +242,7 @@ def recent_results(days: int = 5):
             return None
         if r.sport == "tennis" and (r.subcat or "").upper() not in TENNIS_UNIT_TOURS:
             return None
-        return round(_capped_profit(float(r.taken_odds), bool(r.correct)), 4)
+        return round(_capped_profit(r.taken_odds, bool(r.correct)), 4)
 
     def _pick_beat_close(r):
         """True/False if we can compare the taken line to the close, else None.
@@ -520,7 +563,7 @@ def edges_simulate(days: int = 3650, sport: str | None = None):
             continue
         imp = _implied(float(r.taken_odds))
         won = bool(r.correct)
-        pl = _capped_profit(float(r.taken_odds), won)
+        pl = min(1.0 / imp - 1.0, _WIN_CAP) if won else -1.0
         beat = None
         if r.close_odds is not None and abs(r.close_odds) >= 100:
             beat = imp < _implied(float(r.close_odds))
@@ -562,7 +605,7 @@ def tennis_tours():
         if r.taken_odds is not None and abs(r.taken_odds) >= 100 and not _is_push(r):
             imp = _implied(float(r.taken_odds))
             bucket["priced"] += 1
-            bucket["units"] += (1.0 / imp - 1.0) if won else -1.0
+            bucket["units"] += min(1.0 / imp - 1.0, _WIN_CAP) if won else -1.0
             if r.close_odds is not None and abs(r.close_odds) >= 100:
                 bucket["clv_total"] += 1
                 bucket["clv_beat"] += 1 if imp < _implied(float(r.close_odds)) else 0
@@ -626,7 +669,7 @@ def edges_wagers(days: int = 3650, min_edge: float = 0.03, min_sample: int = 25)
         if _calibrate(r.sport, prob) - imp < min_edge:
             continue
         won = bool(r.correct)
-        pl = _capped_profit(float(r.taken_odds), won)
+        pl = min(1.0 / imp - 1.0, _WIN_CAP) if won else -1.0
         s = by.setdefault(r.sport, blank())
         for b in (s, ov):
             b["n"] += 1; b["wins"] += won; b["units"] += pl
@@ -675,7 +718,7 @@ def edges_report(days: int = 90, sport: str | None = None):
         if not n:
             return None
         wins = sum(1 for b in bets if b["won"])
-        units = sum((_dec(b["odds"]) - 1.0) if b["won"] else -1.0 for b in bets)
+        units = sum(min(_dec(b["odds"]) - 1.0, _WIN_CAP) if b["won"] else -1.0 for b in bets)
         clv = [b for b in bets if b["close"] is not None]
         beat = sum(1 for b in clv if _imp(b["odds"]) < _imp(b["close"]))
         avg_clv = (sum(_imp(b["close"]) - _imp(b["odds"]) for b in clv) / len(clv) * 100.0) if clv else None
