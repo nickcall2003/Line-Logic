@@ -7122,20 +7122,21 @@ def tennis_resync(confirm: str = ""):
         _build_attempts.clear()
     except Exception:
         pass
-    # rebuild today + next few days right now
-    rebuilt = {}
-    try:
-        for off in range(0, int(os.environ.get("TENNIS_LOOKAHEAD_DAYS", "3")) + 1):
-            d = dt.date.today() + dt.timedelta(days=off)
-            try:
-                _ensure_day(d)
-            except Exception as e:
-                rebuilt[d.isoformat()] = f"err: {e}"
-        with SessionLocal() as db:
-            for off in range(0, 4):
+    # Rebuild in the BACKGROUND — build_day fetches weather per match, which is far
+    # too slow (dozens of matches x days) to do inside the request without timing
+    # out. Return right away; the board fills over the next minute or two.
+    def _rebuild_bg():
+        try:
+            for off in range(0, int(os.environ.get("TENNIS_LOOKAHEAD_DAYS", "3")) + 1):
                 d = dt.date.today() + dt.timedelta(days=off)
-                s = dt.datetime.combine(d, dt.time.min); e2 = dt.datetime.combine(d, dt.time.max)
-                rebuilt[d.isoformat()] = db.query(Match.id).filter(Match.scheduled >= s, Match.scheduled <= e2).count()
-    except Exception as e:
-        rebuilt["error"] = repr(e)
-    return JSONResponse({"deleted": deleted, "rebuilt_counts": rebuilt})
+                try:
+                    _ensure_day(d)
+                except Exception as e:
+                    print(f"[resync] {d}: {e}")
+        except Exception as e:
+            print(f"[resync] rebuild error: {e}")
+    import threading as _th
+    _th.Thread(target=_rebuild_bg, daemon=True).start()
+    return JSONResponse({"deleted": deleted, "rebuilding": True,
+                         "note": "rebuild running in background; check /api/tennis/schedule-diag "
+                                 "or the board in ~1-2 minutes"})
