@@ -7222,3 +7222,29 @@ def tennis_resync(confirm: str = ""):
     return JSONResponse({"deleted": deleted, "orphans_swept": orphans, "rebuilding": True,
                          "note": "rebuild running in background; check /api/tennis/schedule-diag "
                                  "or the board in ~1-2 minutes"})
+
+
+@app.get("/api/tennis/profiles/probe")
+def tennis_profiles_probe():
+    """Fetch one Sackmann CSV from Railway to confirm the builder can reach the
+    data and which branch serves it. Pinpoints a 0-player build fast."""
+    import urllib.request as _ur
+    import urllib.error as _ue
+    import csv as _csv
+    import io as _io
+    out = {}
+    for branch in ("master", "main"):
+        url = f"https://raw.githubusercontent.com/JeffSackmann/tennis_atp/{branch}/atp_matches_2024.csv"
+        try:
+            req = _ur.Request(url, headers={"User-Agent": "LineLogic/1.0"})
+            with _ur.urlopen(req, timeout=30) as r:
+                txt = r.read().decode("utf-8", "replace")
+            rows = list(_csv.DictReader(_io.StringIO(txt)))
+            out[branch] = {"ok": True, "rows": len(rows),
+                           "cols": list(rows[0].keys())[:5] if rows else [],
+                           "winner_sample": rows[0].get("winner_name") if rows else None}
+        except _ue.HTTPError as e:
+            out[branch] = {"ok": False, "http": e.code}
+        except Exception as e:
+            out[branch] = {"ok": False, "err": repr(e)}
+    return out
