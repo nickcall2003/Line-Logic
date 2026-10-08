@@ -4837,7 +4837,9 @@ function renderAnalysisHTML(d){
       +'<div class="rw"><span class="k">Titles</span><span class="v">'+(p.titles!=null?p.titles:"—")+'</span></div>'
       +'<div class="rw"><span class="k">Career high</span><span class="v hl">'+(p.career_high?'#'+p.career_high:"—")+'</span></div></div>';
   }
-  h+='<div class="dcard"><div class="dct">This season</div><div class="prof">'+pcard(A,"a")+pcard(B,"b")+'</div></div>';
+  h+='<div class="dcard"><div class="dct">This season</div><div class="prof">'+pcard(A,"a")+pcard(B,"b")+'</div>'
+    +(d.h2h&&d.h2h.label?('<div style="margin-top:11px;display:flex;align-items:center;gap:9px;border-top:1px solid rgba(255,255,255,.06);padding-top:10px"><span style="font-family:Archivo,sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);font-weight:800">Head-to-head</span><span style="font-family:Space Mono,monospace;font-weight:700;color:var(--gold)">'+d.h2h.label+'</span></div>'):'')
+    +'</div>';
   function careerCol(p,cls){
     var ys=p.by_year?Object.keys(p.by_year).sort().reverse().slice(0,4):[];
     var rows=ys.map(function(y){var r=p.by_year[y],pct=_tdWLP(r)||0;return '<div class="yr '+cls+'"><span class="y">'+y+'</span><div class="tk"><div class="fl" style="width:'+pct+'%"></div></div><span class="rc">'+r.w+'-'+r.l+' · '+pct+'%</span></div>';}).join("");

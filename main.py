@@ -6972,3 +6972,78 @@ try:
     print("[tennis] analysis endpoint registered")
 except Exception as _e:
     print(f"[tennis] analysis endpoint not registered: {_e}")
+
+
+# --- Tennis player-profile builder (free Sackmann data) + weekly auto-refresh ---
+def _run_profiles_build():
+    try:
+        import build_tennis_profiles as _bp
+        _bp.build(years_recent=int(os.environ.get("PROFILE_YEARS", "4")),
+                  out_path="/data/tennis_profiles.json")
+        try:   # drop the analysis cache so the fresh file is picked up immediately
+            import tennis_analysis as _ta
+            _ta._PROFILES_CACHE["data"] = None
+            _ta._PROFILES_CACHE["mtime"] = 0.0
+        except Exception:
+            pass
+        print("[profiles] rebuild complete -> /data/tennis_profiles.json")
+    except Exception as e:
+        print(f"[profiles] build failed: {e}")
+
+
+@app.get("/api/tennis/profiles/build")
+def tennis_profiles_build(confirm: str = ""):
+    """Rebuild tennis_profiles.json from Sackmann (ATP+WTA). Append ?confirm=yes."""
+    if confirm != "yes":
+        return JSONResponse({"note": "append ?confirm=yes to rebuild tennis_profiles.json from Sackmann",
+                             "poll": "/api/tennis/profiles/status"})
+    import threading as _th
+    _th.Thread(target=_run_profiles_build, daemon=True).start()
+    return JSONResponse({"status": "tennis profiles build started", "poll": "/api/tennis/profiles/status"})
+
+
+@app.get("/api/tennis/profiles/status")
+def tennis_profiles_status():
+    import os as _os
+    import json as _json
+    for p in ("/data/tennis_profiles.json", "tennis_profiles.json"):
+        if _os.path.exists(p):
+            try:
+                d = _json.load(open(p))
+                tours = d.get("tours", {})
+                return {"exists": True, "path": p, "generated": d.get("generated"),
+                        "tours": {t: {"players": len(v.get("players", {})),
+                                      "tournaments": len(v.get("tournaments", {})),
+                                      "h2h": len(v.get("h2h", {}))}
+                                  for t, v in tours.items()}}
+            except Exception as e:
+                return {"exists": True, "path": p, "error": str(e)}
+    return {"exists": False, "note": "run /api/tennis/profiles/build?confirm=yes"}
+
+
+def _profiles_refresh_loop():
+    """Rebuild profiles on boot if missing, then weekly. Off with PROFILES_AUTOREFRESH=0."""
+    import time as _t
+    if os.environ.get("PROFILES_AUTOREFRESH", "1") != "1":
+        print("[profiles] auto-refresh disabled")
+        return
+    _t.sleep(150)   # let the app settle first
+    while True:
+        try:
+            p = "/data/tennis_profiles.json"
+            need = True
+            if os.path.exists(p):
+                need = (_t.time() - os.path.getmtime(p)) > 7 * 86400
+            if need:
+                _run_profiles_build()
+        except Exception as e:
+            print(f"[profiles] refresh loop error: {e}")
+        _t.sleep(24 * 3600)
+
+
+try:
+    import threading as _th_prof
+    _th_prof.Thread(target=_profiles_refresh_loop, daemon=True).start()
+    print("[profiles] weekly auto-refresh thread started")
+except Exception as _e:
+    print(f"[profiles] auto-refresh not started: {_e}")
