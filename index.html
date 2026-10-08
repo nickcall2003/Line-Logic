@@ -644,7 +644,9 @@ function render(){renderTabs();renderBubbles();loadTournaments();
     el.innerHTML=matchCardHTML(m);el.onclick=()=>openDetail(m.id);list.appendChild(el);});}
 function showView(detail){document.getElementById("main").style.display=detail?"none":"";
   const useSide=(sport==="tennis"||sport==="soccer");
-  document.getElementById("side").style.display=(detail||!useSide)?"none":"";document.getElementById("detail").style.display=detail?"block":"none";}
+  document.getElementById("side").style.display=(detail||!useSide)?"none":"";document.getElementById("detail").style.display=detail?"block":"none";
+  // the record box + hamburger belong to the board/home only — hide the whole top bar on a detail card so it shifts up
+  var hdr=document.querySelector("header.top");if(hdr)hdr.style.display=detail?"none":"";}
 async function openDetail(id){detailId=id;detailTab="analysis";showView(true);
   document.getElementById("detail").innerHTML='<div class="skel-wrap"><div class="skel-card" style="height:130px"></div><div class="skel-card"></div><div class="skel-card"></div></div>';await refreshDetail();
   if(detailTimer)clearInterval(detailTimer);detailTimer=setInterval(()=>{if(detailId)refreshDetail(true);},10000);}
@@ -5134,29 +5136,33 @@ function renderAnalysisHTML(d){
   function hi(a,b){return (a==null||b==null)?null:(a>b);}
   function lo(a,b){return (a==null||b==null)?null:(a<b);}
   var h="",c=d.conditions||{};
-  /* ---- Court & conditions ---- */
-  if(c.cpi!=null){
-    var pos=Math.max(0,Math.min(100,(c.cpi-15)/35*100)),ci=_catInfo(c.cpi);
+  /* ---- Court & conditions (always shown) ---- */
+  (function(){
+    var hasCpi=c.cpi!=null, ci=hasCpi?_catInfo(c.cpi):null;
     var sr=c.speed_ratio!=null?((+c.speed_ratio).toFixed(2)+"× tour avg"):null;
-    h+='<div class="card"><div class="ctag"><span class="pip"></span>Court &amp; conditions</div><div class="speed">'
-      +'<div class="s-lab"><span>Court Pace Index · est. from ace rate</span><b>~'+c.cpi+' · '+(ci?ci.label.split(" (")[0]:"")+'</b></div>'
-      +'<div class="s-track"><div class="s-bands">'
-      +'<span class="sb" style="flex:40;background:#3f6f8f"></span><span class="sb" style="flex:14.3;background:#3f8a78"></span>'
-      +'<span class="sb" style="flex:14.3;background:#C9932F"></span><span class="sb" style="flex:14.3;background:#E0903A"></span>'
-      +'<span class="sb" style="flex:17.1;background:#E0563A"></span></div><div class="s-dot" style="left:'+pos+'%"></div></div>'
-      +'<div class="s-cats"><span>Slow ≤29</span><span>Medium 35-39</span><span>Fast ≥45</span></div>'
-      +(ci?'<div class="s-desc"><b>Category '+ci.n+' · '+ci.label+':</b> '+ci.desc+' CPI from Sackmann ace rates, calibrated to the real scale (AO 42 · Wimbledon 37 · US Open 35 · Roland Garros 21).</div>':'')
-      +'</div>'
-      +'<div class="grid2" style="margin-bottom:0"><div>'
+    var env=_courtEnv(d.match&&d.match.tournament), wx=_parseWx(c.weather);
+    h+='<div class="card"><div class="ctag"><span class="pip"></span>Court &amp; conditions</div>';
+    if(hasCpi){
+      var pos=Math.max(0,Math.min(100,(c.cpi-15)/35*100));
+      h+='<div class="speed"><div class="s-lab"><span>Court Pace Index · est. from ace rate</span><b>~'+c.cpi+' · '+(ci?ci.label.split(" (")[0]:"")+'</b></div>'
+        +'<div class="s-track"><div class="s-bands">'
+        +'<span class="sb" style="flex:40;background:#3f6f8f"></span><span class="sb" style="flex:14.3;background:#3f8a78"></span>'
+        +'<span class="sb" style="flex:14.3;background:#C9932F"></span><span class="sb" style="flex:14.3;background:#E0903A"></span>'
+        +'<span class="sb" style="flex:17.1;background:#E0563A"></span></div><div class="s-dot" style="left:'+pos+'%"></div></div>'
+        +'<div class="s-cats"><span>Slow ≤29</span><span>Medium 35-39</span><span>Fast ≥45</span></div>'
+        +(ci?'<div class="s-desc"><b>Category '+ci.n+' · '+ci.label+':</b> '+ci.desc+' CPI from Sackmann ace rates, calibrated to the real scale (AO 42 · Wimbledon 37 · US Open 35 · Roland Garros 21).</div>':'')
+        +'</div>';
+    }
+    h+='<div class="grid2" style="margin-bottom:0"><div>'
       +'<div class="sub-row"><span class="k">Surface</span><span class="v">'+surf+'</span></div>'
-      +'<div class="sub-row"><span class="k">Environment</span><span class="v">'+(_courtEnv(d.match&&d.match.tournament)||"—")+'</span></div></div>'
+      +'<div class="sub-row"><span class="k">Environment</span><span class="v">'+(env||"—")+'</span></div></div>'
       +'<div><div class="sub-row"><span class="k">Ace rate vs tour</span><span class="v hl">'+(sr||"—")+'</span></div>'
       +'<div class="sub-row"><span class="k">Court pace</span><span class="v">'+(ci?ci.label.split(" (")[0]:"—")+'</span></div></div></div>';
-    var wx=_parseWx(c.weather);
     h+=_wxTiles(wx);
     if(c.weather)h+='<div class="impact">'+(wx&&wx.cond?'<b>'+wx.cond+'</b> — ':'')+c.weather+'</div>';
+    else h+='<div class="s-desc" style="margin-top:10px">Venue weather fills in here once the match-day forecast is pulled.</div>';
     h+='</div>';
-  }
+  })();
   /* ---- This season ---- */
   function pcard(p,cls){
     var yr=p.by_year?Object.keys(p.by_year).sort().reverse()[0]:null;
