@@ -347,11 +347,25 @@ class ESPNTennisProvider(TennisProvider):
         return []
 
     def get_odds(self, day=None, match_key=None):
-        """Moneyline captured alongside the Odds-API schedule, by provider_match_id.
-        The main odds layer also matches by player name via odds_api.get_tennis_odds()."""
+        """Board odds. For day mode, return {provider_match_id: {a,b,first,second}}
+        with DECIMAL prices (the shape list_matches._ml_pair expects), built from the
+        Odds API events (cached). 'first'/'second' are the home/away player names so
+        the board can align prices to player_a/player_b."""
         if match_key:
             return (getattr(self, "_oa_odds", None) or {}).get(match_key, {})
-        return {}
+        out = {}
+        try:
+            import odds_api
+            for e in odds_api.get_tennis_events():
+                a_am, b_am = e.get("ml_home"), e.get("ml_away")
+                if a_am is None or b_am is None:
+                    continue
+                pid = "oa:" + str(e.get("id") or f"{e.get('home')}|{e.get('away')}")
+                out[pid] = {"a": _amer_to_dec(a_am), "b": _amer_to_dec(b_am),
+                            "first": e.get("home"), "second": e.get("away")}
+        except Exception as ex:
+            self.last_error = f"get_odds: {ex}"
+        return out
 
     def _refresh_live(self):
         return None
@@ -392,3 +406,14 @@ def _as_int(v):
         return int(round(float(v)))
     except Exception:
         return None
+
+
+def _amer_to_dec(am):
+    """American odds -> decimal."""
+    try:
+        am = float(am)
+    except (TypeError, ValueError):
+        return None
+    if am > 0:
+        return round(1.0 + am / 100.0, 3)
+    return round(1.0 + 100.0 / abs(am), 3)
