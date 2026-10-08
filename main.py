@@ -7161,18 +7161,39 @@ def tennis_resync(confirm: str = ""):
     Only touches not-finished matches from today-1 forward, so settled history is safe."""
     if confirm != "yes":
         return JSONResponse({"note": "append ?confirm=yes to clear & rebuild upcoming tennis matches"})
-    from models import Match, Prediction
+    from models import Match, Prediction, LiveState
+    try:
+        from models import MatchAnalysis
+    except Exception:
+        MatchAnalysis = None
+    child_models = [m for m in (Prediction, LiveState, MatchAnalysis) if m is not None]
     cutoff = dt.datetime.combine(dt.date.today() - dt.timedelta(days=1), dt.time.min)
     deleted = 0
+    orphans = 0
     with SessionLocal() as db:
         rows = db.query(Match).filter(Match.scheduled >= cutoff,
                                       Match.status != "finished").all()
         ids = [m.id for m in rows]
         for mid in ids:
-            db.query(Prediction).filter_by(match_id=mid).delete()
+            for Model in child_models:
+                db.query(Model).filter_by(match_id=mid).delete()
         for m in rows:
             db.delete(m)
         deleted = len(ids)
+        db.commit()
+        # Sweep ORPHANED child rows (e.g. live_state left behind by an earlier
+        # partial delete) — these collide on the UNIQUE live_state.match_id
+        # constraint when build_day reuses an id and silently void every insert.
+        valid = {r[0] for r in db.query(Match.id).all()}
+        for Model in child_models:
+            try:
+                q = db.query(Model)
+                orph = q.all() if not valid else q.filter(~Model.match_id.in_(valid)).all()
+                for o in orph:
+                    db.delete(o)
+                orphans += len(orph)
+            except Exception as e:
+                print(f"[resync] orphan sweep {getattr(Model,'__name__','?')}: {e}")
         db.commit()
     # clear build throttles so the lookahead rebuilds immediately
     try:
@@ -7198,6 +7219,6 @@ def tennis_resync(confirm: str = ""):
             print(f"[resync] rebuild error: {e}")
     import threading as _th
     _th.Thread(target=_rebuild_bg, daemon=True).start()
-    return JSONResponse({"deleted": deleted, "rebuilding": True,
+    return JSONResponse({"deleted": deleted, "orphans_swept": orphans, "rebuilding": True,
                          "note": "rebuild running in background; check /api/tennis/schedule-diag "
                                  "or the board in ~1-2 minutes"})
