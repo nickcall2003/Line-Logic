@@ -3,10 +3,12 @@ name: Refresh tennis profiles
 # Builds tennis_profiles.json from Jeff Sackmann's public data on a GitHub runner,
 # then commits it so Railway just reads the committed file.
 #
-# We pull the Sackmann repos with actions/checkout (NOT a manual `git clone`): on a
-# hosted runner an anonymous clone of github.com gets an auth challenge and dies with
-# "could not read Username ... No such device or address". actions/checkout checks out
-# other PUBLIC repos using the workflow's GITHUB_TOKEN, which sidesteps that entirely.
+# Why this shape: the authenticated REST API (api.github.com + GITHUB_TOKEN) returns
+# 404 for JeffSackmann repos from this account's runners, which kills actions/checkout
+# at its "default branch" lookup and also kills raw fetches that go through the API.
+# We avoid the API entirely: codeload.github.com serves a repo tarball over plain
+# anonymous HTTPS (no token, no API call), which a hosted runner can always reach.
+# The first step probes reachability so a failure tells us exactly which host is blocked.
 
 on:
   schedule:
@@ -23,31 +25,39 @@ jobs:
       - name: Check out this repo
         uses: actions/checkout@v4
 
-      - name: Check out Sackmann ATP data
-        uses: actions/checkout@v4
-        with:
-          repository: JeffSackmann/tennis_atp
-          path: sackmann/tennis_atp
-
-      - name: Check out Sackmann WTA data
-        uses: actions/checkout@v4
-        with:
-          repository: JeffSackmann/tennis_wta
-          path: sackmann/tennis_wta
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Show the data that was checked out
+      - name: Probe GitHub reachability (no auth)
         run: |
+          echo "== raw.githubusercontent (anonymous) =="
+          curl -sS -o /dev/null -w "HTTP %{http_code}  bytes=%{size_download}\n" --max-time 30 \
+            https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_2024.csv || echo "raw FAILED"
+          echo "== codeload tarball (anonymous) =="
+          curl -sSL -o /dev/null -w "HTTP %{http_code}  bytes=%{size_download}\n" --max-time 60 \
+            https://codeload.github.com/JeffSackmann/tennis_atp/tar.gz/refs/heads/master || echo "codeload FAILED"
+
+      - name: Download + unpack Sackmann data (codeload tarballs, anonymous)
+        run: |
+          mkdir -p sackmann/tennis_atp sackmann/tennis_wta
+          for repo in tennis_atp tennis_wta; do
+            echo "== downloading $repo =="
+            curl -sSL --retry 3 --max-time 180 \
+              "https://codeload.github.com/JeffSackmann/$repo/tar.gz/refs/heads/master" \
+              -o "/tmp/$repo.tgz"
+            echo "tarball bytes: $(wc -c < /tmp/$repo.tgz)"
+            # --strip-components=1 drops the top-level "<repo>-master/" dir so the CSVs
+            # land directly in sackmann/<repo>/ to match the build's LOCAL_DATA layout.
+            tar -xzf "/tmp/$repo.tgz" --strip-components=1 -C "sackmann/$repo"
+          done
           echo "== ATP match files present =="
           ls sackmann/tennis_atp 2>/dev/null | grep -E 'atp_matches_(2023|2024|2025|2026)' || echo "NONE FOUND"
           echo "== WTA match files present =="
           ls sackmann/tennis_wta 2>/dev/null | grep -E 'wta_matches_(2023|2024|2025|2026)' || echo "NONE FOUND"
 
-      - name: Build tennis_profiles.json (ATP + WTA) from checked-out data
+      - name: Build tennis_profiles.json (ATP + WTA) from downloaded data
         env:
           LOCAL_DATA: ${{ github.workspace }}/sackmann
           PROFILE_YEARS: "4"
