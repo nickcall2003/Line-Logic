@@ -7232,19 +7232,22 @@ def tennis_profiles_probe():
     import urllib.error as _ue
     import csv as _csv
     import io as _io
+    srcs = {
+        "jsdelivr_master": "https://cdn.jsdelivr.net/gh/JeffSackmann/tennis_atp@master/atp_matches_2024.csv",
+        "jsdelivr_main": "https://cdn.jsdelivr.net/gh/JeffSackmann/tennis_atp@main/atp_matches_2024.csv",
+        "raw_master": "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_2024.csv",
+    }
     out = {}
-    for branch in ("master", "main"):
-        url = f"https://raw.githubusercontent.com/JeffSackmann/tennis_atp/{branch}/atp_matches_2024.csv"
+    for name, url in srcs.items():
         try:
             req = _ur.Request(url, headers={"User-Agent": "LineLogic/1.0"})
             with _ur.urlopen(req, timeout=30) as r:
                 txt = r.read().decode("utf-8", "replace")
             rows = list(_csv.DictReader(_io.StringIO(txt)))
-            out[branch] = {"ok": True, "rows": len(rows),
-                           "cols": list(rows[0].keys())[:5] if rows else [],
-                           "winner_sample": rows[0].get("winner_name") if rows else None}
+            out[name] = {"ok": True, "rows": len(rows),
+                         "winner_sample": rows[0].get("winner_name") if rows else None}
         except _ue.HTTPError as e:
-            out[branch] = {"ok": False, "http": e.code}
+            out[name] = {"ok": False, "http": e.code}
         except Exception as e:
-            out[branch] = {"ok": False, "err": repr(e)}
+            out[name] = {"ok": False, "err": repr(e)}
     return out
