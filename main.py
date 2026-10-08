@@ -6379,6 +6379,39 @@ def ladder_settle(token: str = ""):
     return _settle_ladder()
 
 
+@app.get("/api/mlb/statcast-probe")
+def mlb_statcast_probe():
+    """Gate test for the Venom-style props build: can THIS server reach Baseball
+    Savant (Statcast)? Tries the batter expected-stats and pitch-arsenal CSV
+    leaderboards and reports status + size + the header row of each. If these come
+    back 200 with real CSV, we can build the full Statcast depth; if they're blocked,
+    we know before building and pick another route."""
+    import httpx
+    yr = dt.date.today().year
+    targets = {
+        "batter_expected": f"https://baseballsavant.mlb.com/leaderboard/expected_statistics?type=batter&year={yr}&position=&team=&min=q&csv=true",
+        "batter_exitvelo": f"https://baseballsavant.mlb.com/leaderboard/statcast?type=batter&year={yr}&min=q&csv=true",
+        "pitch_arsenal":   f"https://baseballsavant.mlb.com/leaderboard/pitch-arsenal-stats?type=pitcher&pitchType=&year={yr}&team=&min=100&csv=true",
+    }
+    out = {}
+    headers = {"User-Agent": "Mozilla/5.0 (LineLogic StatcastProbe)"}
+    for name, url in targets.items():
+        try:
+            r = httpx.get(url, headers=headers, timeout=25.0, follow_redirects=True)
+            body = r.text or ""
+            first = body.splitlines()[0][:400] if body.strip() else ""
+            rows = max(0, body.count("\n") - 1)
+            out[name] = {"status": r.status_code, "bytes": len(body),
+                         "rows": rows, "header": first}
+        except Exception as e:
+            out[name] = {"error": f"{type(e).__name__}: {e}"}
+    out["_year"] = yr
+    out["_verdict"] = ("reachable" if any(isinstance(v, dict) and v.get("status") == 200
+                                          and v.get("rows", 0) > 10 for v in out.values())
+                       else "blocked_or_empty")
+    return out
+
+
 @app.get("/api/mlb/diag")
 def mlb_diag(token: str = "", days: int = 40):
     """Read-only diagnostic for the MLB model over the last `days`. Reports record,
