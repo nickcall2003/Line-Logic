@@ -7109,6 +7109,48 @@ def tennis_schedule_diag():
                 }
     except Exception as e:
         out["db_error"] = repr(e)
+    # BUILD PROBE: replay build_day's per-match steps on the first scheduled match
+    # and report exactly which step raises (build_day swallows + rolls back each).
+    try:
+        sched = provider.get_schedule(_dt.datetime(today.year, today.month, today.day))
+        if not sched:
+            sched = provider.get_schedule(_dt.datetime.now() + _dt.timedelta(days=1))
+        if sched:
+            info = sched[0]
+            pr = {"pid": info.provider_match_id, "players": [info.player_a, info.player_b],
+                  "scheduled": str(info.scheduled)}
+            try:
+                pa, conf = engine.predict_feed(info.player_a, info.player_b)
+                pr["predict"] = [round(pa, 3), conf]
+            except Exception as e:
+                pr["predict_err"] = repr(e)
+            try:
+                sc = provider.get_live_score(info.provider_match_id)
+                pr["livescore"] = "ok:" + sc.status
+            except Exception as e:
+                pr["livescore_err"] = repr(e)
+            try:
+                from models import Match as _M, LiveState as _LS, Prediction as _P
+                with SessionLocal() as db:
+                    m = _M(provider_match_id="PROBE:" + str(info.provider_match_id),
+                           tier=info.tier, tournament=info.tournament, surface=info.surface,
+                           player_a=info.player_a, player_b=info.player_b,
+                           scheduled=info.scheduled, best_of=info.best_of, status=info.status,
+                           prominence=2900.0)
+                    db.add(m); db.flush()
+                    db.add(_P(match_id=m.id, prob_a=0.5, confident=True, confidence="low"))
+                    db.add(_LS(match_id=m.id, sets_a="", sets_b="", game_a="0", game_b="0",
+                               server="a", status=info.status, winner=None))
+                    db.flush()
+                    db.rollback()   # never persist the probe row
+                pr["db_insert"] = "ok (rolled back)"
+            except Exception as e:
+                pr["db_insert_err"] = repr(e)
+            out["build_probe"] = pr
+        else:
+            out["build_probe"] = "no scheduled match to probe"
+    except Exception as e:
+        out["build_probe_fatal"] = repr(e)
     return out
 
 
