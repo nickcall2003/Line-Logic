@@ -7090,6 +7090,25 @@ def tennis_schedule_diag():
     except Exception as e:
         out["schedule_error"] = repr(e)
     out["provider_last_error"] = getattr(provider, "last_error", None)
+    # what's ACTUALLY in the DB per day (this is what the board renders)
+    try:
+        from models import Match
+        out["db"] = {}
+        with SessionLocal() as db:
+            total = db.query(Match.id).count()
+            out["db_total_matches"] = total
+            for off in range(0, 3):
+                d = today + _dt.timedelta(days=off)
+                s = _dt.datetime.combine(d, _dt.time.min); e2 = _dt.datetime.combine(d, _dt.time.max)
+                rows = db.query(Match).filter(Match.scheduled >= s, Match.scheduled <= e2).all()
+                out["db"][d.isoformat()] = {
+                    "count": len(rows),
+                    "sample": [{"pid": m.provider_match_id, "sched": str(m.scheduled),
+                                "tourn": m.tournament, "team_filtered": _is_tennis_team_event(m)}
+                               for m in rows[:4]],
+                }
+    except Exception as e:
+        out["db_error"] = repr(e)
     return out
 
 
