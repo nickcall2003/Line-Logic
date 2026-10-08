@@ -206,11 +206,13 @@ class ESPNTennisProvider(TennisProvider):
             is_slam = any(s in title.lower() for s in _SLAMS)
             best_of = 5 if (is_slam and tier == "ATP") else 3
             pid = "oa:" + str(e.get("id") or f"{a}|{b}")
-            when_naive = when.replace(tzinfo=None) if when.tzinfo else when
+            # store the Central wall-clock so the board files the match on the SAME
+            # day we bucketed it into (the board filters scheduled by naive date).
+            sched = local.replace(tzinfo=None) if getattr(local, "tzinfo", None) else local
             out.append(MatchInfo(
                 provider_match_id=pid, tier=tier, tournament=_fmt_tourn(title),
                 surface=_surface_of(title, tier, when), player_a=a, player_b=b,
-                scheduled=when_naive, best_of=best_of, status="scheduled"))
+                scheduled=sched, best_of=best_of, status="scheduled"))
             self._oa_odds[pid] = {"ml_a": e.get("ml_home"), "ml_b": e.get("ml_away")}
         return out
 
@@ -230,7 +232,11 @@ class ESPNTennisProvider(TennisProvider):
                 if not cid:
                     continue
                 when = _parse_dt(comp.get("date") or comp.get("startDate")) or dt.datetime.combine(d, dt.time(12, 0))
-                when_naive = when.replace(tzinfo=None) if getattr(when, "tzinfo", None) else when
+                # store Central wall-clock to match the board's naive-date filter
+                if getattr(when, "tzinfo", None):
+                    when_naive = (when - dt.timedelta(hours=5)).replace(tzinfo=None)
+                else:
+                    when_naive = when
                 surface = _surface_of(ename, tier, when)
                 is_slam = any(s in ename.lower() for s in _SLAMS)
                 best_of = 5 if (is_slam and tier == "ATP") else 3

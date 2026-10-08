@@ -7091,3 +7091,51 @@ def tennis_schedule_diag():
         out["schedule_error"] = repr(e)
     out["provider_last_error"] = getattr(provider, "last_error", None)
     return out
+
+
+@app.get("/api/tennis/resync")
+def tennis_resync(confirm: str = ""):
+    """One-shot: drop upcoming/active tennis rows so they rebuild with corrected
+    (Central) dates, then let the lookahead refill. Append ?confirm=yes.
+    Only touches not-finished matches from today-1 forward, so settled history is safe."""
+    if confirm != "yes":
+        return JSONResponse({"note": "append ?confirm=yes to clear & rebuild upcoming tennis matches"})
+    from models import Match, Prediction
+    cutoff = dt.datetime.combine(dt.date.today() - dt.timedelta(days=1), dt.time.min)
+    deleted = 0
+    with SessionLocal() as db:
+        rows = db.query(Match).filter(Match.scheduled >= cutoff,
+                                      Match.status != "finished").all()
+        ids = [m.id for m in rows]
+        for mid in ids:
+            db.query(Prediction).filter_by(match_id=mid).delete()
+        for m in rows:
+            db.delete(m)
+        deleted = len(ids)
+        db.commit()
+    # clear build throttles so the lookahead rebuilds immediately
+    try:
+        _built_dates.clear()
+    except Exception:
+        pass
+    try:
+        _build_attempts.clear()
+    except Exception:
+        pass
+    # rebuild today + next few days right now
+    rebuilt = {}
+    try:
+        for off in range(0, int(os.environ.get("TENNIS_LOOKAHEAD_DAYS", "3")) + 1):
+            d = dt.date.today() + dt.timedelta(days=off)
+            try:
+                _ensure_day(d)
+            except Exception as e:
+                rebuilt[d.isoformat()] = f"err: {e}"
+        with SessionLocal() as db:
+            for off in range(0, 4):
+                d = dt.date.today() + dt.timedelta(days=off)
+                s = dt.datetime.combine(d, dt.time.min); e2 = dt.datetime.combine(d, dt.time.max)
+                rebuilt[d.isoformat()] = db.query(Match.id).filter(Match.scheduled >= s, Match.scheduled <= e2).count()
+    except Exception as e:
+        rebuilt["error"] = repr(e)
+    return JSONResponse({"deleted": deleted, "rebuilt_counts": rebuilt})
