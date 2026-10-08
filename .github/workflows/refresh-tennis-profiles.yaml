@@ -1,12 +1,12 @@
 name: Refresh tennis profiles
 
 # Builds tennis_profiles.json from Jeff Sackmann's public data on a GitHub runner,
-# then commits it so Railway just reads the committed file. We CLONE the public
-# repos (raw/CDN URLs 404 from here) and build from the local CSVs — no raw access.
+# then commits it so Railway just reads the committed file.
 #
-# Note: actions/checkout sets a git auth header for github.com scoped to THIS repo,
-# which GitHub rejects when cloning a different repo. We blank that header for the
-# clone so the public, anonymous clone succeeds.
+# We pull the Sackmann repos with actions/checkout (NOT a manual `git clone`): on a
+# hosted runner an anonymous clone of github.com gets an auth challenge and dies with
+# "could not read Username ... No such device or address". actions/checkout checks out
+# other PUBLIC repos using the workflow's GITHUB_TOKEN, which sidesteps that entirely.
 
 on:
   schedule:
@@ -20,30 +20,36 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repo
+      - name: Check out this repo
         uses: actions/checkout@v4
+
+      - name: Check out Sackmann ATP data
+        uses: actions/checkout@v4
+        with:
+          repository: JeffSackmann/tennis_atp
+          path: sackmann/tennis_atp
+
+      - name: Check out Sackmann WTA data
+        uses: actions/checkout@v4
+        with:
+          repository: JeffSackmann/tennis_wta
+          path: sackmann/tennis_wta
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Clone Sackmann data (public, anonymous)
+      - name: Show the data that was checked out
         run: |
-          mkdir -p /tmp/sack
-          for repo in tennis_atp tennis_wta; do
-            echo "== cloning $repo =="
-            git -c http."https://github.com/".extraheader= clone --depth 1 \
-              "https://github.com/JeffSackmann/$repo.git" "/tmp/sack/$repo" 2>&1 | tail -4
-          done
           echo "== ATP match files present =="
-          ls /tmp/sack/tennis_atp 2>/dev/null | grep -E 'atp_matches_(2023|2024|2025|2026)' || echo "NONE FOUND"
+          ls sackmann/tennis_atp 2>/dev/null | grep -E 'atp_matches_(2023|2024|2025|2026)' || echo "NONE FOUND"
           echo "== WTA match files present =="
-          ls /tmp/sack/tennis_wta 2>/dev/null | grep -E 'wta_matches_(2023|2024|2025|2026)' || echo "NONE FOUND"
+          ls sackmann/tennis_wta 2>/dev/null | grep -E 'wta_matches_(2023|2024|2025|2026)' || echo "NONE FOUND"
 
-      - name: Build tennis_profiles.json (ATP + WTA) from local clones
+      - name: Build tennis_profiles.json (ATP + WTA) from checked-out data
         env:
-          LOCAL_DATA: /tmp/sack
+          LOCAL_DATA: ${{ github.workspace }}/sackmann
           PROFILE_YEARS: "4"
         run: python build_tennis_profiles.py
 
