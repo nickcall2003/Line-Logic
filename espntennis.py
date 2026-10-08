@@ -171,7 +171,50 @@ class ESPNTennisProvider(TennisProvider):
 
     # ---- the three required methods -------------------------------------
     def get_schedule(self, day: datetime) -> list[MatchInfo]:
+        """Schedule for one day. The Odds API is the PRIMARY source because ESPN's
+        free tennis feed lags and misses events (it had no Shanghai Masters while the
+        tournament was live). ESPN is the fallback when the Odds API is off or empty."""
         d = day.date() if isinstance(day, dt.datetime) else day
+        oa = self._schedule_from_oddsapi(d)
+        if oa:
+            return oa
+        return self._schedule_from_espn(d)
+
+    def _schedule_from_oddsapi(self, d):
+        """Upcoming ATP/WTA matches from The Odds API (needs ODDS_TENNIS=1)."""
+        try:
+            import odds_api
+            evs = odds_api.get_tennis_events()
+        except Exception as e:
+            self.last_error = f"oddsapi schedule: {e}"
+            return []
+        out = []
+        self._oa_odds = {}
+        for e in evs:
+            when = _parse_dt(e.get("commence"))
+            if not when:
+                continue
+            # The board shows Central time; bucket a match on its Central calendar day.
+            local = when - dt.timedelta(hours=5)
+            if local.date() != d:
+                continue
+            a, b = e.get("home"), e.get("away")
+            if not a or not b:
+                continue
+            tier = e.get("tour") or "ATP"
+            title = e.get("title") or "Tennis"
+            is_slam = any(s in title.lower() for s in _SLAMS)
+            best_of = 5 if (is_slam and tier == "ATP") else 3
+            pid = "oa:" + str(e.get("id") or f"{a}|{b}")
+            when_naive = when.replace(tzinfo=None) if when.tzinfo else when
+            out.append(MatchInfo(
+                provider_match_id=pid, tier=tier, tournament=_fmt_tourn(title),
+                surface=_surface_of(title, tier, when), player_a=a, player_b=b,
+                scheduled=when_naive, best_of=best_of, status="scheduled"))
+            self._oa_odds[pid] = {"ml_a": e.get("ml_home"), "ml_b": e.get("ml_away")}
+        return out
+
+    def _schedule_from_espn(self, d):
         out: list[MatchInfo] = []
         for tier, lg in _LEAGUES.items():
             data = _scoreboard(lg, d)
@@ -187,6 +230,7 @@ class ESPNTennisProvider(TennisProvider):
                 if not cid:
                     continue
                 when = _parse_dt(comp.get("date") or comp.get("startDate")) or dt.datetime.combine(d, dt.time(12, 0))
+                when_naive = when.replace(tzinfo=None) if getattr(when, "tzinfo", None) else when
                 surface = _surface_of(ename, tier, when)
                 is_slam = any(s in ename.lower() for s in _SLAMS)
                 best_of = 5 if (is_slam and tier == "ATP") else 3
@@ -197,7 +241,7 @@ class ESPNTennisProvider(TennisProvider):
                     surface=surface,
                     player_a=na,
                     player_b=nb,
-                    scheduled=when,
+                    scheduled=when_naive,
                     best_of=best_of,
                     status=_state(comp),
                 ))
@@ -297,7 +341,10 @@ class ESPNTennisProvider(TennisProvider):
         return []
 
     def get_odds(self, day=None, match_key=None):
-        """Odds come from the Odds API layer, not the tennis feed."""
+        """Moneyline captured alongside the Odds-API schedule, by provider_match_id.
+        The main odds layer also matches by player name via odds_api.get_tennis_odds()."""
+        if match_key:
+            return (getattr(self, "_oa_odds", None) or {}).get(match_key, {})
         return {}
 
     def _refresh_live(self):
