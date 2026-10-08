@@ -1,14 +1,19 @@
 name: Refresh tennis profiles
 
-# Builds tennis_profiles.json from Jeff Sackmann's public data on a GitHub runner,
-# then commits it so Railway just reads the committed file.
+# Rebuilds tennis_profiles.json weekly from the live Sackmann data archive and
+# commits it, so Railway just reads the committed file.
 #
-# Why this shape: the authenticated REST API (api.github.com + GITHUB_TOKEN) returns
-# 404 for JeffSackmann repos from this account's runners, which kills actions/checkout
-# at its "default branch" lookup and also kills raw fetches that go through the API.
-# We avoid the API entirely: codeload.github.com serves a repo tarball over plain
-# anonymous HTTPS (no token, no API call), which a hosted runner can always reach.
-# The first step probes reachability so a failure tells us exactly which host is blocked.
+# IMPORTANT networking note for this account's runners:
+#   api.github.com, raw.githubusercontent.com and codeload.github.com all return a
+#   stock 404 here (egress policy), which is why actions/checkout of an external repo
+#   and every raw/tarball fetch failed. But plain github.com GIT protocol works — the
+#   checkout of THIS repo proves it. So we `git clone` the data archive directly; no
+#   API, no raw, no codeload anywhere in the path.
+#
+#   Source: Aneeshers/tennis-sackmann-archive — the community's live mirror of Jeff
+#   Sackmann's ATP/WTA datasets (his own JeffSackmann/tennis_atp + _wta are now 404).
+#   Layout there is atp/ and wta/ (original atp_matches_YYYY.csv filenames inside),
+#   which we symlink to the tennis_atp/ tennis_wta/ names the builder's LOCAL_DATA wants.
 
 on:
   schedule:
@@ -17,6 +22,9 @@ on:
 
 permissions:
   contents: write
+
+env:
+  GIT_TERMINAL_PROMPT: "0"     # never hang waiting for a credential prompt; fail fast
 
 jobs:
   refresh:
@@ -30,34 +38,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Probe GitHub reachability (no auth)
+      - name: Clone the live Sackmann archive (git protocol, anonymous)
         run: |
-          echo "== raw.githubusercontent (anonymous) =="
-          curl -sS -o /dev/null -w "HTTP %{http_code}  bytes=%{size_download}\n" --max-time 30 \
-            https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_2024.csv || echo "raw FAILED"
-          echo "== codeload tarball (anonymous) =="
-          curl -sSL -o /dev/null -w "HTTP %{http_code}  bytes=%{size_download}\n" --max-time 60 \
-            https://codeload.github.com/JeffSackmann/tennis_atp/tar.gz/refs/heads/master || echo "codeload FAILED"
-
-      - name: Download + unpack Sackmann data (codeload tarballs, anonymous)
-        run: |
-          mkdir -p sackmann/tennis_atp sackmann/tennis_wta
-          for repo in tennis_atp tennis_wta; do
-            echo "== downloading $repo =="
-            curl -sSL --retry 3 --max-time 180 \
-              "https://codeload.github.com/JeffSackmann/$repo/tar.gz/refs/heads/master" \
-              -o "/tmp/$repo.tgz"
-            echo "tarball bytes: $(wc -c < /tmp/$repo.tgz)"
-            # --strip-components=1 drops the top-level "<repo>-master/" dir so the CSVs
-            # land directly in sackmann/<repo>/ to match the build's LOCAL_DATA layout.
-            tar -xzf "/tmp/$repo.tgz" --strip-components=1 -C "sackmann/$repo"
-          done
+          rm -rf /tmp/arc
+          git clone --depth 1 --branch main \
+            https://github.com/Aneeshers/tennis-sackmann-archive /tmp/arc
+          mkdir -p sackmann
+          ln -sfn /tmp/arc/atp sackmann/tennis_atp
+          ln -sfn /tmp/arc/wta sackmann/tennis_wta
           echo "== ATP match files present =="
-          ls sackmann/tennis_atp 2>/dev/null | grep -E 'atp_matches_(2023|2024|2025|2026)' || echo "NONE FOUND"
+          ls sackmann/tennis_atp 2>/dev/null | grep -E 'atp_matches_(2023|2024|2025|2026)\.csv' || echo "NONE FOUND"
           echo "== WTA match files present =="
-          ls sackmann/tennis_wta 2>/dev/null | grep -E 'wta_matches_(2023|2024|2025|2026)' || echo "NONE FOUND"
+          ls sackmann/tennis_wta 2>/dev/null | grep -E 'wta_matches_(2023|2024|2025|2026)\.csv' || echo "NONE FOUND"
 
-      - name: Build tennis_profiles.json (ATP + WTA) from downloaded data
+      - name: Build tennis_profiles.json (ATP + WTA)
         env:
           LOCAL_DATA: ${{ github.workspace }}/sackmann
           PROFILE_YEARS: "4"
@@ -71,6 +65,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No change (or build produced nothing) — nothing to commit"
           else
-            git commit -m "chore: refresh tennis_profiles.json (ATP+WTA, Sackmann)"
+            git commit -m "chore: refresh tennis_profiles.json (ATP+WTA, Sackmann archive)"
             git push
           fi
