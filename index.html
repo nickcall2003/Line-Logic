@@ -34,7 +34,59 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();win
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Hanken+Grotesque:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=35">
+<link rel="stylesheet" href="/app.css?v=36">
+
+<style id="tdeep-css">
+.tdeep{--a:#53D98A;--b:#5EA6F2;--a-soft:rgba(83,217,138,.14);--b-soft:rgba(94,166,242,.14)}
+.tdeep .dcard{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
+.tdeep .dct{font-family:"Archivo",sans-serif;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.tdeep .dct:before{content:"";width:5px;height:13px;border-radius:3px;background:var(--gold)}
+.tdeep .prof{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tdeep .pc{border-radius:11px;padding:11px;border:1px solid var(--line)}
+.tdeep .pc.a{background:var(--a-soft);border-color:rgba(83,217,138,.3)}
+.tdeep .pc.b{background:var(--b-soft);border-color:rgba(94,166,242,.3)}
+.tdeep .pc .nm{font-family:"Archivo",sans-serif;font-weight:800;font-size:13.5px}
+.tdeep .pc.a .nm{color:var(--a)} .tdeep .pc.b .nm{color:var(--b)}
+.tdeep .pc .tl{font-family:"Space Mono",monospace;font-size:9px;color:var(--muted);margin-bottom:8px}
+.tdeep .rw{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-top:1px solid rgba(255,255,255,.06)}
+.tdeep .rw:first-of-type{border-top:0}.tdeep .rw .k{color:var(--muted)}.tdeep .rw .v{font-family:"Space Mono",monospace;font-weight:700}
+.tdeep .yr{display:grid;grid-template-columns:38px 1fr 70px;gap:9px;align-items:center;margin:6px 0}
+.tdeep .yr .y{font-family:"Space Mono",monospace;font-size:10px;color:var(--muted)}
+.tdeep .yr .tk{height:8px;border-radius:5px;background:var(--panel-3);overflow:hidden}
+.tdeep .yr .fl{height:100%;border-radius:5px}
+.tdeep .yr.a .fl{background:var(--a)}.tdeep .yr.b .fl{background:var(--b)}
+.tdeep .yr .rc{font-family:"Space Mono",monospace;font-size:10px;text-align:right;font-weight:700}
+.tdeep .cmp{width:100%;border-collapse:collapse}
+.tdeep .cmp td{padding:7px 3px;font-family:"Space Mono",monospace;font-size:12px;font-weight:700}
+.tdeep .cmp .mid{text-align:center;font-family:"Archivo",sans-serif;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.tdeep .cmp .la{text-align:left}.tdeep .cmp .ra{text-align:right}
+.tdeep .cmp tr{border-top:1px solid rgba(255,255,255,.06)}
+.tdeep .cmp tr.grp td{font-family:"Archivo",sans-serif;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);font-weight:800;padding:9px 2px 3px;border-top:0}
+.tdeep .pv{padding:2px 7px;border-radius:12px;font-size:11px}
+.tdeep .pv.la2{color:#0e0f0d;background:var(--a)}.tdeep .pv.lb2{color:#0e0f0d;background:var(--b)}
+.tdeep .mk .hd,.tdeep .mrow{display:grid;grid-template-columns:1fr 56px 44px 48px;gap:6px;align-items:center}
+.tdeep .mk .hd{font-family:"Archivo",sans-serif;font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);font-weight:800;padding-bottom:3px}
+.tdeep .mk .hd .r{text-align:right}
+.tdeep .mg{margin-top:11px}.tdeep .mg .gl{font-family:"Archivo",sans-serif;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:2px}
+.tdeep .mrow{padding:6px 0;border-top:1px solid rgba(255,255,255,.06)}
+.tdeep .mrow .sel{font-size:11.5px;font-weight:700}.tdeep .mrow .sel .ln{font-family:"Space Mono",monospace;font-size:9.5px;color:var(--muted);margin-left:4px}
+.tdeep .mrow .md{font-family:"Space Mono",monospace;font-size:10px;text-align:right;line-height:1.3}.tdeep .mrow .md .p{display:block;font-weight:700}.tdeep .mrow .md .o{color:var(--muted-2)}
+.tdeep .mrow .mkv{font-family:"Space Mono",monospace;font-size:11.5px;text-align:right;font-weight:700}
+.tdeep .mrow .eg{font-family:"Space Mono",monospace;font-size:10.5px;text-align:right;font-weight:700}
+.tdeep .eg.pos{color:var(--win)}.tdeep .eg.neg{color:var(--loss)}.tdeep .eg.na,.tdeep .mkv.na{color:var(--muted-2);font-weight:400}
+.tdeep .spd .bands{display:flex;height:10px;border-radius:6px;overflow:hidden}
+.tdeep .spd .trk{position:relative}
+.tdeep .spd .dot{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--bg);transform:translate(-50%,-50%);box-shadow:0 0 8px rgba(255,255,255,.6)}
+.tdeep .spd .cats{display:flex;justify-content:space-between;font-family:"Space Mono",monospace;font-size:8.5px;color:var(--muted-2);margin-top:5px}
+.tdeep .wx{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px;margin-top:10px}
+.tdeep .wx .w{background:var(--panel-3);border:1px solid var(--line);border-radius:10px;padding:8px 5px;text-align:center}
+.tdeep .wx .w .v{font-family:"Space Mono",monospace;font-size:13px;font-weight:700}.tdeep .wx .w .k{font-family:"Archivo",sans-serif;font-size:7.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);font-weight:800;margin-top:2px}
+.tdeep .leg{display:flex;gap:16px;justify-content:center;margin-top:6px;font-family:"Space Mono",monospace;font-size:10.5px}
+.tdeep .leg .dd{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.tdeep .hl{color:var(--gold)}
+.tdeep .note{font-size:11px;color:var(--muted-2);margin-top:10px;font-style:italic;line-height:1.5}
+</style>
+
 </head>
 <body>
 <div class="shell">
@@ -461,19 +513,16 @@ function renderDetail(m){const sc=m.score||{},live=m.status==="live",fin=m.statu
     (_hasSurf?'<button class="d-tab '+(detailTab==="surface"?"active":"")+'" onclick="setDetailTab(\'surface\')">Surface</button>':"")+
     '<button class="d-tab '+(detailTab==="stats"?"active":"")+'" onclick="setDetailTab(\'stats\')">Match Stats</button></div>';
   let body;
-  if(detailTab==="analysis"){let meta="";
-    if(m.h2h)meta+='<div class="meta-line"><b>Head-to-head:</b> '+m.h2h+'</div>';
-    if(m.form_a)meta+='<div class="meta-line"><b>'+m.player_a+':</b> '+m.form_a+" "+formPills(m.recent_a)+'</div>';
-    if(m.form_b)meta+='<div class="meta-line"><b>'+m.player_b+':</b> '+m.form_b+" "+formPills(m.recent_b)+'</div>';
-    if(m.weather)meta+='<div class="meta-line"><b>Weather:</b> '+wxIcon(m.weather)+' '+m.weather+(m.weather_effect?' &middot; '+m.weather_effect:"")+'</div>';
-    meta+='<div class="meta-line"><b>Confidence:</b> '+confLabel+'</div>';
-    if(m.lines)meta+=tennisLinesHTML(m);
+  if(detailTab==="analysis"){
     const paras=(m.analysis||"").split("\n\n").filter(Boolean).map(p=>'<p style="margin:0 0 12px">'+p+'</p>').join("");
-    body='<div class="panel">'+tennisReportHTML(m)+'<div class="analysis">'+paras+'</div>'+meta+'</div>';
+    body='<div class="panel"><div id="tdeep-mount" class="tdeep">'+tdeepSkeleton()+'</div>'
+       +(paras?('<div class="analysis" style="margin-top:16px">'+paras+'</div>'):'')
+       +'<div class="meta-line" style="margin-top:10px"><b>Model confidence:</b> '+confLabel+'</div></div>';
   }else if(detailTab==="surface"){body='<div class="panel">'+surfaceHTML(m)+'</div>';
   }else{body='<div class="panel">'+statsHTML(m)+'</div>';}
   document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to matches</button>'+head+mvMount("tennis",m.id,m.best_of||3)+(live?'<div id="twp-host" class="twp-host"></div>':"")+tabs+body;
-  if(live){try{loadTennisWinProb(m.id);}catch(e){}}}
+  if(live){try{loadTennisWinProb(m.id);}catch(e){}}
+  if(detailTab==="analysis"){try{loadDeep(m.id);}catch(e){}}}
 function setDetailTab(t){detailTab=t;refreshDetail(true);}
 function preMatchFormHTML(m){
   let h='<div class="season-hdr">Pre-match form<br><span>Serve &amp; return stats take over once play begins</span></div>';
@@ -4744,7 +4793,102 @@ setInterval(loadAccuracy,300000);
 
 
 </script>
-<script src="/ll-enhance.js?v=34"></script>
+<script src="/ll-enhance.js?v=35"></script>
 <script src="/ll-stocks.js?v=1"></script>
+
+<script id="tdeep-js">
+var _deepCache={};
+function tdeepSkeleton(){return '<div class="skel-card" style="height:120px"></div><div class="skel-card"></div>';}
+function _tdWLP(r){if(!r||(r.w+r.l)===0)return null;return Math.round(100*r.w/(r.w+r.l));}
+function _tdWL(r){return r?(r.w+"-"+r.l):"—";}
+function loadDeep(id){
+  var mount=document.getElementById("tdeep-mount"); if(!mount)return;
+  if(_deepCache[id]){mount.innerHTML=_deepCache[id].html; if(_deepCache[id].radar)drawDeepRadar(_deepCache[id].radar); return;}
+  getJSON("/api/tennis/analysis/"+id).then(function(d){
+    if(!d||d.error){mount.innerHTML='<div class="stat-na" style="padding:18px 0">Full analysis appears once player profiles are built for this match.</div>';return;}
+    var html=renderAnalysisHTML(d);
+    _deepCache[id]={html:html,radar:d._radar};
+    var mm=document.getElementById("tdeep-mount"); if(mm){mm.innerHTML=html; if(d._radar)drawDeepRadar(d._radar);}
+  }).catch(function(){var mm=document.getElementById("tdeep-mount"); if(mm)mm.innerHTML='';});
+}
+function renderAnalysisHTML(d){
+  var A=d.players.a,B=d.players.b,surf=(d.conditions&&d.conditions.surface)||"Hard";
+  function P(x){return x==null?"—":Math.round(x*100)+"%";}
+  function N(x,dec){return x==null?"—":(dec?x.toFixed(1):x);}
+  function hi(a,b){return (a==null||b==null)?null:(a>b);}
+  function lo(a,b){return (a==null||b==null)?null:(a<b);}
+  var h="";
+  var c=d.conditions;
+  if(c&&c.cpi!=null){
+    var pos=Math.max(0,Math.min(100,(c.cpi-15)/35*100));
+    h+='<div class="dcard"><div class="dct">Court &amp; conditions</div><div class="spd">'
+      +'<div style="display:flex;justify-content:space-between;font-family:Archivo,sans-serif;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);font-weight:800;margin-bottom:6px"><span>Court Pace Index</span><span style="font-family:Space Mono,monospace;color:var(--gold)">~'+c.cpi+' · cat '+c.category+'</span></div>'
+      +'<div class="trk"><div class="bands"><span style="flex:40;background:#3f6f8f"></span><span style="flex:14.3;background:#3f8a78"></span><span style="flex:14.3;background:#C9932F"></span><span style="flex:14.3;background:#E0903A"></span><span style="flex:17.1;background:#E0563A"></span></div><div class="dot" style="left:'+pos+'%"></div></div>'
+      +'<div class="cats"><span>Slow ≤29</span><span>Medium 35-39</span><span>Fast ≥45</span></div></div>';
+    if(c.weather)h+='<div style="margin-top:10px;font-size:12px;color:var(--muted)"><b style="color:var(--fg)">Conditions:</b> '+c.weather+'</div>';
+    h+='</div>';
+  }
+  function pcard(p,cls){
+    var yr=p.by_year?Object.keys(p.by_year).sort().reverse()[0]:null;
+    var season=yr?p.by_year[yr]:null,sr=(p.surface||{})[surf];
+    return '<div class="pc '+cls+'"><div class="nm">'+lastName(p.name||"")+'</div><div class="tl">'+(p.rank?'#'+p.rank+' ':'')+(p.age?'· Age '+p.age:'')+'</div>'
+      +'<div class="rw"><span class="k">'+(yr||"Season")+'</span><span class="v">'+_tdWL(season)+(_tdWLP(season)!=null?' ('+_tdWLP(season)+'%)':'')+'</span></div>'
+      +'<div class="rw"><span class="k">'+surf+'</span><span class="v">'+_tdWL(sr)+(_tdWLP(sr)!=null?' ('+_tdWLP(sr)+'%)':'')+'</span></div>'
+      +'<div class="rw"><span class="k">Titles</span><span class="v">'+(p.titles!=null?p.titles:"—")+'</span></div>'
+      +'<div class="rw"><span class="k">Career high</span><span class="v hl">'+(p.career_high?'#'+p.career_high:"—")+'</span></div></div>';
+  }
+  h+='<div class="dcard"><div class="dct">This season</div><div class="prof">'+pcard(A,"a")+pcard(B,"b")+'</div></div>';
+  function careerCol(p,cls){
+    var ys=p.by_year?Object.keys(p.by_year).sort().reverse().slice(0,4):[];
+    var rows=ys.map(function(y){var r=p.by_year[y],pct=_tdWLP(r)||0;return '<div class="yr '+cls+'"><span class="y">'+y+'</span><div class="tk"><div class="fl" style="width:'+pct+'%"></div></div><span class="rc">'+r.w+'-'+r.l+' · '+pct+'%</span></div>';}).join("");
+    var car=p.career?('Career '+p.career.w+'-'+p.career.l+(_tdWLP(p.career)!=null?' · '+_tdWLP(p.career)+'%':'')):'';
+    return '<div><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span style="font-family:Archivo,sans-serif;font-weight:800;font-size:12.5px;color:var(--'+cls+')">'+lastName(p.name||"")+'</span><span style="font-family:Space Mono,monospace;font-size:10px;color:var(--muted)">'+car+'</span></div>'+rows+'</div>';
+  }
+  h+='<div class="dcard"><div class="dct">Career results · don’t judge on one season</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'+careerCol(A,"a")+careerCol(B,"b")+'</div></div>';
+  var oa=A.overall||{},ob=B.overall||{};
+  function row(lab,va,vb,leadA){var ca=leadA===true?'<span class="pv la2">'+va+'</span>':va;var cb=leadA===false?'<span class="pv lb2">'+vb+'</span>':vb;return '<tr><td class="la">'+ca+'</td><td class="mid">'+lab+'</td><td class="ra">'+cb+'</td></tr>';}
+  h+='<div class="dcard"><div class="dct">Serve &amp; return · surface-adjusted</div><table class="cmp">'
+    +'<tr class="grp"><td colspan="3">🎾 Serve</td></tr>'
+    +row("Serve pts won %",P(oa.spw),P(ob.spw),hi(oa.spw,ob.spw))
+    +row("1st serve win %",P(oa.first_win),P(ob.first_win),hi(oa.first_win,ob.first_win))
+    +row("2nd serve win %",P(oa.second_win),P(ob.second_win),hi(oa.second_win,ob.second_win))
+    +row("Aces / match",N(oa.ace_pm,1),N(ob.ace_pm,1),hi(oa.ace_pm,ob.ace_pm))
+    +row("Double faults / match",N(oa.df_pm,1),N(ob.df_pm,1),lo(oa.df_pm,ob.df_pm))
+    +row("Service hold %",P(oa.hold),P(ob.hold),hi(oa.hold,ob.hold))
+    +'<tr class="grp"><td colspan="3">↩ Return</td></tr>'
+    +row("Return pts won %",P(oa.rpw),P(ob.rpw),hi(oa.rpw,ob.rpw))
+    +row("Break %",P(oa.brk),P(ob.brk),hi(oa.brk,ob.brk))
+    +row("Break pts converted %",P(oa.bp_conv),P(ob.bp_conv),hi(oa.bp_conv,ob.bp_conv))
+    +'</table><div class="note">Serve pts won and return pts won drive the market engine — combined opponent-adjusted, so a great returner pulls the server’s hold down.</div></div>';
+  if(d.markets&&d.markets.length){
+    var groups={},order=[];
+    d.markets.forEach(function(r){if(!groups[r.group]){groups[r.group]=[];order.push(r.group);}groups[r.group].push(r);});
+    var mh='<div class="dcard mk"><div class="dct">Betting markets · model vs market</div><div class="hd"><span>Selection</span><span class="r">Model</span><span class="r">Mkt</span><span class="r">Edge</span></div>';
+    order.forEach(function(g){mh+='<div class="mg"><div class="gl">'+g+'</div>';
+      groups[g].forEach(function(r){
+        var ln=r.line?'<span class="ln">'+r.line+'</span>':'';
+        var eg=r.edge!=null?('<span class="eg '+(r.edge>=0?'pos':'neg')+'">'+(r.edge>=0?'+':'')+r.edge+'%</span>'):'<span class="eg na">no mkt</span>';
+        mh+='<div class="mrow"><span class="sel">'+r.selection+' '+ln+'</span><span class="md"><span class="p">'+r.model_prob+'%</span><span class="o">'+(r.model_fair||'')+'</span></span><span class="mkv'+(r.market==null?' na':'')+'">'+(r.market!=null?r.market:'—')+'</span>'+eg+'</div>';
+      });
+      mh+='</div>';});
+    mh+='</div>'; h+=mh;
+  }
+  h+='<div class="dcard"><div class="dct">Player comparison</div><div style="display:flex;justify-content:center"><svg id="tdeep-radar" width="320" height="300" viewBox="0 0 320 300"></svg></div><div class="leg"><span><span class="dd" style="background:var(--a)"></span>'+lastName(A.name||"A")+'</span><span><span class="dd" style="background:var(--b)"></span>'+lastName(B.name||"B")+'</span></div></div>';
+  var axes=["Form","Momentum","Energy","First Set %","Surface","Season %","Tier","H2H"];
+  d._radar={axes:axes,a:axes.map(function(k){return (A.radar&&A.radar[k])||0;}),b:axes.map(function(k){return (B.radar&&B.radar[k])||0;})};
+  return h;
+}
+function drawDeepRadar(R){
+  var svg=document.getElementById("tdeep-radar"); if(!svg)return; svg.innerHTML="";
+  var cx=160,cy=150,rad=104,n=R.axes.length,NS="http://www.w3.org/2000/svg";
+  function pt(i,r){var a=-Math.PI/2+i*2*Math.PI/n;return [cx+r*Math.cos(a),cy+r*Math.sin(a)];}
+  function mk(t,at){var e=document.createElementNS(NS,t);for(var k in at)e.setAttribute(k,at[k]);return e;}
+  [0.25,0.5,0.75,1].forEach(function(f){var dd="";for(var i=0;i<n;i++){var q=pt(i,rad*f);dd+=(i?"L":"M")+q[0].toFixed(1)+" "+q[1].toFixed(1)+" ";}svg.appendChild(mk("path",{d:dd+"Z",fill:"none",stroke:"#2F302D","stroke-width":1}));});
+  for(var i=0;i<n;i++){var q=pt(i,rad);svg.appendChild(mk("line",{x1:cx,y1:cy,x2:q[0],y2:q[1],stroke:"#2F302D","stroke-width":1}));var lp=pt(i,rad+14);var t=mk("text",{x:lp[0],y:lp[1],fill:"#9A9B95","font-size":"8","font-family":"Space Mono, monospace","text-anchor":Math.abs(lp[0]-cx)<6?"middle":(lp[0]>cx?"start":"end"),"dominant-baseline":"middle"});t.textContent=R.axes[i];svg.appendChild(t);}
+  function poly(v,col,fil){var dd="";for(var i=0;i<n;i++){var q=pt(i,rad*(v[i]||0)/100);dd+=(i?"L":"M")+q[0].toFixed(1)+" "+q[1].toFixed(1)+" ";}svg.appendChild(mk("path",{d:dd+"Z",fill:fil,stroke:col,"stroke-width":2,"stroke-linejoin":"round"}));}
+  poly(R.b,"#5EA6F2","rgba(94,166,242,.18)"); poly(R.a,"#53D98A","rgba(83,217,138,.22)");
+}
+</script>
+
 </body>
 </html>

@@ -38,8 +38,12 @@ from ws import manager
 import sports
 
 PROVIDER_NAME = os.environ.get("TENNIS_PROVIDER", "mock").lower()
-# Real tennis feeds: apitennis (legacy, paid) or sofascore (free, current).
-USE_REAL = PROVIDER_NAME in ("apitennis", "sofascore")
+# Real tennis feeds:
+#   espn      - FREE ATP/WTA + Slams via ESPN's public API (current default choice)
+#   apitennis - legacy paid api-tennis feed
+#   sofascore - old free scrape (now IP-gated, kept for reference)
+# All three pair with the same Sackmann-trained surface-Elo ratings and Odds API lines.
+USE_REAL = PROVIDER_NAME in ("apitennis", "sofascore", "espn")
 
 # Optional AI narrative for write-ups. If ANTHROPIC_API_KEY is set in the
 # environment, we use Claude to turn the computed FACTS into richer prose
@@ -72,7 +76,10 @@ LLM_COMPLETE = _make_llm_complete()
 
 if USE_REAL:
     from seed import build_day
-    if PROVIDER_NAME == "sofascore":
+    if PROVIDER_NAME == "espn":
+        from espntennis import ESPNTennisProvider
+        provider = ESPNTennisProvider()
+    elif PROVIDER_NAME == "sofascore":
         from sofatennis import SofaTennisProvider
         provider = SofaTennisProvider()
     else:
@@ -584,63 +591,32 @@ async def lifespan(app: FastAPI):
         def _odds_snapshot_bg():
             import time as _t
             _t.sleep(150)
-            # Every 3h by default. On the $30 Odds API tier (~667 credits/day) this
-            # runs ~8 sports x ~3 markets x 8 cycles = ~192 credits/day (~29% of
-            # budget), leaving ample headroom for on-view pulls. Env-overridable.
-            every = max(1, int(os.environ.get("ODDS_SNAPSHOT_HOURS", "3") or 3)) * 3600
-            # Per-sport LOOKAHEAD (days ahead to snapshot). Capturing a game's line
-            # as far ahead as the book posts it = freezing a real OPENING line, which
-            # is what the ATS/CLV tracking grades against. Football books post the
-            # next week's lines Sun night/Mon, so NFL/NCAAF look a full week ahead;
-            # other sports open closer to game day, so 1-2 days is enough. The odds
-            # feed is cached per sport, so looking N days ahead costs ~1 API call per
-            # sport per cycle, not N calls. Env-overridable per sport.
-            def _ahead(sport, default):
-                try:
-                    return max(0, int(os.environ.get("ODDS_AHEAD_" + sport.upper(), str(default))))
-                except Exception:
-                    return default
-            LOOKAHEAD = {
-                "nfl": _ahead("nfl", 7), "ncaaf": _ahead("ncaaf", 7),
-                "mlb": _ahead("mlb", 2), "nba": _ahead("nba", 2),
-                "nhl": _ahead("nhl", 2), "ncaab": _ahead("ncaab", 2),
-                "ncaabb": _ahead("ncaabb", 2), "soccer": _ahead("soccer", 2),
-            }
-            def _dates(sport):
-                base = dt.date.today()
-                return [(base + dt.timedelta(days=i)).isoformat()
-                        for i in range(LOOKAHEAD.get(sport, 1) + 1)]
+            every = max(1, int(os.environ.get("ODDS_SNAPSHOT_HOURS", "12") or 12)) * 3600
             while True:
                 try:
                     import odds_api
                     if odds_api.enabled():
-                        n = 0
-                        # date-driven sports: walk each sport's own lookahead window
-                        per_day = [
-                            ("mlb", lambda d: mlb_games(date=d)),
-                            ("ncaabb", lambda d: ncaabb_games(date=d)),
-                            ("nba", lambda d: team_games("nba", date=d)),
-                            ("nhl", lambda d: team_games("nhl", date=d)),
-                            ("ncaaf", lambda d: team_games("ncaaf", date=d)),
-                            ("ncaab", lambda d: team_games("ncaab", date=d)),
-                            ("nfl", lambda d: team_games("nfl", date=d)),
+                        today = dt.date.today().isoformat()
+                        jobs = [
+                            ("mlb", lambda: mlb_games(date=today)),
+                            ("ncaabb", lambda: ncaabb_games(date=today)),
+                            ("ufc", lambda: ufc_games(date=None)),
+                            ("nba", lambda: team_games("nba", date=today)),
+                            ("nfl", lambda: team_games("nfl", date=today)),
+                            ("nhl", lambda: team_games("nhl", date=today)),
+                            ("ncaaf", lambda: team_games("ncaaf", date=today)),
+                            ("ncaab", lambda: team_games("ncaab", date=today)),
+                            ("soccer", lambda: soccer_games(date=today, league="all")),
                         ]
-                        for name, fn in per_day:
-                            for d in _dates(name):
-                                try:
-                                    fn(d); n += 1
-                                except Exception as e:
-                                    print(f"[odds-snapshot] {name} {d} failed: {e}")
-                                _t.sleep(1)
-                        # sports that manage their own window
-                        for name, fn in (("ufc", lambda: ufc_games(date=None)),
-                                          ("soccer", lambda: soccer_games(date=dt.date.today().isoformat(), league="all"))):
+                        n = 0
+                        for name, fn in jobs:
                             try:
-                                fn(); n += 1
+                                fn()
+                                n += 1
                             except Exception as e:
                                 print(f"[odds-snapshot] {name} failed: {e}")
-                            _t.sleep(2)
-                        print(f"[odds-snapshot] cycle done ({n} board-days; NFL/CFB {LOOKAHEAD['nfl']}d ahead)")
+                            _t.sleep(3)
+                        print(f"[odds-snapshot] cycle done ({n} boards)")
                 except Exception as e:
                     print(f"[odds-snapshot] loop error: {e}")
                 _t.sleep(every)
@@ -2282,30 +2258,6 @@ def _odds_rec_sides(home_name, o):
     return o.get("ml_away"), o.get("ml_home")
 
 
-def _fuzzy_odds_match(book, home_name, away_name):
-    """Find a book entry for a game even when names don't match exactly. ESPN
-    includes mascots ("North Texas Mean Green", "Tulsa Golden Hurricane") while
-    the Odds API often uses just the school ("North Texas", "Tulsa"), so an exact
-    key lookup misses most college games. This matches when the two normalized
-    names overlap (one starts-with or contains the other) on BOTH teams. Returns
-    the matched record or None."""
-    hn, an = _norm_team(home_name), _norm_team(away_name)
-    if not hn or not an:
-        return None
-    def _sim(a, b):
-        if not a or not b:
-            return False
-        return a == b or a.startswith(b) or b.startswith(a) or a in b or b in a
-    for key, rec in book.items():
-        # key is "normhome|normaway", but home/away can be flipped vs ours, so
-        # match against the record's own team names both ways.
-        rh = _norm_team(rec.get("home_team", ""))
-        ra = _norm_team(rec.get("away_team", ""))
-        if (_sim(hn, rh) and _sim(an, ra)) or (_sim(hn, ra) and _sim(an, rh)):
-            return rec
-    return None
-
-
 def _attach_odds(sport, games):
     """Attach real market odds to each game and snapshot the pick's line.
 
@@ -2314,15 +2266,16 @@ def _attach_odds(sport, games):
     scarce Odds API call — we reserve the Odds API's limited monthly quota for
     the sports SGO can't do (tennis, golf, NCAA baseball, WNBA). Falls through to
     SGO below so the model-vs-market edge renders on either source."""
-    # PRIMARY = the Odds API (paid tier, includes spreads + totals, reliable).
-    # SGO is the FALLBACK for any game the Odds API doesn't return — and since SGO
-    # is prone to 429 rate-limiting, we never DEPEND on it. This ordering fixes the
-    # bug where SGO-covered sports got NO odds when SGO was rate-limited, even
-    # though the paid Odds API had quota to spare.
     book = {}
+    sgo_covers = False
+    try:
+        import sgo_api
+        sgo_covers = (sgo_api.available() and sport in getattr(sgo_api, "SGO_LEAGUE", {}))
+    except Exception:
+        sgo_covers = False
     try:
         import odds_api
-        if odds_api.enabled():
+        if odds_api.enabled() and not sgo_covers:
             book = odds_api.get_odds(sport) or {}
     except Exception as e:
         print(f"[odds] odds-api {sport} skipped: {e}")
@@ -2337,22 +2290,19 @@ def _attach_odds(sport, games):
         if g.get("odds"):
             continue                          # provider already attached (soccer)
         o = book.get(_norm_team(g["home"]["name"]) + "|" + _norm_team(g["away"]["name"])) if book else None
-        if not o and book:                    # exact key missed (mascot names) -> fuzzy
-            o = _fuzzy_odds_match(book, g["home"]["name"], g["away"]["name"])
         if o:
             mlh, mla = _odds_rec_sides(g["home"]["name"], o)
             g["odds"] = {"ml_home": mlh, "ml_away": mla,
                          "spread_home": o.get("spread_home"), "total": o.get("total"),
                          "books": o.get("books")}
-        # Fall back to SGO only if the Odds API had nothing for this game.
-        if not g.get("odds") and sgo is not None:
+        elif sgo is not None:
             try:
                 so = sgo.get_game_odds(sport, g["home"]["name"], g["away"]["name"])
             except Exception:
                 so = None
             if so and (so.get("ml_home") is not None or so.get("ml_away") is not None):
                 g["odds"] = {"ml_home": so.get("ml_home"), "ml_away": so.get("ml_away"),
-                             "spread_home": so.get("spread_home"), "total": so.get("total"),
+                             "spread_home": None, "total": None,
                              "books": ["SportsGameOdds"]}
         if g.get("odds"):                     # snapshot the side we pick (CLV)
             side = "home" if g["prob_home"] >= 0.5 else "away"
@@ -2364,31 +2314,6 @@ def _attach_odds(sport, games):
                                    spread=(g.get("odds") or {}).get("spread_home"))
                 except Exception:
                     pass
-            # ATS side pick: compare the model's projected margin to the market
-            # spread and recommend the side with value. Model Georgia -7.4 vs a
-            # market of -10.5 => value is the OTHER side (+10.5). Attached as
-            # g["ats"] for the UI; None when we lack a margin or a spread.
-            try:
-                mm = g.get("exp_margin")
-                sp = (g.get("odds") or {}).get("spread_home")
-                if mm is not None and sp is not None:
-                    import ats as _ats
-                    _side = _ats.pick_side(float(mm), float(sp))   # 'home'/'away'/None
-                    if _side:
-                        h = g["home"]; a = g["away"]
-                        pick_team = (h if _side == "home" else a)
-                        pick_ab = pick_team.get("abbr") or pick_team.get("short") or pick_team.get("name")
-                        # the line the bettor takes on that side (home line = sp; away = -sp)
-                        line = sp if _side == "home" else -sp
-                        line_str = ("+" if line > 0 else "") + str(round(line, 1))
-                        # edge = how many points the model disagrees with the market
-                        edge_pts = round(abs(float(mm) - (-float(sp))), 1)
-                        g["ats"] = {"side": _side, "team": pick_ab,
-                                    "line": round(line, 1), "line_str": line_str,
-                                    "edge_pts": edge_pts,
-                                    "pick_str": pick_ab + " " + line_str}
-            except Exception:
-                pass
     return games
 
 
@@ -6085,99 +6010,6 @@ def sport_news(sport: str, date: str | None = None):
     return {"sport": sport, "news": news, "injuries": injuries, "headlines": headlines}
 
 
-@app.get("/api/ncaaf/roster-impact")
-def ncaaf_roster_impact(limit: int = 0, team: str = ""):
-    """Transfer-portal impact board: every team ranked by roster change, with key
-    transfers in/out. Reads ncaaf_roster.json (built by the GitHub Action).
-    ?team= filters to one team's full transfer list."""
-    import json as _json, os as _os
-    _cands = [p for p in [
-        _os.environ.get("NCAAF_ROSTER_PATH"),
-        "/data/ncaaf_roster.json",
-        _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "ncaaf_roster.json"),
-        "ncaaf_roster.json",
-    ] if p]
-    blob = None
-    for _p in _cands:
-        try:
-            with open(_p) as f:
-                blob = _json.load(f)
-            break
-        except Exception:
-            continue
-    if blob is None:
-        return {"ok": False, "error": "no roster file found. Run the 'Refresh "
-                "efficiency ratings' GitHub Action to build ncaaf_roster.json.",
-                "teams": []}
-    teams = list((blob.get("teams") or {}).values())
-    if team:
-        tn = team.strip().lower()
-        hit = [t for t in teams if tn in (t.get("name", "").lower())]
-        return {"ok": True, "updated": blob.get("updated"),
-                "season": blob.get("year"), "matches": hit}
-    teams.sort(key=lambda t: -(t.get("impact") or 0))
-    rows = []
-    for t in teams:
-        if not t.get("moves"):
-            continue
-        rows.append({"team": t.get("name"), "impact": t.get("impact"),
-                     "adj_sp": t.get("adj_sp"), "moves": t.get("moves"),
-                     "in_value": t.get("in_value"), "out_value": t.get("out_value"),
-                     "key_in": t.get("key_in", []), "key_out": t.get("key_out", [])})
-    if limit and limit > 0:
-        rows = rows[:limit]
-    return {"ok": True, "updated": blob.get("updated"), "season": blob.get("year"),
-            "count": len(rows), "teams": rows}
-
-
-@app.get("/portal")
-def portal_board():
-    """Self-contained Transfer Portal Impact board. Fetches /api/ncaaf/roster-impact
-    and renders every team ranked by roster change with key transfers in/out."""
-    html = """<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transfer Portal Impact \u2014 Line Logic</title>
-<style>
-:root{--bg:#111211;--panel:#171817;--panel2:#1E1F1D;--ink:#EDEBE6;--line:#2A2B29;
---gain:#5FCF86;--loss:#EE6A54;--gold:#E8B04B;--muted:#8E8F8A;--muted2:#57584F}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
-font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:16px;max-width:900px;margin:0 auto}
-h1{font-size:22px;margin:8px 0 2px}.sub{color:var(--muted);font-size:13px;margin-bottom:16px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px}
-.row1{display:flex;align-items:center;gap:12px}
-.rank{color:var(--muted2);font:600 13px/1 monospace;min-width:26px}
-.team{font-weight:700;font-size:17px;flex:1}
-.impact{font:700 15px/1 monospace;padding:4px 8px;border-radius:8px}
-.adj{color:var(--muted);font:600 13px/1 monospace;margin-left:8px}
-.tx{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.txcol h4{margin:0 0 4px;font-size:11px;letter-spacing:.05em;text-transform:uppercase}
-.in h4{color:var(--gain)}.out h4{color:var(--loss)}
-.p{font-size:13px;padding:2px 0;display:flex;gap:6px}
-.pos{color:var(--muted2);font:600 11px/1.4 monospace;min-width:26px}
-.pn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pv{color:var(--muted);font:600 12px/1.4 monospace}
-.none{color:var(--muted2);font-size:12px;font-style:italic}
-.err{color:var(--loss);padding:20px;text-align:center}
-.foot{color:var(--muted2);font-size:11px;margin:18px 0 40px;text-align:center}
-@media(max-width:520px){.tx{grid-template-columns:1fr}}
-</style></head><body>
-<h1>Transfer Portal Impact</h1><div class="sub" id="sub">Loading\u2026</div><div id="list"></div>
-<div class="foot">Impact 0\u2013100 (50 = no net change). Ranks roster change by portal moves + recruiting,
-valuing each player by the better of last-season production or talent grade. Not betting advice.</div>
-<script>
-function col(x){if(x>=50){var t=(x-50)/50;return 'rgba(95,200,138,'+(0.12+t*0.28)+')';}var t=(50-x)/50;return 'rgba(226,104,95,'+(0.12+t*0.28)+')';}
-function esc(s){return (s||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
-function plist(arr,dir){if(!arr||!arr.length)return '<div class="none">none tracked</div>';
-return arr.map(function(p){return '<div class="p"><span class="pos">'+esc(p.pos||'')+'</span><span class="pn">'+esc(p.name)+'</span><span class="pv">'+(dir==='in'?(p.from?('\u2190 '+esc(p.from)):''):(p.to?('\u2192 '+esc(p.to)):''))+'</span></div>';}).join('');}
-fetch('/api/ncaaf/roster-impact').then(function(r){return r.json();}).then(function(d){
-if(!d.ok){document.getElementById('sub').innerHTML='';document.getElementById('list').innerHTML='<div class="err">'+esc(d.error||'No data yet.')+'</div>';return;}
-var up=new Date(d.updated);document.getElementById('sub').textContent=d.count+' teams \u00b7 '+(d.season||'')+' cycle \u00b7 updated '+(isNaN(up)?d.updated:up.toLocaleDateString());
-document.getElementById('list').innerHTML=d.teams.map(function(t,i){return '<div class="card"><div class="row1"><span class="rank">'+(i+1)+'</span><span class="team">'+esc(t.team)+'</span><span class="impact" style="background:'+col(t.impact)+'">'+t.impact+'</span><span class="adj">'+(t.adj_sp>=0?'+':'')+t.adj_sp+' pts</span></div><div class="tx"><div class="txcol in"><h4>Added ('+(t.moves||0)+' moves)</h4>'+plist(t.key_in,'in')+'</div><div class="txcol out"><h4>Lost</h4>'+plist(t.key_out,'out')+'</div></div></div>';}).join('');
-}).catch(function(e){document.getElementById('list').innerHTML='<div class="err">Failed to load: '+e+'</div>';});
-</script></body></html>"""
-    return Response(content=html, media_type="text/html")
-
-
 @app.get("/api/ats")
 def ats_record(sport: str | None = None, days: int = 0):
     """The model's against-the-spread record vs the OPENING line (first spread we
@@ -6327,28 +6159,6 @@ def _odds_diag():
             out["sgo_game_odds_sample"] = {"note": "no MLB games today to sample"}
     except Exception as e:
         out["sgo_game_odds_sample"] = {"error": str(e)}
-    # RAW Odds API book probe: how many games does get_odds return per sport, and
-    # a sample of the team names it uses (so we can tell "empty fetch" from
-    # "name mismatch"). This is the definitive check for the missing-market issue.
-    try:
-        import odds_api
-        probe = {}
-        for sp in ("nfl", "ncaaf", "mlb", "nba"):
-            try:
-                bk = odds_api.get_odds(sp) or {}
-                # unique records (the book stores each under 2 keys)
-                recs = {id(v): v for v in bk.values()}.values()
-                sample = None
-                for v in recs:
-                    sample = {"home_team": v.get("home_team"), "away_team": v.get("away_team"),
-                              "spread_home": v.get("spread_home"), "ml_home": v.get("ml_home")}
-                    break
-                probe[sp] = {"games": len(recs), "sample": sample}
-            except Exception as e:
-                probe[sp] = {"error": str(e)}
-        out["oddsapi_book_probe"] = probe
-    except Exception as e:
-        out["oddsapi_book_probe"] = {"error": str(e)}
     return JSONResponse(out, headers={"Cache-Control": "no-store"})
 
 
@@ -7151,3 +6961,14 @@ try:
     app.include_router(_capper_router)
 except Exception as _e:
     print(f"[startup] capper router not loaded: {_e}")
+
+
+# --- Tennis analysis page endpoint (profiles + CPI + weather + model lines) ---
+# Registered at import time so GET /api/tennis/analysis/{id} is live before serving.
+# Guarded so a missing/invalid module never takes down the rest of the app.
+try:
+    import tennis_analysis as _tennis_analysis
+    _tennis_analysis.register(app)
+    print("[tennis] analysis endpoint registered")
+except Exception as _e:
+    print(f"[tennis] analysis endpoint not registered: {_e}")
