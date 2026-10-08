@@ -7082,6 +7082,90 @@ except Exception as _e:
     print(f"[profiles] auto-refresh not started: {_e}")
 
 
+# --- MLB Statcast profiles (Baseball Savant) — the Venom engine + daily refresh ---
+def _statcast_path():
+    for p in ("/data/mlb_statcast.json", "mlb_statcast.json"):
+        if os.path.exists(p):
+            return p
+    return "/data/mlb_statcast.json"
+
+
+def _run_statcast_build():
+    try:
+        import build_mlb_statcast as _bs
+        out = "/data/mlb_statcast.json"
+        try:
+            os.makedirs("/data", exist_ok=True)
+        except Exception:
+            out = "mlb_statcast.json"
+        _bs.build(out_path=out)
+        try:    # drop the venom cache so the fresh file is picked up immediately
+            import venom as _v
+            _v._CACHE["data"] = None
+            _v._CACHE["mtime"] = 0.0
+        except Exception:
+            pass
+        print(f"[statcast] rebuild complete -> {out}")
+    except Exception as e:
+        print(f"[statcast] build failed: {e}")
+
+
+@app.get("/api/mlb/statcast/build")
+def mlb_statcast_build(confirm: str = ""):
+    """Rebuild mlb_statcast.json from Baseball Savant. Append ?confirm=yes."""
+    if confirm != "yes":
+        return JSONResponse({"note": "append ?confirm=yes to rebuild mlb_statcast.json from Baseball Savant",
+                             "poll": "/api/mlb/statcast/status"})
+    import threading as _th
+    _th.Thread(target=_run_statcast_build, daemon=True).start()
+    return JSONResponse({"status": "statcast build started", "poll": "/api/mlb/statcast/status"})
+
+
+@app.get("/api/mlb/statcast/status")
+def mlb_statcast_status():
+    import json as _json
+    for p in ("/data/mlb_statcast.json", "mlb_statcast.json"):
+        if os.path.exists(p):
+            try:
+                d = _json.load(open(p))
+                return {"exists": True, "path": p, "generated": d.get("generated"),
+                        "year": d.get("year"),
+                        "batters": len(d.get("batters", {})),
+                        "pitchers": len(d.get("pitchers", {}))}
+            except Exception as e:
+                return {"exists": True, "path": p, "error": str(e)}
+    return {"exists": False, "note": "run /api/mlb/statcast/build?confirm=yes"}
+
+
+def _statcast_refresh_loop():
+    """Rebuild on boot if missing/stale, then daily (Statcast updates daily in-season).
+    Off with STATCAST_AUTOREFRESH=0."""
+    import time as _t
+    if os.environ.get("STATCAST_AUTOREFRESH", "1") != "1":
+        print("[statcast] auto-refresh disabled")
+        return
+    _t.sleep(180)
+    while True:
+        try:
+            p = "/data/mlb_statcast.json"
+            need = True
+            if os.path.exists(p):
+                need = (_t.time() - os.path.getmtime(p)) > 20 * 3600   # ~daily
+            if need:
+                _run_statcast_build()
+        except Exception as e:
+            print(f"[statcast] refresh loop error: {e}")
+        _t.sleep(12 * 3600)
+
+
+try:
+    import threading as _th_sc
+    _th_sc.Thread(target=_statcast_refresh_loop, daemon=True).start()
+    print("[statcast] daily auto-refresh thread started")
+except Exception as _e:
+    print(f"[statcast] auto-refresh not started: {_e}")
+
+
 @app.get("/api/tennis/schedule-diag")
 def tennis_schedule_diag():
     """Pinpoints why the tennis board is empty: is the flag on, are the tennis
