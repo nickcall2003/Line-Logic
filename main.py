@@ -7047,3 +7047,47 @@ try:
     print("[profiles] weekly auto-refresh thread started")
 except Exception as _e:
     print(f"[profiles] auto-refresh not started: {_e}")
+
+
+@app.get("/api/tennis/schedule-diag")
+def tennis_schedule_diag():
+    """Pinpoints why the tennis board is empty: is the flag on, are the tennis
+    tournaments discovered, does the Odds API return events, and does the provider
+    turn them into a schedule for today/tomorrow."""
+    import datetime as _dt
+    out = {"provider_name": PROVIDER_NAME, "provider_type": type(provider).__name__,
+           "ODDS_TENNIS_env": os.environ.get("ODDS_TENNIS")}
+    try:
+        import odds_api
+        out["tennis_odds_on"] = odds_api._tennis_odds_on()
+        out["ODDS_API_KEY_present"] = bool(odds_api.API_KEY)
+        try:
+            out["active_tennis_keys"] = odds_api._active_tennis_keys()
+        except Exception as e:
+            out["active_tennis_keys_error"] = str(e)
+        try:
+            evs = odds_api.get_tennis_events()
+            out["events_count"] = len(evs)
+            out["events_sample"] = [{"title": e.get("title"), "a": e.get("home"),
+                                     "b": e.get("away"), "commence": e.get("commence"),
+                                     "ml": [e.get("ml_home"), e.get("ml_away")]} for e in evs[:5]]
+        except Exception as e:
+            out["events_error"] = repr(e)
+    except Exception as e:
+        out["odds_api_error"] = repr(e)
+    # what the provider actually yields for today + next 2 days
+    try:
+        today = _dt.date.today()
+        for off in range(0, 3):
+            d = today + _dt.timedelta(days=off)
+            try:
+                sched = provider.get_schedule(_dt.datetime(d.year, d.month, d.day, 12, 0))
+                out[f"schedule_{d.isoformat()}"] = {
+                    "count": len(sched),
+                    "sample": [f"{m.player_a} vs {m.player_b} [{m.tier} {m.tournament}]" for m in sched[:4]]}
+            except Exception as e:
+                out[f"schedule_{d.isoformat()}_error"] = repr(e)
+    except Exception as e:
+        out["schedule_error"] = repr(e)
+    out["provider_last_error"] = getattr(provider, "last_error", None)
+    return out
