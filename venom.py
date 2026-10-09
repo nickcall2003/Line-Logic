@@ -122,6 +122,37 @@ def _grade(z):
     return "neutral"
 
 
+def _batter_leaks(pitcher):
+    """Favorable bullets about the opposing starter's weaknesses (percentile-based)."""
+    if not pitcher:
+        return []
+    lp = _CACHE["lg"]["pitcher"]
+    nm = pitcher.get("name") or "the starter"
+    out = []
+
+    def pctl(key):
+        v = pitcher.get(key)
+        return (None, None) if v is None else (_pctile(_z(v, lp.get(key, (0, 1)))), v)
+
+    p, v = pctl("xwoba")                         # high xwOBA-against = hittable
+    if p is not None and p >= 78:
+        top = max(1, round(100 - p))
+        out.append({"text": "%s is in the top %d%% most hittable (xwOBA %s)."
+                    % (nm, top, ("%.3f" % v).lstrip("0")), "rank": top, "strong": p >= 90})
+    p, v = pctl("hard_hit_pct")                  # allows hard contact
+    if p is not None and p >= 78:
+        top = max(1, round(100 - p))
+        out.append({"text": "%s allows top %d%% hard contact (%.1f%%)."
+                    % (nm, top, v), "rank": top, "strong": p >= 90})
+    p, v = pctl("k_pct")                          # low K rate = favorable
+    if p is not None and p <= 22:
+        bot = max(1, round(p))
+        out.append({"text": "%s has a bottom %d%% strikeout rate (%.1f%%)."
+                    % (nm, bot, v), "rank": bot, "strong": p <= 10})
+    out.sort(key=lambda x: x["rank"])
+    return out[:3]
+
+
 def score_batter(b, pitcher, order=None):
     """Full Venom card for one batter vs one pitcher (pitcher may be None)."""
     load()
@@ -185,6 +216,7 @@ def score_batter(b, pitcher, order=None):
                      "avg_season", "rbi_season", "runs_season", "sb_season", "ops_season")},
         "grid": grid, "radar": radar, "projections": proj,
         "pitcher": (pitcher or {}).get("name"), "arsenal": arsenal,
+        "leaks": _batter_leaks(pitcher),
     }
 
 
@@ -239,6 +271,15 @@ def score_pitcher(p, opp_batters):
         opp = 50.0
     edge_pct = round((opp - 50) / 5.0, 1)
     logic = round(0.62 * baseline + 0.38 * opp, 1)
+    # matchup leak: is the lineup he faces soft?
+    p_leaks = []
+    if xw:
+        lineup_x = sum(xw) / len(xw)
+        bp = _pctile(_z(lineup_x, lb.get("xwoba", (0, 1))))   # low = weak lineup
+        if bp <= 28:
+            p_leaks.append({"text": "Faces a soft lineup — opponent xwOBA ranks bottom %d%% (%s)."
+                            % (max(1, round(bp)), ("%.3f" % lineup_x).lstrip("0")),
+                            "rank": max(1, round(bp)), "strong": bp <= 12})
     mf = 1.0 + max(-0.18, min(0.18, edge_pct / 100.0))
     bf = 23.0                                   # ~batters faced by a starter
     proj = {}
@@ -264,7 +305,7 @@ def score_pitcher(p, opp_batters):
         "baseline": baseline, "opportunity": round(opp, 1), "edge_pct": edge_pct,
         "metrics": {k: p.get(k) for k in ("k_pct", "whiff_pct", "xwoba", "hard_hit_pct", "pitches")},
         "grid": grid, "radar": radar, "projections": proj,
-        "pitcher": None, "arsenal": ars,
+        "pitcher": None, "arsenal": ars, "leaks": p_leaks,
     }
 
 

@@ -374,6 +374,10 @@ font-family:var(--body);color:var(--fg)}
 .vr-propwrap{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
 .vr-propk{font-family:var(--mono);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:1px}
 .vr-propln{font-family:var(--mono);font-size:8.5px;font-weight:700;padding:1px 5px;border-radius:5px;margin-top:2px}
+
+.pe-leaks{display:flex;flex-direction:column;gap:6px}
+.pe-leak{font-family:var(--mono);font-size:11px;line-height:1.35;color:#cfcabb;background:#13140f;border:1px solid #2c2d26;border-left:2px solid #3a3b33;border-radius:7px;padding:8px 10px}
+.pe-leak.on{border-left-color:var(--gold);color:#f3ead4;box-shadow:0 0 10px rgba(240,185,78,.12)}
 </style>
 </head>
 <body>
@@ -5546,6 +5550,7 @@ function peCard(gid,c,i,props,sport,activeProp){
           '<div class="vscore-r"><div class="vbar"><div class="l"><span>Baseline</span><b>'+Number(c.baseline).toFixed(1)+'</b></div><div class="tk"><div class="fl" style="width:'+c.baseline+'%"></div></div></div>'+
           '<div class="vbar opp"><div class="l"><span>Opportunity</span><b>'+Number(c.opportunity).toFixed(1)+'</b></div><div class="tk"><div class="fl" style="width:'+c.opportunity+'%"></div></div></div></div>'+
         '</div></div>'+
+      ((c.leaks&&c.leaks.length)?('<div class="vsec"><div class="vsec-h">Matchup leaks'+(c.opp?' · '+c.opp+' defense':'')+'</div><div class="pe-leaks">'+c.leaks.map(function(l){return '<div class="pe-leak'+(l.strong?' on':'')+'">'+l.text+'</div>';}).join("")+'</div></div>'):"")+
       (projTiles?'<div class="vsec"><div class="vsec-h">Projections · model vs line</div><div class="proj">'+projTiles+'</div></div>':"")+
       (grid?'<div class="vsec"><div class="vsec-h">'+secH+'</div>'+vsLine+
         (chips?'<div class="chips">'+chips+'</div>':"")+
