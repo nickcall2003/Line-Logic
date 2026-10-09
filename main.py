@@ -2309,6 +2309,13 @@ def _odds_rec_sides(home_name, o):
     return o.get("ml_away"), o.get("ml_home")
 
 
+def _odds_rec_books(home_name, o):
+    """Same orientation as _odds_rec_sides, for the best-price book per side."""
+    if _norm_team(home_name) == _norm_team(o.get("home_team", "")):
+        return o.get("ml_home_book"), o.get("ml_away_book")
+    return o.get("ml_away_book"), o.get("ml_home_book")
+
+
 def _attach_odds(sport, games):
     """Attach real market odds to each game and snapshot the pick's line.
 
@@ -2343,7 +2350,9 @@ def _attach_odds(sport, games):
         o = book.get(_norm_team(g["home"]["name"]) + "|" + _norm_team(g["away"]["name"])) if book else None
         if o:
             mlh, mla = _odds_rec_sides(g["home"]["name"], o)
+            hb, ab = _odds_rec_books(g["home"]["name"], o)
             g["odds"] = {"ml_home": mlh, "ml_away": mla,
+                         "ml_home_book": hb, "ml_away_book": ab,
                          "spread_home": o.get("spread_home"), "total": o.get("total"),
                          "books": o.get("books")}
         elif sgo is not None:
@@ -2384,7 +2393,9 @@ def _attach_odds_one(sport, g):
         print(f"[odds] detail attach {sport} skipped: {e}")
     if o:
         mlh, mla = _odds_rec_sides(g["home"]["name"], o)
+        hb, ab = _odds_rec_books(g["home"]["name"], o)
         g["odds"] = {"ml_home": mlh, "ml_away": mla,
+                     "ml_home_book": hb, "ml_away_book": ab,
                      "spread_home": o.get("spread_home"), "total": o.get("total"),
                      "books": o.get("books")}
         return g

@@ -408,6 +408,9 @@ font-family:var(--body);color:var(--fg)}
 .gsc-box{background:#13140f;border:1px solid #2c2d26;border-radius:9px;padding:8px 6px;text-align:center}
 .gsc-box .k{font-family:var(--mono);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gsc-box .v{font-family:var(--disp);font-weight:800;font-size:15px;color:#f3ead4;margin-top:3px}
+
+.bk-chip{display:inline-block;font-family:var(--mono);font-size:8px;font-weight:800;letter-spacing:.02em;padding:1px 4px;border-radius:4px;vertical-align:middle;margin-left:3px;line-height:1.55}
+.pe-book{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;display:flex;align-items:center;justify-content:center;gap:1px}
 </style>
 </head>
 <body>
@@ -717,6 +720,24 @@ function renderBubbles(){const s=dayStats(filteredMatches());
   document.getElementById("bubbles").innerHTML='<div class="bubble"><div class="num">'+s.p+'</div><div class="lab">Settled</div></div>'+
     '<div class="bubble won"><div class="num">'+s.c+'</div><div class="lab">Correct</div></div>'+
     '<div class="bubble acc"><div class="num">'+(s.p?s.acc+"%":"\u2014")+'</div><div class="lab">Accuracy</div></div>';}
+function bookMeta(name){
+  var n=(name||"").toLowerCase();
+  if(n.indexOf("draftking")>=0)return {s:"DK",c:"#53d337",t:"#07210a"};
+  if(n.indexOf("fanduel")>=0)return {s:"FD",c:"#1493ff",t:"#06243f"};
+  if(n.indexOf("betmgm")>=0)return {s:"MGM",c:"#c6a15b",t:"#1a1206"};
+  if(n.indexOf("caesar")>=0)return {s:"CZR",c:"#1d7a4c",t:"#eafff2"};
+  if(n.indexOf("espn")>=0)return {s:"ESPN",c:"#cc0000",t:"#fff"};
+  if(n.indexOf("betrivers")>=0)return {s:"BR",c:"#1961b4",t:"#fff"};
+  if(n.indexOf("fanatics")>=0)return {s:"FAN",c:"#20356b",t:"#fff"};
+  if(n.indexOf("hardrock")>=0)return {s:"HR",c:"#6a2a8c",t:"#fff"};
+  if(n.indexOf("pointsbet")>=0)return {s:"PB",c:"#e4002b",t:"#fff"};
+  if(n.indexOf("bovada")>=0)return {s:"BOV",c:"#b11313",t:"#fff"};
+  if(n.indexOf("betonline")>=0)return {s:"BOL",c:"#0b6b3a",t:"#fff"};
+  if(n.indexOf("sportsgameodds")>=0||n==="sgo")return {s:"SGO",c:"#444",t:"#ddd"};
+  return {s:(name||"BK").replace(/[^A-Za-z0-9]/g,"").slice(0,3).toUpperCase()||"BK",c:"#3a3b33",t:"#e7e3d5"};
+}
+function bookChip(name){ if(!name)return ""; var m=bookMeta(name);
+  return '<span class="bk-chip" style="background:'+m.c+';color:'+m.t+'" title="Best price at '+String(name).replace(/[<>"]/g,"")+'">'+m.s+'</span>'; }
 function matchCardHTML(m){const sc=m.score||{},fin=m.status==="finished",live=m.status==="live";let st;
   if(fin&&(m.correct===true||m.correct===false))st='<span class="mark '+(m.correct?'ok':'no')+'">'+(m.correct?"\u2713":"\u2717")+'</span>';
   else if(live)st='<span class="live-tag"><span class="pulse"></span>Live</span>';
@@ -1769,8 +1790,19 @@ function teamLinesHTML(g){const L=g.lines;if(!L)return "";const pc=v=>Math.round
       '<div class="line-row"><span>'+dog+' +'+Math.abs(favLine)+'</span><span class="od">'+pc(sp.favorite==="home"?sp.away_cover:sp.home_cover)+'</span></div></div>'+
     '<div class="line-box"><h5>Projected margin</h5><div class="line-row"><span>'+fav+' by</span><span class="od">'+Math.abs(sp.exp_margin)+'</span></div>'+
       '<div class="line-row" style="opacity:.6;font-size:11px"><span>model line</span><span>own number</span></div></div>'+
+    _marketMLBox(g)+
     _marketSpreadBox(g,sp,fav,dog,favLine)+
     '</div>';}
+function _marketMLBox(g){
+  // Best available market moneyline per side + which sportsbook posts it (line shopping).
+  if(!g.odds||(g.odds.ml_home==null&&g.odds.ml_away==null))return "";
+  var H=(g.home&&g.home.abbr)||"Home",A=(g.away&&g.away.abbr)||"Away";
+  var amer=function(v){return v==null?"—":((v>0?"+":"")+v);};
+  var bc=(typeof bookChip==="function")?bookChip:function(){return "";};
+  return '<div class="line-box"><h5>Market moneyline</h5>'+
+    '<div class="line-row"><span>'+A+'</span><span class="od">'+amer(g.odds.ml_away)+' '+bc(g.odds.ml_away_book)+'</span></div>'+
+    '<div class="line-row"><span>'+H+'</span><span class="od">'+amer(g.odds.ml_home)+' '+bc(g.odds.ml_home_book)+'</span></div>'+
+    '<div class="line-row" style="opacity:.6;font-size:11px"><span>best available</span><span>across books</span></div></div>';}
 function _marketSpreadBox(g,sp,fav,dog,favLine){
   // Market spread vs the model line — the head-to-head that shows legitimacy.
   if(!g.odds||g.odds.spread_home==null)return "";
@@ -5529,7 +5561,10 @@ function peProjTile(key,val,props,player){
   if(lo&&lo.line!=null){
     var ln=Number(lo.line),op=peOverProb(Number(val),ln);
     if(op!=null){var over=op>=0.5,pct=Math.round((over?op:1-op)*100);
-      base+='<div class="pe-line '+(over?"pe-over":"pe-under")+'">'+(over?"o":"u")+ln+' · '+pct+'%</div>';}
+      base+='<div class="pe-line '+(over?"pe-over":"pe-under")+'">'+(over?"o":"u")+ln+' · '+pct+'%</div>';
+      var bk=over?lo.over_book:lo.under_book, bp=over?lo.over_best_odds:lo.under_best_odds;
+      if(bk&&typeof bookChip==="function")
+        base+='<div class="pe-book">'+(bp!=null?((bp>0?"+":"")+bp+" "):"")+bookChip(bk)+'</div>';}
     else base+='<div class="pe-line">line '+ln+'</div>';}
   return '<div class="t">'+base+'</div>';}
 function peRadar(id,R){
