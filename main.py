@@ -7174,6 +7174,82 @@ except Exception as _e:
     print(f"[venom] endpoint not registered: {_e}")
 
 
+# --- NFL Player Edge: nflverse advanced stats profiles + scoring endpoint ---
+def _run_nfl_build():
+    try:
+        import build_nfl_profiles as _bn
+        out = "/data/nfl_profiles.json"
+        try:
+            os.makedirs("/data", exist_ok=True)
+        except Exception:
+            out = "nfl_profiles.json"
+        _bn.build(out_path=out)
+        try:
+            import nfl_edge as _ne
+            _ne._CACHE["data"] = None
+            _ne._CACHE["mtime"] = 0.0
+        except Exception:
+            pass
+        print(f"[nfl] rebuild complete -> {out}")
+    except Exception as e:
+        print(f"[nfl] build failed: {e}")
+
+
+@app.get("/api/nfl/profiles/build")
+def nfl_profiles_build(confirm: str = ""):
+    """Rebuild nfl_profiles.json from nflverse. Append ?confirm=yes."""
+    if confirm != "yes":
+        return JSONResponse({"note": "append ?confirm=yes to rebuild nfl_profiles.json from nflverse",
+                             "poll": "/api/nfl/profiles/status"})
+    import threading as _th
+    _th.Thread(target=_run_nfl_build, daemon=True).start()
+    return JSONResponse({"status": "nfl profiles build started", "poll": "/api/nfl/profiles/status"})
+
+
+@app.get("/api/nfl/profiles/status")
+def nfl_profiles_status():
+    import json as _json
+    for p in ("/data/nfl_profiles.json", "nfl_profiles.json"):
+        if os.path.exists(p):
+            try:
+                d = _json.load(open(p))
+                return {"exists": True, "path": p, "generated": d.get("generated"),
+                        "season": d.get("season"),
+                        "players": len(d.get("players", {})),
+                        "defenses": len(d.get("defense", {}))}
+            except Exception as e:
+                return {"exists": True, "path": p, "error": str(e)}
+    return {"exists": False, "note": "run /api/nfl/profiles/build?confirm=yes (or commit nfl_profiles.json)"}
+
+
+def _nfl_refresh_loop():
+    """Weekly rebuild if the server can reach nflverse. Off with NFL_AUTOREFRESH=0.
+    If github is blocked here, the committed nfl_profiles.json still serves."""
+    import time as _t
+    if os.environ.get("NFL_AUTOREFRESH", "1") != "1":
+        return
+    _t.sleep(240)
+    while True:
+        try:
+            p = "/data/nfl_profiles.json"
+            need = not os.path.exists(p) or (_t.time() - os.path.getmtime(p)) > 3 * 86400
+            if need:
+                _run_nfl_build()
+        except Exception as e:
+            print(f"[nfl] refresh loop error: {e}")
+        _t.sleep(2 * 86400)
+
+
+try:
+    import threading as _th_nfl
+    _th_nfl.Thread(target=_nfl_refresh_loop, daemon=True).start()
+    import nfl_edge as _nfl_edge
+    _nfl_edge.register(app)
+    print("[nfl] Player Edge endpoint registered")
+except Exception as _e:
+    print(f"[nfl] edge not registered: {_e}")
+
+
 @app.get("/api/tennis/schedule-diag")
 def tennis_schedule_diag():
     """Pinpoints why the tennis board is empty: is the flag on, are the tennis
