@@ -1798,12 +1798,12 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
     '<div class="d-score"><span>'+g.home.name+(g.home.record?' &middot; '+g.home.record:"")+'</span></div>'+
     heroStatHTML(g,sp)+
     ((g.status==="live"&&sp==="ncaabb")?ncaabbLiveBarHTML(g):(g.status==="live"&&(sp==="nfl"||sp==="ncaaf"))?nflLiveBarHTML(g):(g.status==="live"&&sp==="nba")?nbaLiveBarHTML(g):(g.status==="live"&&sp==="nhl")?nhlLiveBarHTML(g):(g.status==="live"&&sp==="ncaab")?ncaabLiveBarHTML(g):(g.status==="live"&&sp==="wncaab")?wncaabLiveBarHTML(g):g.status==="live"?predBarHTML(g.away.abbr,pa,g.home.abbr,ph,g.status):dPredBar(g.away.abbr,pa,g.home.abbr,ph))+((g.status==="live"&&(sp==="nfl"||sp==="ncaaf"))?nflFieldHTML(g):(g.status==="live"&&sp==="ncaabb")?mlbSituationHTML(g):"")+'</div>';
-  const propsTab=(sp==="nba"||sp==="wnba"||sp==="nfl")?'<button class="d-tab '+(teamDetailTab==="props"?"active":"")+'" onclick="setTeamTab(\'props\')">Props</button>':'';
+  const propsTab=(sp==="nba"||sp==="wnba"||sp==="nfl"||sp==="nhl")?'<button class="d-tab '+(teamDetailTab==="props"?"active":"")+'" onclick="setTeamTab(\'props\')">Props</button>':'';
   const tabs='<div class="d-tabs"><button class="d-tab '+(teamDetailTab==="prediction"?"active":"")+'" onclick="setTeamTab(\'prediction\')">Prediction</button>'+propsTab+
     '<button class="d-tab '+(teamDetailTab==="box"?"active":"")+'" onclick="setTeamTab(\'box\')">Live Stats</button></div>';
   let body;
   if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
-  else if(teamDetailTab==="props"){body=(sp==="nfl")?'<div class="panel"><div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
+  else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl")?'<div class="panel"><div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
   else{const mp=writeupHTML(g.analysis);
     body='<div class="panel">'+predictionReportHTML(g,sp)+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
     teamFactorsHTML(g,sp)+
@@ -1813,7 +1813,7 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
     '<div class="note">Predictions use an Elo model seeded from season records with home-court/field advantage. Lines are the model\u2019s own fair probabilities, not sportsbook numbers. Not betting advice.</div></div>'+depthHTML(g);}
   document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to games</button>'+head+mvMount(sp,g.id)+tabs+body;
   if(teamDetailTab!=="box"&&teamDetailTab!=="props")setTimeout(function(){loadOfficials(sp,g.id);},30);
-  if(sp==="nfl"&&teamDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id,"nfl","home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);}
+  if((sp==="nfl"||sp==="nhl")&&teamDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id,sp,"home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);}
 // ===================== SOCCER (multi-league) =====================
 async function loadUFC(){
   let d;try{d=await getJSON("/api/ufc/games?date="+ymd(selected));}catch(e){d={games:[],event:"UFC"};}
@@ -5383,14 +5383,18 @@ var PE_EMBLEM="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcwAAAHMCAYAAABY25i
 /* ===== Player Edge — Statcast/nflverse-powered ranked player cards (MLB + NFL) ===== */
 var _peData={};
 var PE_PROJ_ORDER=["pass_yards","pass_tds","completions","rush_yards","rush_tds","rec_yards","receptions","rec_tds",
+  "shots_on_goal","points","goals","assists","saves","goals_against",
   "home_runs","hits","total_bases","rbis","runs","strikeouts","outs"];
 var PE_PROJ_LABEL={pass_yards:"Pass Yds",pass_tds:"Pass TD",completions:"Comp",rush_yards:"Rush Yds",rush_tds:"Rush TD",
   rec_yards:"Rec Yds",receptions:"Rec",rec_tds:"Rec TD",
+  shots_on_goal:"SOG",points:"Pts",goals:"Goals",assists:"Ast",saves:"Saves",goals_against:"GA",
   home_runs:"HR",hits:"Hits",total_bases:"Tot Bases",rbis:"RBIs",runs:"Runs",strikeouts:"Ks",outs:"Outs"};
 var PE_STAT_MATCH={
   pass_yards:["passing yards","pass yds"],pass_tds:["passing touchdown","passing td","pass td"],completions:["completions"],
   rush_yards:["rushing yards","rush yds"],rush_tds:["rushing touchdown","rush td"],
   rec_yards:["receiving yards","rec yds","receiving yds"],receptions:["receptions"],rec_tds:["receiving touchdown","rec td"],
+  shots_on_goal:["shots on goal","shots on net","sog"],points:["points"],goals:["goals"],assists:["assists"],
+  saves:["saves"],goals_against:["goals against"],
   home_runs:["home run"],hits:["hits"],total_bases:["total base"],rbis:["rbi","runs batted"],runs:["runs scored"],
   strikeouts:["strikeout"],outs:["outs"]};
 function _peNorm(s){return (s||"").normalize("NFKD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9 ]/g,"").trim();}
@@ -5420,6 +5424,8 @@ function peFindLine(props,player,key){
       if(key==="hits"&&lab.indexOf("allow")>=0)continue;
       if(key==="runs"&&(lab.indexOf("batted")>=0||lab.indexOf("earned")>=0))continue;
       if(key==="receptions"&&lab.indexOf("yard")>=0)continue;
+      if(key==="goals"&&(lab.indexOf("against")>=0||lab.indexOf("power play")>=0))continue;
+      if(key==="points"&&lab.indexOf("fantasy")>=0)continue;
       return p;}}
   return null;}
 function peOverProb(proj,line){

@@ -7295,6 +7295,81 @@ except Exception as _e:
     print(f"[nfl] edge not registered: {_e}")
 
 
+# --- NHL Player Edge: NHL API + MoneyPuck xG profiles + scoring endpoint ---
+def _run_nhl_build():
+    try:
+        import build_nhl_profiles as _bh
+        out = "/data/nhl_profiles.json"
+        try:
+            os.makedirs("/data", exist_ok=True)
+        except Exception:
+            out = "nhl_profiles.json"
+        _bh.build(out_path=out)
+        try:
+            import nhl_edge as _nh
+            _nh._CACHE["data"] = None
+            _nh._CACHE["mtime"] = 0.0
+        except Exception:
+            pass
+        print(f"[nhl] rebuild complete -> {out}")
+    except Exception as e:
+        print(f"[nhl] build failed: {e}")
+
+
+@app.get("/api/nhl/profiles/build")
+def nhl_profiles_build(confirm: str = ""):
+    """Rebuild nhl_profiles.json from the NHL API + MoneyPuck. Append ?confirm=yes."""
+    if confirm != "yes":
+        return JSONResponse({"note": "append ?confirm=yes to rebuild nhl_profiles.json",
+                             "poll": "/api/nhl/profiles/status"})
+    import threading as _th
+    _th.Thread(target=_run_nhl_build, daemon=True).start()
+    return JSONResponse({"status": "nhl profiles build started", "poll": "/api/nhl/profiles/status"})
+
+
+@app.get("/api/nhl/profiles/status")
+def nhl_profiles_status():
+    import json as _json
+    for p in ("/data/nhl_profiles.json", "nhl_profiles.json"):
+        if os.path.exists(p):
+            try:
+                d = _json.load(open(p))
+                return {"exists": True, "path": p, "generated": d.get("generated"),
+                        "season": d.get("season"),
+                        "skaters": len(d.get("players", {})),
+                        "goalies": len(d.get("goalies", {})),
+                        "defenses": len(d.get("defense", {}))}
+            except Exception as e:
+                return {"exists": True, "path": p, "error": str(e)}
+    return {"exists": False, "note": "run /api/nhl/profiles/build?confirm=yes"}
+
+
+def _nhl_refresh_loop():
+    import time as _t
+    if os.environ.get("NHL_AUTOREFRESH", "1") != "1":
+        return
+    _t.sleep(300)
+    while True:
+        try:
+            p = "/data/nhl_profiles.json"
+            need = not os.path.exists(p) or (_t.time() - os.path.getmtime(p)) > 20 * 3600
+            if need:
+                _run_nhl_build()
+        except Exception as e:
+            print(f"[nhl] refresh loop error: {e}")
+        _t.sleep(12 * 3600)
+
+
+try:
+    import threading as _th_nhl
+    _th_nhl.Thread(target=_nhl_refresh_loop, daemon=True).start()
+    import nhl_edge as _nhl_edge
+    _nhl_edge.register(app)
+    print("[nhl] Player Edge endpoint registered")
+except Exception as _e:
+    print(f"[nhl] edge not registered: {_e}")
+
+
 @app.get("/api/tennis/schedule-diag")
 def tennis_schedule_diag():
     """Pinpoints why the tennis board is empty: is the flag on, are the tennis
