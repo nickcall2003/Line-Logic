@@ -5451,10 +5451,7 @@ function peTags(c){
 function peTagStrip(c){var t=peTags(c); if(!t.length)return "";
   return '<div class="pe-tags">'+t.map(function(x){return '<span class="pe-ptag'+(x.glow?' on':'')+'">'+String(x.t).toUpperCase()+'</span>';}).join("")+'</div>';}
 function peSortVal(c,prop,props){
-  var pv=c.projections&&c.projections[prop]; if(pv==null)return -1;
-  var lo=peFindLine(props,c.player,prop);
-  if(lo&&lo.line!=null){var op=peOverProb(Number(pv),Number(lo.line)); if(op!=null)return 100*op+Number(pv)/1000;}
-  return Number(pv);}
+  var pv=c.projections&&c.projections[prop]; return (pv==null)?-1:Number(pv);}
 function peSelProp(key,prop){var d=_peData[key]; if(!d)return; d._prop=(prop==="__all__"?null:prop); _pePaint(key);}
 function peFindLine(props,player,key){
   var pn=_peNorm(player),want=PE_STAT_MATCH[key]||[];
