@@ -7421,6 +7421,15 @@ except Exception as _e:
     print(f"[nhl] edge not registered: {_e}")
 
 
+# --- NBA/WNBA Player Edge: live ESPN averages + hoops_advanced snapshot ---
+try:
+    import nba_edge as _nba_edge
+    _nba_edge.register(app)
+    print("[nba] Player Edge endpoint registered")
+except Exception as _e:
+    print(f"[nba] edge not registered: {_e}")
+
+
 @app.get("/api/tennis/schedule-diag")
 def tennis_schedule_diag():
     """Pinpoints why the tennis board is empty: is the flag on, are the tennis

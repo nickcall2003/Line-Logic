@@ -1865,9 +1865,9 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
     '<button class="d-tab '+(teamDetailTab==="box"?"active":"")+'" onclick="setTeamTab(\'box\')">Live Stats</button></div>';
   let body;
   if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
-  else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl")?'<div class="panel"><div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
+  else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div class="panel"><div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
   else{const mp=writeupHTML(g.analysis);
-    body='<div class="panel">'+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
+    body='<div class="panel">'+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
     teamFactorsHTML(g,sp)+
     injuryPanelHTML(g)+
     teamLinesHTML(g)+
@@ -1875,8 +1875,8 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
     '<div class="note">Predictions use an Elo model seeded from season records with home-court/field advantage. Lines are the model\u2019s own fair probabilities, not sportsbook numbers. Not betting advice.</div></div>'+depthHTML(g);}
   document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to games</button>'+head+mvMount(sp,g.id)+tabs+body;
   if(teamDetailTab!=="box"&&teamDetailTab!=="props")setTimeout(function(){loadOfficials(sp,g.id);},30);
-  if((sp==="nfl"||sp==="nhl")&&teamDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id,sp,"home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);
-  if((sp==="nfl"||sp==="nhl")&&teamDetailTab==="prediction")setTimeout(function(){try{loadGameImpact(g.id,sp,"home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);}
+  if((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")&&teamDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id,sp,"home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);
+  if((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")&&teamDetailTab==="prediction")setTimeout(function(){try{loadGameImpact(g.id,sp,"home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);}
 // ===================== SOCCER (multi-league) =====================
 async function loadUFC(){
   let d;try{d=await getJSON("/api/ufc/games?date="+ymd(selected));}catch(e){d={games:[],event:"UFC"};}
@@ -5445,17 +5445,18 @@ function drawDeepRadar(R){
 /* ===== Player Edge — Statcast/nflverse-powered ranked player cards (MLB + NFL) ===== */
 var _peData={};
 var PE_PROJ_ORDER=["pass_yards","pass_tds","completions","rush_yards","rush_tds","rec_yards","receptions","rec_tds",
-  "shots_on_goal","points","goals","assists","saves","goals_against",
+  "shots_on_goal","points","rebounds","goals","assists","threes","saves","goals_against",
   "home_runs","hits","total_bases","rbis","runs","strikeouts","outs"];
 var PE_PROJ_LABEL={pass_yards:"Pass Yds",pass_tds:"Pass TD",completions:"Comp",rush_yards:"Rush Yds",rush_tds:"Rush TD",
   rec_yards:"Rec Yds",receptions:"Rec",rec_tds:"Rec TD",
-  shots_on_goal:"SOG",points:"Pts",goals:"Goals",assists:"Ast",saves:"Saves",goals_against:"GA",
+  shots_on_goal:"SOG",points:"Pts",rebounds:"Reb",goals:"Goals",assists:"Ast",threes:"3PM",saves:"Saves",goals_against:"GA",
   home_runs:"HR",hits:"Hits",total_bases:"Tot Bases",rbis:"RBIs",runs:"Runs",strikeouts:"Ks",outs:"Outs"};
 var PE_STAT_MATCH={
   pass_yards:["passing yards","pass yds"],pass_tds:["passing touchdown","passing td","pass td"],completions:["completions"],
   rush_yards:["rushing yards","rush yds"],rush_tds:["rushing touchdown","rush td"],
   rec_yards:["receiving yards","rec yds","receiving yds"],receptions:["receptions"],rec_tds:["receiving touchdown","rec td"],
   shots_on_goal:["shots on goal","shots on net","sog"],points:["points"],goals:["goals"],assists:["assists"],
+  rebounds:["rebound"],threes:["three","3-point","3pt","3 pt","3pm","made three"],
   saves:["saves"],goals_against:["goals against"],
   home_runs:["home run"],hits:["hits"],total_bases:["total base"],rbis:["rbi","runs batted"],runs:["runs scored"],
   strikeouts:["strikeout"],outs:["outs"]};
@@ -5554,6 +5555,7 @@ function peRadar(id,R){
   svg.appendChild(mk("text",{x:mx,y:296,fill:"#6f7468","font-size":"7.5","font-family":"Space Mono, monospace","font-weight":"700","letter-spacing":".7","text-anchor":"middle"},"PERCENTILE RANK VS LEAGUE · 0-100"));}
 function peCard(gid,c,i,props,sport,activeProp){
   var isNFL=c.type==="nfl";
+  var isTeam=isNFL||c.type==="nhl"||c.type==="nba";
   var _lg=peLogo(c,sport);
   var logo=_lg?('<img class="vr-logo" src="'+_lg+'" alt="" loading="lazy" onerror="this.remove()">'):"";
   var scoreMain='<div class="vpill '+peScoreCls(c.logic_score)+'">'+Number(c.logic_score).toFixed(1)+'</div>';
@@ -5573,14 +5575,14 @@ function peCard(gid,c,i,props,sport,activeProp){
       return '<span class="chip">● '+a.pitch+' <span class="u">'+(a.usage!=null?Math.round(a.usage)+"%":"")+'</span></span>';}).join("");}
   var grid=(c.grid||[]).map(function(g){return '<div class="gt '+g.grade+'"><div class="k">'+g.label+'</div><div class="v">'+peFmt(g.value,g.kind)+'</div></div>';}).join("");
   var edgeCol=c.edge_pct>=0?"var(--good)":"var(--bad)";
-  var rankLab=isNFL?(c.pos||"Player"):(c.type==="pitcher"?"Pitcher":"Overall");
-  var tag=isNFL?('<span class="pe-tag">'+(c.pos||"")+'</span>'):(c.type==="pitcher"?'<span class="pe-tag">SP</span>':"");
+  var rankLab=isTeam?(c.pos||"Player"):(c.type==="pitcher"?"Pitcher":"Overall");
+  var tag=(isTeam&&c.pos)?('<span class="pe-tag">'+c.pos+'</span>'):(c.type==="pitcher"?'<span class="pe-tag">SP</span>':"");
   var sub=isNFL?((c.team||"")+(c.opp?' vs '+c.opp:"")):((c.team||"")+(c.ml?' <span class="ml">'+c.ml+'</span>':""));
-  var vsLine=isNFL?('<div class="cc-vs"><b>'+c.player+'</b> ('+(c.pos||"")+') vs '+(c.opp||"")+' defense</div>'):
+  var vsLine=(isTeam&&c.opp)?('<div class="cc-vs"><b>'+c.player+'</b> ('+(c.pos||"")+') vs '+(c.opp||"")+' defense</div>'):
     (c.pitcher?('<div class="cc-vs"><b>'+c.player+'</b> vs '+c.pitcher+'</div>'):
     (c.type==="pitcher"?'<div class="cc-vs"><b>'+c.player+'</b> · arsenal &amp; matchup</div>':""));
-  var legPos=isNFL?"Player Edge":(c.type==="pitcher"?"Pitcher Edge":"Batter Edge");
-  var legNeg=isNFL?"Matchup Edge":(c.type==="pitcher"?"Hitter Edge":"Pitcher Edge");
+  var legPos=isTeam?"Player Edge":(c.type==="pitcher"?"Pitcher Edge":"Batter Edge");
+  var legNeg=isTeam?"Matchup Edge":(c.type==="pitcher"?"Hitter Edge":"Pitcher Edge");
   var secH=isNFL?"Matchup breakdown":(c.type==="pitcher"?"Pitch profile":"Matchup breakdown");
   return '<div class="vrow" id="row'+gid+'_'+i+'" onclick="peToggle(\''+gid+'\','+i+')">'+
       '<div class="vr-rank"><div class="n">'+c.rank+'</div><div class="l">'+rankLab+'</div></div>'+
