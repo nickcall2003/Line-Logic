@@ -7166,6 +7166,14 @@ except Exception as _e:
     print(f"[statcast] auto-refresh not started: {_e}")
 
 
+# --- Venom scoring endpoint (/api/mlb/venom/{game_id}) ---
+try:
+    import venom as _venom
+    _venom.register(app)
+except Exception as _e:
+    print(f"[venom] endpoint not registered: {_e}")
+
+
 @app.get("/api/tennis/schedule-diag")
 def tennis_schedule_diag():
     """Pinpoints why the tennis board is empty: is the flag on, are the tennis
