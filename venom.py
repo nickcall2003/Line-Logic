@@ -83,7 +83,7 @@ def _league(batters, pitchers):
     bs = [b for b in batters.values() if (b.get("pa") or 0) >= 100]
     lg = {"batter": {}, "pitcher": {}}
     for k in ("barrel_pct", "hard_hit_pct", "exit_velo", "xwoba", "xslg",
-              "fb_ld_pct", "xba", "barrel_pa"):
+              "fb_ld_pct", "xba", "barrel_pa", "home_runs_season", "avg_season"):
         lg["batter"][k] = stats([b.get(k) for b in bs])
     ps = [p for p in pitchers.values() if (p.get("pitches") or 0) >= 200]
     for k in ("xwoba", "hard_hit_pct", "k_pct", "whiff_pct"):
@@ -172,16 +172,17 @@ def score_batter(b, pitcher, order=None):
         "Barrel %": comps.get("barrel_pct", 0), "Hard Hit %": comps.get("hard_hit_pct", 0),
         "Exit Velo": comps.get("exit_velo", 0), "xwOBA": comps.get("xwoba", 0),
         "xSLG": comps.get("xslg", 0), "Fly Ball %": comps.get("fb_ld_pct", 0),
-        "Matchup": round(opp, 1), "Venom": venom,
+        "Matchup": round(opp, 1), "Logic": venom,
     }
     grid = _metric_grid(b, lb)
     return {
-        "player": b.get("name"), "venom_score": venom,
+        "player": b.get("name"), "type": "batter", "logic_score": venom,
         "baseline": baseline, "opportunity": round(opp, 1), "edge_pct": edge_pct,
         "metrics": {k: b.get(k) for k in
                     ("xwoba", "xba", "xslg", "woba", "ba", "slg", "exit_velo",
                      "barrel_pct", "hard_hit_pct", "fb_ld_pct", "gb_pct",
-                     "sweet_spot_pct", "avg_hr_dist", "pa")},
+                     "sweet_spot_pct", "avg_hr_dist", "pa", "home_runs_season",
+                     "avg_season", "rbi_season", "runs_season", "sb_season", "ops_season")},
         "grid": grid, "radar": radar, "projections": proj,
         "pitcher": (pitcher or {}).get("name"), "arsenal": arsenal,
     }
@@ -189,10 +190,11 @@ def score_batter(b, pitcher, order=None):
 
 _GRID_SPEC = [  # (key, label, higher_is_better, kind)
     ("home_runs_season", "HR", True, "int"),
-    ("xba", "xBA", True, "avg"), ("xwoba", "xwOBA", True, "avg"),
+    ("avg_season", "AVG", True, "avg"), ("xwoba", "xwOBA", True, "avg"),
     ("barrel_pct", "Barrel %", True, "pct"), ("hard_hit_pct", "Hard Hit %", True, "pct"),
     ("fb_ld_pct", "Fly Ball %", True, "pct"), ("exit_velo", "Exit Velo", True, "mph"),
-    ("xslg", "xSLG", True, "avg"), ("sweet_spot_pct", "Sweet Spot %", True, "pct"),
+    ("xslg", "xSLG", True, "avg"), ("xba", "xBA", True, "avg"),
+    ("sweet_spot_pct", "Sweet Spot %", True, "pct"),
 ]
 
 
@@ -210,9 +212,65 @@ def _metric_grid(b, lb):
     return out
 
 
+_PGRID = [  # (key, label, higher_is_better, kind)
+    ("k_pct", "K %", True, "pct"), ("whiff_pct", "Whiff %", True, "pct"),
+    ("xwoba", "xwOBA", False, "avg"), ("hard_hit_pct", "Hard Hit %", False, "pct"),
+]
+
+
+def score_pitcher(p, opp_batters):
+    """Logic card for a starting pitcher vs the lineup he faces."""
+    load()
+    lp = _CACHE["lg"]["pitcher"]
+    lb = _CACHE["lg"]["batter"]
+
+    def pct(key, invert=False):
+        z = _z(p.get(key), lp.get(key, (0, 1)))
+        return _pctile(-z if invert else z)
+    k_p = pct("k_pct"); whiff_p = pct("whiff_pct")
+    xw_p = pct("xwoba", invert=True); hh_p = pct("hard_hit_pct", invert=True)
+    baseline = round(0.30 * k_p + 0.25 * whiff_p + 0.25 * xw_p + 0.20 * hh_p, 1)
+    # opportunity: how weak is the lineup he faces (low xwOBA = good for pitcher)
+    xw = [bb.get("xwoba") for bb in (opp_batters or []) if bb and bb.get("xwoba") is not None]
+    if xw:
+        zc = _z(sum(xw) / len(xw), lb.get("xwoba", (0, 1)))
+        opp = _pctile(-zc)
+    else:
+        opp = 50.0
+    edge_pct = round((opp - 50) / 5.0, 1)
+    logic = round(0.62 * baseline + 0.38 * opp, 1)
+    mf = 1.0 + max(-0.18, min(0.18, edge_pct / 100.0))
+    bf = 23.0                                   # ~batters faced by a starter
+    proj = {}
+    if p.get("k_pct") is not None:
+        proj["strikeouts"] = round(p["k_pct"] / 100.0 * bf * mf, 2)
+    proj["outs"] = 16.0                         # ~5.1 IP baseline (refined once we add IP)
+    ars = p.get("arsenal", [])
+    depth = min(100, len([a for a in ars if (a.get("usage") or 0) >= 8]) * 20)
+    radar = {"K %": k_p, "Whiff %": whiff_p, "Soft Contact": hh_p, "xwOBA Supp": xw_p,
+             "Arsenal": depth, "Dominance": round((k_p + whiff_p) / 2, 1),
+             "Matchup": round(opp, 1), "Logic": logic}
+    grid = []
+    for key, label, hib, kind in _PGRID:
+        val = p.get(key)
+        if val is None:
+            continue
+        z = _z(val, lp.get(key, (0, 1)))
+        if not hib:
+            z = -z
+        grid.append({"label": label, "value": val, "kind": kind, "grade": _grade(z)})
+    return {
+        "player": p.get("name"), "type": "pitcher", "logic_score": logic,
+        "baseline": baseline, "opportunity": round(opp, 1), "edge_pct": edge_pct,
+        "metrics": {k: p.get(k) for k in ("k_pct", "whiff_pct", "xwoba", "hard_hit_pct", "pitches")},
+        "grid": grid, "radar": radar, "projections": proj,
+        "pitcher": None, "arsenal": ars,
+    }
+
+
 def game_cards(matchups):
-    """From get_matchups() output, build Venom cards for every batter on both sides,
-    sorted by Venom Score (highest first)."""
+    """From get_matchups(), build Logic cards for every batter AND both starting
+    pitchers, sorted by Logic Score (highest first)."""
     load()
     cards = []
     for side in ("away", "home"):
@@ -228,7 +286,18 @@ def game_cards(matchups):
             card["order"] = row.get("order")
             card["side"] = side
             cards.append(card)
-    cards.sort(key=lambda c: c.get("venom_score") or 0, reverse=True)
+    # pitcher cards: home batters face the away starter, away batters face the home starter
+    for side, team_key in (("home", "away_team"), ("away", "home_team")):
+        s = matchups.get(side) or {}
+        pit = find_pitcher(s.get("pitcher"))
+        if not pit:
+            continue
+        opp_batters = [find_batter(r.get("batter")) for r in s.get("batters", [])]
+        card = score_pitcher(pit, opp_batters)
+        card["team"] = matchups.get(team_key)
+        card["side"] = team_key.split("_")[0]
+        cards.append(card)
+    cards.sort(key=lambda c: c.get("logic_score") or 0, reverse=True)
     for i, c in enumerate(cards, 1):
         c["rank"] = i
     return cards

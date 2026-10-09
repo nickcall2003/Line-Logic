@@ -261,6 +261,103 @@ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();win
 .tpv .mkt-note{font-size:11px;color:var(--muted-2);margin-top:12px;line-height:1.5;font-style:italic}
 </style>
 
+<style id="pe-css">
+.pew{--gold:#F0B94E;--gold-2:#C9932F;--gold-soft:rgba(240,185,78,.14);--gold-glow:rgba(240,185,78,.45);
+--good:#53D98A;--good-soft:rgba(83,217,138,.12);--bad:#E0695A;--bad-soft:rgba(224,105,90,.1);
+--disp:"Archivo",sans-serif;--body:"Hanken Grotesque",sans-serif;--mono:"Space Mono",monospace;
+font-family:var(--body);color:var(--fg)}
+.pew .vmask svg{width:100%;height:auto;max-width:360px;display:block;margin:0 auto}
+.pew-empty{color:var(--muted);text-align:center;padding:26px 10px;font-size:13px}
+.pew .vmask svg{width:100%;height:auto}
+.pew /* game header */
+.gh{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:15px;padding:14px 15px;margin-bottom:12px}
+.pew .gh-top{display:flex;align-items:center;justify-content:space-between}
+.pew .gh-match{font-family:var(--disp);font-weight:900;font-size:17px;letter-spacing:.01em}
+.pew .gh-match .vs{color:var(--muted-2);font-size:12px;margin:0 7px;font-weight:700}
+.pew .gh-sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:3px}
+.pew .gh-n{font-family:var(--mono);font-size:10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.08em}
+.pew /* ranked row */
+.vrow{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:14px;
+  padding:11px 13px;margin-bottom:9px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color .15s}
+.pew .vrow:hover{border-color:var(--gold-2)}
+.pew .vrow.open{border-color:var(--gold-2);box-shadow:0 0 18px rgba(240,185,78,.08)}
+.pew .vr-rank{text-align:center;min-width:26px}
+.pew .vr-rank .n{font-family:var(--disp);font-weight:900;font-size:18px;line-height:1}
+.pew .vr-rank .l{font-family:var(--mono);font-size:7px;color:var(--muted-2);letter-spacing:.1em;text-transform:uppercase}
+.pew .vr-av{width:44px;height:44px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+  font-family:var(--disp);font-weight:900;font-size:17px;color:#161310;
+  background:radial-gradient(130% 130% at 30% 25%,#ffe4a6,var(--gold));box-shadow:0 0 0 2px #101211,0 0 14px var(--gold-glow)}
+.pew .vr-mid{flex:1;min-width:0}
+.pew .vr-nm{font-family:var(--disp);font-weight:800;font-size:16px;line-height:1.1}
+.pew .vr-sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:7px}
+.pew .vr-sub .ml{color:var(--good)}
+.pew .vr-sub .ic{font-size:12px}
+.pew .vr-score{display:flex;align-items:center;gap:8px}
+.pew .vpill{font-family:var(--disp);font-weight:900;font-size:19px;color:#161310;padding:7px 14px;border-radius:13px;
+  background:linear-gradient(180deg,#ffd77a,var(--gold));box-shadow:0 0 16px var(--gold-glow);min-width:66px;text-align:center}
+.pew .vpill.mid{background:linear-gradient(180deg,#e7c877,var(--gold-2))}
+.pew .vpill.low{background:linear-gradient(180deg,#8a8f82,#6f7466);box-shadow:none}
+.pew .vr-exp{color:var(--gold);font-size:12px;transition:transform .2s}
+.pew .vrow.open .vr-exp{transform:rotate(180deg)}
+.pew /* expanded body */
+.vbody{display:none;background:linear-gradient(180deg,var(--panel),#121411);border:1px solid var(--line);border-top:0;
+  border-radius:0 0 14px 14px;margin:-9px 0 9px;padding:15px 14px 16px}
+.pew .vbody.show{display:block}
+.pew .vhero{margin-bottom:14px}
+.pew .vmask{margin-bottom:10px}
+.pew .vmask svg{width:100%;max-width:360px;display:block;margin:0 auto}
+.pew .vscore-wrap{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.pew .vscore-l{text-align:center}
+.pew .vscore-r{min-width:0}
+.pew .vscore-k{font-family:var(--disp);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2);font-weight:800}
+.pew .vscore-n{font-family:var(--disp);font-weight:900;font-size:52px;line-height:.95;color:var(--gold);text-shadow:0 0 22px var(--gold-glow)}
+.pew .vscore-edge{font-family:var(--mono);font-size:12px;font-weight:700;margin-top:4px}
+.pew .vbar{margin-top:12px}
+.pew .vbar .l{display:flex;justify-content:space-between;font-family:var(--disp);font-size:11px;font-weight:700;margin-bottom:5px}
+.pew .vbar .l b{font-family:var(--mono)}
+.pew .vbar .tk{height:9px;border-radius:6px;background:#0d0f0d;border:1px solid #23261f;overflow:hidden}
+.pew .vbar .fl{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--gold-2),var(--gold))}
+.pew .vbar.opp .fl{background:linear-gradient(90deg,#4a7d5a,var(--good))}
+.pew /* section */
+.vsec{margin-top:14px;border-top:1px solid var(--line);padding-top:13px}
+.pew .vsec-h{font-family:var(--disp);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.pew .vsec-h:before{content:"";width:5px;height:13px;border-radius:3px;background:var(--gold)}
+.pew /* projections */
+.proj{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+.pew .proj .t{background:var(--panel-3);border:1px solid var(--line);border-radius:10px;padding:9px 4px;text-align:center}
+.pew .proj .t .v{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--gold)}
+.pew .proj .t .k{font-family:var(--disp);font-size:7.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-2);font-weight:800;margin-top:3px}
+.pew /* matchup breakdown */
+.cc-vs{font-family:var(--body);font-size:13px;color:var(--muted);margin-bottom:10px}
+.pew .cc-vs b{color:var(--fg);font-family:var(--disp);font-weight:800}
+.pew .chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.pew .chip{font-family:var(--mono);font-size:10.5px;font-weight:700;padding:6px 11px;border-radius:9px;border:1px solid var(--gold-2);background:var(--gold-soft);color:var(--gold)}
+.pew .chip .u{color:var(--fg)}
+.pew .chip.full{background:var(--gold);color:#161310;border-color:var(--gold)}
+.pew .cc-note{font-size:11px;color:var(--muted-2);margin-bottom:12px;font-style:italic}
+.pew .leg{display:flex;gap:14px;margin-bottom:10px;font-family:var(--mono);font-size:10px;color:var(--muted)}
+.pew .leg .d{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:middle}
+.pew .leg .b .d{background:var(--gold)}
+.pew .leg .n .d{background:var(--muted-2)}
+.pew .leg .p .d{background:var(--bad)}
+.pew .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pew .gt{border-radius:11px;padding:11px 10px;border:1px solid var(--line)}
+.pew .gt.batter{background:var(--gold-soft);border-color:rgba(240,185,78,.3)}
+.pew .gt.neutral{background:var(--panel-3);border-color:var(--line)}
+.pew .gt.pitcher{background:var(--bad-soft);border-color:rgba(224,105,90,.3)}
+.pew .gt .k{font-family:var(--disp);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);font-weight:800}
+.pew .gt .v{font-family:var(--mono);font-size:18px;font-weight:700;margin-top:3px}
+.pew .gt.batter .v{color:var(--gold)}
+.pew .gt.neutral .v{color:var(--fg)}
+.pew .gt.pitcher .v{color:var(--bad)}
+.pew /* summary */
+.vsum{background:var(--panel-3);border:1px solid var(--line);border-radius:11px;padding:11px 13px;font-size:12.5px;line-height:1.55;color:var(--muted);margin-top:13px}
+.pew .vsum b{color:var(--fg)}.pew .pe-empty{color:var(--muted);text-align:center;padding:26px 12px;font-size:13px;line-height:1.5}
+.pew .proj .t .pe-line{font-family:var(--mono);font-size:8.5px;font-weight:700;margin-top:4px}
+.pew .pe-over{color:var(--good)} .pew .pe-under{color:var(--gold)}
+.pew .pe-tag{font-family:var(--mono);font-size:8px;font-weight:700;color:#161310;background:var(--gold);padding:1px 5px;border-radius:5px;vertical-align:middle;margin-left:4px}
+
+</style>
 </head>
 <body>
 <div class="shell">
@@ -1554,7 +1651,7 @@ function renderMLBDetail(g){const fin=g.status==="finished",live=g.status==="liv
   if(mlbDetailTab==="box"){body=boxscoreHTML(mlbBox);}
   else if(mlbDetailTab==="matchups"){body=matchupsHTML();}
   else if(mlbDetailTab==="injuries"){body=injuriesHTML();}
-  else if(mlbDetailTab==="props"){body=propsPanelHTML(mlbProps);}
+  else if(mlbDetailTab==="props"){body='<div class="panel"><div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>';}
   else{const mp=writeupHTML(g.analysis);
     // Order matters: the decomposition IS the differentiator, so it sits directly
     // under the prediction card instead of below a few hundred words of prose.
@@ -1571,7 +1668,8 @@ function renderMLBDetail(g){const fin=g.status==="finished",live=g.status==="liv
     officialsHostHTML("mlb",g.id)+
     '<div class="note">Starter is each team\u2019s announced probable; bullpen is the team staff ERA. Park &amp; weather scale the run environment for both sides. Lines are the model\u2019s own fair probabilities, not sportsbook numbers. Not betting advice.</div></div>'+depthHTML(g);}
   document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to games</button>'+head+mvMount("mlb",g.id)+tabs+body;
-  if(mlbDetailTab==="prediction")setTimeout(function(){loadOfficials("mlb",g.id,(g.exp_runs_home||0)+(g.exp_runs_away||0));},30);}
+  if(mlbDetailTab==="prediction")setTimeout(function(){loadOfficials("mlb",g.id,(g.exp_runs_home||0)+(g.exp_runs_away||0));},30);
+  if(mlbDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id);}catch(e){}},20);}
 // ===== NBA / NFL DETAIL =====
 async function openTeamDetail(id){detailId=sport+id;teamDetailTab="prediction";teamProps=null;teamBox=null;showView(true);
   document.getElementById("detail").innerHTML='<div class="skel-wrap"><div class="skel-card" style="height:130px"></div><div class="skel-card"></div><div class="skel-card"></div></div>';await refreshTeamDetail(id,sport);
@@ -5274,5 +5372,122 @@ function drawDeepRadar(R){
 }
 </script>
 
+<script id="pe-js">
+/* ===== Player Edge (MLB) — Statcast-powered ranked player cards ===== */
+var _peData={};
+var PE_PROJ_ORDER=["home_runs","hits","total_bases","rbis","runs","strikeouts","outs"];
+var PE_PROJ_LABEL={home_runs:"HR",hits:"Hits",total_bases:"Tot Bases",rbis:"RBIs",runs:"Runs",strikeouts:"Ks",outs:"Outs"};
+var PE_STAT_MATCH={home_runs:["home run"],hits:["hits"],total_bases:["total base"],rbis:["rbi","runs batted"],runs:["runs scored"],strikeouts:["strikeout"],outs:["outs"]};
+function _peNorm(s){return (s||"").normalize("NFKD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9 ]/g,"").trim();}
+function peInit(n){return (n||"?").split(" ").map(function(w){return w[0];}).slice(0,2).join("").toUpperCase();}
+function peScoreCls(s){return s>=70?"":(s>=55?"mid":"low");}
+function peFmt(v,kind){if(v==null||v==="")return "—";
+  if(kind==="avg")return (v<1?("."+String(Math.round(v*1000)).padStart(3,"0")):Number(v).toFixed(3));
+  if(kind==="pct")return Number(v).toFixed(1)+"%"; if(kind==="mph")return Number(v).toFixed(1);
+  if(kind==="int")return Math.round(v); return v;}
+function peFindLine(props,player,key){
+  var pn=_peNorm(player),want=PE_STAT_MATCH[key]||[];
+  for(var i=0;i<props.length;i++){var p=props[i]; if(_peNorm(p.player||"")!==pn)continue;
+    var lab=(p.label||p.stat||"").toLowerCase();
+    for(var j=0;j<want.length;j++){
+      if(lab.indexOf(want[j])<0)continue;
+      if(key==="hits"&&lab.indexOf("allow")>=0)continue;   // hits != hits allowed
+      if(key==="runs"&&(lab.indexOf("batted")>=0||lab.indexOf("earned")>=0))continue;
+      return p;}}
+  return null;}
+function peProjTile(key,val,props,player){
+  var base='<div class="v">'+(val==null?"—":Number(val).toFixed(2))+'</div><div class="k">'+(PE_PROJ_LABEL[key]||key)+'</div>';
+  var lo=peFindLine(props,player,key);
+  if(lo&&lo.line!=null&&typeof _poissonOver==="function"){
+    var ln=Number(lo.line),op=_poissonOver(Number(val),ln);
+    if(op!=null){var over=op>=0.5,pct=Math.round((over?op:1-op)*100);
+      base+='<div class="pe-line '+(over?"pe-over":"pe-under")+'">'+(over?"o":"u")+ln+' · '+pct+'%</div>';}
+    else base+='<div class="pe-line">line '+ln+'</div>';
+  }
+  return '<div class="t">'+base+'</div>';}
+function peRadar(id,R){
+  var svg=document.getElementById("rad"+id); if(!svg)return; svg.innerHTML="";
+  var NS="http://www.w3.org/2000/svg";
+  function mk(t,at,txt){var e=document.createElementNS(NS,t);for(var k in at)e.setAttribute(k,at[k]);if(txt!=null)e.textContent=txt;return e;}
+  var mx=170,my=150,keys=Object.keys(R||{}),n=keys.length||1;
+  for(var i=0;i<n;i++){var a=-Math.PI/2+i*2*Math.PI/n;
+    var ex=mx+66*Math.cos(a),ey=my+60*Math.sin(a),px=mx+136*Math.cos(a),py=my+120*Math.sin(a);
+    svg.appendChild(mk("line",{x1:ex,y1:ey,x2:px,y2:py,stroke:"#4a4b42","stroke-width":1,"stroke-dasharray":"2 3"}));
+    svg.appendChild(mk("circle",{cx:ex,cy:ey,r:2,fill:"#F0B94E"}));
+  }
+  var sz=206; var img=mk("image",{x:(mx-sz/2).toFixed(1),y:(my-sz/2).toFixed(1),width:sz,height:sz,preserveAspectRatio:"xMidYMid meet"});
+  img.setAttributeNS("http://www.w3.org/1999/xlink","href","/emblem.png"); img.setAttribute("href","/emblem.png");
+  svg.appendChild(img);
+  keys.forEach(function(label,i){var a=-Math.PI/2+i*2*Math.PI/n;
+    var px=mx+136*Math.cos(a),py=my+120*Math.sin(a),val=Math.round(R[label]||0);
+    var w=Math.max(44,label.length*5.0+16),h=27;
+    var g=mk("g",{transform:"translate("+(px-w/2).toFixed(1)+","+(py-h/2).toFixed(1)+")"});
+    g.appendChild(mk("rect",{x:0,y:0,width:w,height:h,rx:7,fill:"#13140f",stroke:"#3a3b33","stroke-width":1}));
+    g.appendChild(mk("text",{x:w/2,y:9.5,fill:"#8f9488","font-size":"6","font-family":"Archivo, sans-serif","font-weight":"800","letter-spacing":".4","text-anchor":"middle"},label.toUpperCase()));
+    g.appendChild(mk("text",{x:w/2,y:20.5,fill:"#F0B94E","font-size":"11.5","font-family":"Space Mono, monospace","font-weight":"700","text-anchor":"middle"},val));
+    svg.appendChild(g);
+  });
+}
+function peCard(gid,c,i,props){
+  var projKeys=PE_PROJ_ORDER.filter(function(k){return c.projections&&c.projections[k]!=null;});
+  var projTiles=projKeys.map(function(k){return peProjTile(k,c.projections[k],props,c.player);}).join("");
+  var pcs=c.type==="pitcher"?"P":(c.order?("#"+c.order):"B");
+  var chips="";
+  if(c.arsenal&&c.arsenal.length){
+    chips='<span class="chip full">● Full Mix</span>'+c.arsenal.slice(0,7).map(function(a){
+      return '<span class="chip">● '+a.pitch+' <span class="u">'+(a.usage!=null?Math.round(a.usage)+"%":"")+'</span></span>';}).join("");
+  }
+  var grid=(c.grid||[]).map(function(g){return '<div class="gt '+g.grade+'"><div class="k">'+g.label+'</div><div class="v">'+peFmt(g.value,g.kind)+'</div></div>';}).join("");
+  var edgeCol=c.edge_pct>=0?"var(--good)":"var(--bad)";
+  var vsLine=c.pitcher?('<div class="cc-vs"><b>'+c.player+'</b> vs '+c.pitcher+'</div>'):
+    (c.type==="pitcher"?'<div class="cc-vs"><b>'+c.player+'</b> · arsenal & matchup</div>':'');
+  var tag=c.type==="pitcher"?'<span class="pe-tag">SP</span>':'';
+  return '<div class="vrow" id="row'+gid+'_'+i+'" onclick="peToggle(\''+gid+'\','+i+')">'+
+      '<div class="vr-rank"><div class="n">'+c.rank+'</div><div class="l">'+(c.type==="pitcher"?"Pitcher":"Overall")+'</div></div>'+
+      '<div class="vr-av">'+peInit(c.player)+'</div>'+
+      '<div class="vr-mid"><div class="vr-nm">'+c.player+' '+tag+'</div>'+
+        '<div class="vr-sub">'+(c.team||"")+' <span class="ic">🔥</span><span class="ic">⚡</span></div></div>'+
+      '<div class="vr-score"><div class="vpill '+peScoreCls(c.logic_score)+'">'+Number(c.logic_score).toFixed(1)+'</div><span class="vr-exp">▾</span></div>'+
+    '</div>'+
+    '<div class="vbody" id="body'+gid+'_'+i+'">'+
+      '<div class="vhero"><div class="vmask"><svg id="rad'+gid+'_'+i+'" viewBox="0 0 340 300"></svg></div>'+
+        '<div class="vscore-wrap"><div class="vscore-l"><div class="vscore-k">Logic Score</div><div class="vscore-n">'+Number(c.logic_score).toFixed(1)+'</div>'+
+          '<div class="vscore-edge" style="color:'+edgeCol+'">'+(c.edge_pct>=0?"+":"")+Number(c.edge_pct).toFixed(1)+'% edge</div></div>'+
+          '<div class="vscore-r"><div class="vbar"><div class="l"><span>Baseline</span><b>'+Number(c.baseline).toFixed(1)+'</b></div><div class="tk"><div class="fl" style="width:'+c.baseline+'%"></div></div></div>'+
+          '<div class="vbar opp"><div class="l"><span>Opportunity</span><b>'+Number(c.opportunity).toFixed(1)+'</b></div><div class="tk"><div class="fl" style="width:'+c.opportunity+'%"></div></div></div></div>'+
+        '</div></div>'+
+      (projTiles?'<div class="vsec"><div class="vsec-h">Projections · model vs line</div><div class="proj">'+projTiles+'</div></div>':"")+
+      (grid?'<div class="vsec"><div class="vsec-h">'+(c.type==="pitcher"?"Pitch profile":"Matchup breakdown")+'</div>'+vsLine+
+        (chips?'<div class="chips">'+chips+'</div>':"")+
+        '<div class="leg"><span class="b"><span class="d"></span>'+(c.type==="pitcher"?"Pitcher Edge":"Batter Edge")+'</span><span class="n"><span class="d"></span>Neutral</span><span class="p"><span class="d"></span>'+(c.type==="pitcher"?"Hitter Edge":"Pitcher Edge")+'</span></div>'+
+        '<div class="grid">'+grid+'</div></div>':"")+
+    '</div>';
+}
+function peToggle(gid,i){var b=document.getElementById("body"+gid+"_"+i),r=document.getElementById("row"+gid+"_"+i);
+  if(!b)return; var open=b.classList.toggle("show"); r.classList.toggle("open",open);
+  if(open){var d=_peData[gid]; if(d&&d.cards[i])peRadar(gid+"_"+i,d.cards[i].radar);}}
+function peRender(gid,d,props){
+  var cards=d.cards||[];
+  var h='<div class="gh"><div class="gh-top"><div><div class="gh-match">'+(d.away_team||"")+'<span class="vs">@</span>'+(d.home_team||"")+'</div>'+
+    '<div class="gh-sub">Ranked by Logic Score · '+(cards.length)+' players</div></div></div></div>';
+  h+=cards.map(function(c,i){return peCard(gid,c,i,props);}).join("");
+  return h;}
+function _peProps(){return (typeof mlbProps!=="undefined"&&mlbProps&&mlbProps!=="loading"&&mlbProps.props)?mlbProps.props:[];}
+function _pePaint(key){var mount=document.getElementById("pe-mount");var d=_peData[key];
+  if(!mount||!d)return; mount.innerHTML=peRender(key,d,_peProps()); peToggle(key,0);}
+function loadPlayerEdge(gid){
+  var mount=document.getElementById("pe-mount"); if(!mount)return;
+  var key=String(gid);
+  if(_peData[key]){_pePaint(key); return;}   // cached data -> repaint with current lines
+  var dateq=(typeof selected!=="undefined"&&typeof ymd==="function")?("?date="+ymd(selected)):"";
+  getJSON("/api/mlb/venom/"+gid+dateq).then(function(d){
+    if(!d||d.error||!(d.cards&&d.cards.length)){
+      var mm0=document.getElementById("pe-mount");
+      if(mm0)mm0.innerHTML='<div class="pe-empty">Player Edge fills in once lineups are posted and Statcast profiles are built.'+((d&&d.error)?(" ("+d.error+")"):"")+'</div>';return;}
+    _peData[key]=d; _pePaint(key);
+  }).catch(function(e){var mm=document.getElementById("pe-mount"); if(mm)mm.innerHTML='<div class="pe-empty">Could not load Player Edge.</div>';});
+}
+
+</script>
 </body>
 </html>
