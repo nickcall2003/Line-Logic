@@ -49,6 +49,17 @@ USE_REAL = PROVIDER_NAME in ("apitennis", "sofascore", "espn")
 # environment, we use Claude to turn the computed FACTS into richer prose
 # (under a strict "use only these facts" instruction). With no key, the
 # deterministic template is used — same facts, plainer wording, no cost.
+# Circuit breaker for AI narration. When the Anthropic API returns a hard error
+# (no credits, bad key) we stop calling it for a cooldown instead of hammering it
+# thousands of times a second — that flood was burning quota and spamming logs.
+_AI_BREAK = {"until": 0.0, "logged": False}
+
+
+def _ai_paused():
+    import time as _t
+    return _t.time() < _AI_BREAK["until"]
+
+
 def _make_llm_complete():
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
@@ -62,10 +73,28 @@ def _make_llm_complete():
         return None
 
     def complete(prompt: str) -> str:
-        msg = client.messages.create(
-            model=model, max_tokens=400,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        import time as _t
+        now = _t.time()
+        if now < _AI_BREAK["until"]:
+            raise RuntimeError("ai narration paused (circuit breaker open)")
+        try:
+            msg = client.messages.create(
+                model=model, max_tokens=400,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except Exception as e:
+            es = str(e).lower()
+            hard = any(s in es for s in (
+                "credit balance", "billing", "insufficient", "authentication",
+                "invalid x-api-key", "x-api-key", "permission", "401", "403"))
+            cool = float(os.environ.get("AI_BREAK_LONG", "3600") if hard
+                         else os.environ.get("AI_BREAK_SHORT", "120"))
+            _AI_BREAK["until"] = now + cool
+            if not _AI_BREAK["logged"] or hard:
+                print(f"[ai] narration paused {int(cool)}s after error: {str(e)[:140]}")
+                _AI_BREAK["logged"] = True
+            raise
+        _AI_BREAK["logged"] = False
         parts = [b.text for b in msg.content if getattr(b, "type", "") == "text"]
         return "\n".join(parts).strip()
     print(f"[ai] AI narrative enabled with {model}")
@@ -448,6 +477,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[startup] init_db failed: {e}")
 
+    # One-time schema catch-up: older DBs predate these odds_snapshot columns, so
+    # every ATS query was failing with "no such column: odds_snapshot.open_spread".
+    # Add any that are missing; a duplicate just rolls back harmlessly.
+    try:
+        from sqlalchemy import text as _sqltext
+        with SessionLocal() as _mdb:
+            for _col in ("open_spread", "last_spread"):
+                try:
+                    _mdb.execute(_sqltext(
+                        f"ALTER TABLE odds_snapshot ADD COLUMN {_col} FLOAT"))
+                    _mdb.commit()
+                    print(f"[migrate] added odds_snapshot.{_col}")
+                except Exception:
+                    _mdb.rollback()
+    except Exception as e:
+        print(f"[migrate] odds_snapshot check skipped: {e}")
+
     # Loud check: are accounts/bets on durable storage? Surfaces the #1 footgun
     # (SQLite on Railway's ephemeral disk) in the deploy logs immediately.
     try:
@@ -680,10 +726,15 @@ async def lifespan(app: FastAPI):
             _t.sleep(90)   # pass healthcheck + let the first build settle
             while True:
                 try:
+                    if _ai_paused():
+                        _t.sleep(300)
+                        continue
                     target = dt.date.today()
                     plays = _gather_plays(target)
                     slate = [dict(p) for p in plays]
                     for p in plays:
+                        if _ai_paused():
+                            break   # breaker tripped mid-pass; stop hammering
                         _nar.warm(_long_reason(p), kind="reason",
                                   sport=p["sport"], llm=LLM_COMPLETE)
                         pf = _prem.premium_facts(p, slate, SessionLocal)
