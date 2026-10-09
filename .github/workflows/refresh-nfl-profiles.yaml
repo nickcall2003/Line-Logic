@@ -1,0 +1,45 @@
+name: Refresh NFL profiles
+
+# Rebuilds nfl_profiles.json weekly from nflverse and commits it, so the app always
+# serves current advanced stats even if the live server can't reach nflverse.
+# The builder downloads the nflverse weekly-player-stats release directly (urllib),
+# which a GitHub-hosted runner reaches fine — no clone needed.
+
+on:
+  schedule:
+    - cron: "0 12 * * 2"       # Tuesdays 12:00 UTC — after the full Thu/Sun/Mon slate
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Probe nflverse reachability
+        run: |
+          curl -sS -o /dev/null -w "nflverse HTTP %{http_code}  bytes=%{size_download}\n" --max-time 40 -L \
+            "https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_2025.csv" \
+            || echo "nflverse FAILED"
+
+      - name: Build nfl_profiles.json
+        run: python build_nfl_profiles.py
+
+      - name: Commit the refreshed profiles
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add nfl_profiles.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No change — nothing to commit"
+          else
+            git commit -m "chore: refresh nfl_profiles.json (nflverse)"
+            git push
+          fi
