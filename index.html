@@ -381,8 +381,8 @@ font-family:var(--body);color:var(--fg)}
 
 .ga-impact{margin:14px 0 4px}
 .ga-h{font-family:var(--disp);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:800;margin:0 2px 9px}
-.gai-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-@media(max-width:560px){.gai-grid{grid-template-columns:1fr}}
+.gai-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:8px}
+
 .gai-card{background:#13140f;border:1px solid #2c2d26;border-radius:11px;padding:10px;cursor:pointer}
 .gai-top{display:flex;align-items:center;gap:9px}
 .gai-av{position:relative;width:34px;height:34px;border-radius:50%;flex:none;overflow:hidden;background:radial-gradient(130% 130% at 30% 20%,#ffd77a,var(--gold));display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:900;font-size:13px;color:#161310}
@@ -402,6 +402,12 @@ font-family:var(--body);color:var(--fg)}
 .gai-proj b{color:#f3ead4;font-size:12px}
 .gai-leak{font-family:var(--mono);font-size:9.5px;line-height:1.3;color:#cfcabb;margin-top:7px;border-left:2px solid var(--gold);padding-left:7px}
 .gai-foot{font-family:var(--mono);font-size:10px;color:var(--gold);margin:9px 2px 0;cursor:pointer;font-weight:700}
+
+.gsc{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:7px;margin:4px 0 8px}
+
+.gsc-box{background:#13140f;border:1px solid #2c2d26;border-radius:9px;padding:8px 6px;text-align:center}
+.gsc-box .k{font-family:var(--mono);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gsc-box .v{font-family:var(--disp);font-weight:800;font-size:15px;color:#f3ead4;margin-top:3px}
 </style>
 </head>
 <body>
@@ -1705,6 +1711,7 @@ function renderMLBDetail(g){const fin=g.status==="finished",live=g.status==="liv
     // model did with them. Raw season ERA is kept below, since the model runs on
     // FIP and the two are worth seeing side by side.
     body='<div class="panel">'+predictionReportHTML(g,"mlb")+
+    '<div id="ga-impact" class="ga-impact"></div>'+gameScriptHTML(g)+
     modelNotesHTML(g)+
     driversHTML(g)+
     rawStatsHTML(g,sA,sH)+
@@ -1714,6 +1721,7 @@ function renderMLBDetail(g){const fin=g.status==="finished",live=g.status==="liv
     '<div class="note">Starter is each team\u2019s announced probable; bullpen is the team staff ERA. Park &amp; weather scale the run environment for both sides. Lines are the model\u2019s own fair probabilities, not sportsbook numbers. Not betting advice.</div></div>'+depthHTML(g);}
   document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to games</button>'+head+mvMount("mlb",g.id)+tabs+body;
   if(mlbDetailTab==="prediction")setTimeout(function(){loadOfficials("mlb",g.id,(g.exp_runs_home||0)+(g.exp_runs_away||0));},30);
+  if(mlbDetailTab==="prediction")setTimeout(function(){try{loadGameImpact(g.id,"mlb","");}catch(e){}},20);
   if(mlbDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id);}catch(e){}},20);}
 // ===== NBA / NFL DETAIL =====
 async function openTeamDetail(id){detailId=sport+id;teamDetailTab="prediction";teamProps=null;teamBox=null;showView(true);
@@ -1735,6 +1743,20 @@ async function loadTeamProps(id,sp){teamProps="loading";renderTeamDetail(teamGam
 async function loadTeamBox(id,sp,silent){if(!silent){teamBox="loading";renderTeamDetail(teamGame,sp);}
   let b;try{b=await getJSON("/api/"+sp+"/boxscore/"+id+"?date="+ymd(selected));}catch(e){return;}
   if(detailId!==sp+id)return;teamBox=b;renderTeamDetail(teamGame,sp);}
+function gameScriptHTML(g){
+  // Venom-style game script: favorite/spread, total, and each team's implied points
+  // (total/2 ± spread/2). Only when a market line exists.
+  if(!g||!g.odds||g.odds.spread_home==null||g.total==null)return "";
+  var sh=g.odds.spread_home,favHome=sh<0;
+  var favT=favHome?g.home:g.away,dogT=favHome?g.away:g.home;
+  var favA=(favT&&(favT.abbr||favT.short||favT.name))||"Fav",dogA=(dogT&&(dogT.abbr||dogT.short||dogT.name))||"Dog";
+  var spn=Math.round(Math.abs(sh)*10)/10,tot=g.total;
+  var favImp=tot/2+Math.abs(sh)/2,dogImp=tot/2-Math.abs(sh)/2;
+  return '<div class="stat-sec">Game script</div><div class="gsc">'+
+    '<div class="gsc-box"><div class="k">Script</div><div class="v">'+favA+' -'+spn+'</div></div>'+
+    '<div class="gsc-box"><div class="k">Total</div><div class="v">'+tot+'</div></div>'+
+    '<div class="gsc-box"><div class="k">'+favA+' implied</div><div class="v">'+favImp.toFixed(1)+'</div></div>'+
+    '<div class="gsc-box"><div class="k">'+dogA+' implied</div><div class="v">'+dogImp.toFixed(1)+'</div></div></div>';}
 function teamLinesHTML(g){const L=g.lines;if(!L)return "";const pc=v=>Math.round(v*100)+"%";
   const sp=L.spread,fav=sp.favorite==="home"?g.home.abbr:g.away.abbr,dog=sp.favorite==="home"?g.away.abbr:g.home.abbr;
   const favLine=sp.home_line<=0?sp.home_line:-sp.home_line;
@@ -1845,7 +1867,7 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
   if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
   else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl")?'<div class="panel"><div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
   else{const mp=writeupHTML(g.analysis);
-    body='<div class="panel">'+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl")?'<div id="ga-impact" class="ga-impact"></div>':"")+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
+    body='<div class="panel">'+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
     teamFactorsHTML(g,sp)+
     injuryPanelHTML(g)+
     teamLinesHTML(g)+
@@ -5633,10 +5655,14 @@ function gaImpactCard(c){
   var leak=(c.leaks&&c.leaks.length)?('<div class="gai-leak">'+c.leaks[0].text+'</div>'):"";
   var edge=(c.edge_pct>=0?"+":"")+Number(c.edge_pct).toFixed(1)+"%";
   var edgeCls=c.edge_pct>=0?"pos":"neg";
-  return '<div class="gai-card" onclick="if(typeof setTeamTab===\'function\')setTeamTab(\'props\');">'+
+  var posLab=c.pos||(c.type==="pitcher"?"SP":(c.type==="batter"?"BAT":""));
+  var ctx=c.opp?(" vs "+c.opp):(c.pitcher?(" vs "+c.pitcher):"");
+  var sub=(posLab?posLab:"")+(c.team?((posLab?" · ":"")+c.team):"")+ctx;
+  var tabFn="if(typeof setTeamTab===\'function\')setTeamTab(\'props\');else if(typeof setMLBTab===\'function\')setMLBTab(\'props\');";
+  return '<div class="gai-card" onclick="'+tabFn+'">'+
     '<div class="gai-top">'+av+
       '<div class="gai-id"><div class="gai-nm">'+c.player+'</div>'+
-        '<div class="gai-sub">'+(c.pos||"")+' · '+(c.team||"")+(c.opp?' vs '+c.opp:"")+'</div></div>'+
+        '<div class="gai-sub">'+(sub||"&nbsp;")+'</div></div>'+
       '<div class="gai-sc"><div class="gai-pill '+peScoreCls(c.logic_score)+'">'+Number(c.logic_score).toFixed(1)+'</div>'+
         '<div class="gai-edge '+edgeCls+'">'+edge+' edge</div></div></div>'+
     (proj?('<div class="gai-row">'+proj+'</div>'):"")+leak+'</div>';}
@@ -5645,7 +5671,7 @@ function renderGameImpact(mountId,d){
   var top=d.cards.slice().sort(function(a,b){return (b.logic_score||0)-(a.logic_score||0);}).slice(0,4);
   m.innerHTML='<div class="ga-h">Impact players · biggest edges</div><div class="gai-grid">'+
     top.map(gaImpactCard).join("")+'</div>'+
-    '<div class="gai-foot" onclick="if(typeof setTeamTab===\'function\')setTeamTab(\'props\');">See all players &amp; props ›</div>';}
+    '<div class="gai-foot" onclick="if(typeof setTeamTab===\'function\')setTeamTab(\'props\');else if(typeof setMLBTab===\'function\')setMLBTab(\'props\');">See all players &amp; props ›</div>';}
 function loadGameImpact(gid,sport,params){
   var mountId="ga-impact",m=document.getElementById(mountId); if(!m)return;
   var key=(sport+"_"+gid).replace(/[^a-z0-9_]/gi,"_");
