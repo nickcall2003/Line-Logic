@@ -6379,6 +6379,51 @@ def ladder_settle(token: str = ""):
     return _settle_ladder()
 
 
+@app.get("/api/nhl/data-probe")
+def nhl_data_probe():
+    """Gate test for the NHL Player Edge: what advanced-data sources can THIS server
+    reach? Tries the official NHL stats API (skater/goalie season summaries) and
+    MoneyPuck's expected-goals CSV, and reports status + a sample of the fields each
+    returns, so the builder targets whatever is reachable."""
+    import httpx
+    out = {}
+    ua = {"User-Agent": "Mozilla/5.0 (LineLogic NHLProbe)"}
+    # current season id (e.g. 20262027) and the prior completed one
+    y = dt.date.today().year
+    seasons = [f"{y}{y+1}", f"{y-1}{y}"] if dt.date.today().month >= 9 else [f"{y-1}{y}", f"{y-2}{y-1}"]
+    tries = {
+        "nhl_skater_summary": f"https://api.nhle.com/stats/rest/en/skater/summary?limit=5&start=0&cayenneExp=seasonId={seasons[0]}%20and%20gameTypeId=2",
+        "nhl_skater_prev": f"https://api.nhle.com/stats/rest/en/skater/summary?limit=5&start=0&cayenneExp=seasonId={seasons[1]}%20and%20gameTypeId=2",
+        "nhl_goalie_summary": f"https://api.nhle.com/stats/rest/en/goalie/summary?limit=5&start=0&cayenneExp=seasonId={seasons[1]}%20and%20gameTypeId=2",
+    }
+    for name, url in tries.items():
+        try:
+            r = httpx.get(url, headers=ua, timeout=25.0, follow_redirects=True)
+            j = None
+            try:
+                j = r.json()
+            except Exception:
+                pass
+            data = (j or {}).get("data") if isinstance(j, dict) else None
+            out[name] = {"status": r.status_code, "rows": (len(data) if data else 0),
+                         "fields": sorted(list(data[0].keys()))[:60] if data else [],
+                         "sample": data[0] if data else None}
+        except Exception as e:
+            out[name] = {"error": f"{type(e).__name__}: {e}"}
+    # MoneyPuck (expected goals) — third-party host, may or may not be reachable
+    for name, yr in (("moneypuck_skaters", seasons[1][:4]),):
+        url = f"https://moneypuck.com/moneypuck/playerData/seasonSummary/{yr}/regular/skaters.csv"
+        try:
+            r = httpx.get(url, headers=ua, timeout=25.0, follow_redirects=True)
+            body = r.text or ""
+            out[name] = {"status": r.status_code, "bytes": len(body),
+                         "header": body.splitlines()[0][:600] if body.strip() else ""}
+        except Exception as e:
+            out[name] = {"error": f"{type(e).__name__}: {e}"}
+    out["_seasons_tried"] = seasons
+    return out
+
+
 @app.get("/api/mlb/statcast-probe")
 def mlb_statcast_probe():
     """Gate test for the Venom-style props build: can THIS server reach Baseball
