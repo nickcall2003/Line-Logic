@@ -121,6 +121,29 @@ def _name(athlete) -> str:
             or athlete.get("shortName") or "").strip()
 
 
+def _norm_name(name) -> str:
+    """Accent-stripped, lowercased, hyphens->spaces, alnum only."""
+    import unicodedata
+    s = "".join(c for c in unicodedata.normalize("NFKD", str(name or ""))
+                if not unicodedata.combining(c)).lower().replace("-", " ")
+    return " ".join("".join(ch for ch in s if ch.isalnum() or ch == " ").split())
+
+
+def _ln(name) -> str:
+    """Last token of a normalized name — the surname used to match across sources
+    (ESPN vs the Odds API), which format first names differently."""
+    s = _norm_name(name)
+    return s.split()[-1] if s else ""
+
+
+def _comp_name(c) -> str:
+    """Display name of a scoreboard competitor (singles athlete)."""
+    if not isinstance(c, dict):
+        return ""
+    ath = c.get("athlete") or {}
+    return _name(ath) or _name(c)
+
+
 def _order_ab(competitors):
     """Return (a, b) competitor dicts with a stable, deterministic a/b assignment so
     prob_a always means the same side. Prefer explicit 'order', then homeAway, then
@@ -302,6 +325,38 @@ class ESPNTennisProvider(TennisProvider):
         return ls
 
     @staticmethod
+    def _livescore_aligned(comp, name_a, name_b) -> LiveScore:
+        """Like _livescore_from_comp but a/b map to the GIVEN (name_a, name_b) order,
+        not ESPN's — so the winner lines up with the stored player_a/player_b."""
+        ls = ESPNTennisProvider._livescore_from_comp(comp)
+        a, b = _order_ab(comp.get("competitors"))
+        if not a or not b:
+            return ls
+        if _ln(_comp_name(a)) == _ln(name_a):
+            return ls                              # ESPN 'a' is already our player_a
+        # swapped: flip sets + winner so a/b mean (name_a, name_b)
+        ls.sets_a, ls.sets_b = ls.sets_b, ls.sets_a
+        ls.winner = "b" if ls.winner == "a" else ("a" if ls.winner == "b" else None)
+        return ls
+
+    def get_live_score_by_names(self, name_a, name_b) -> LiveScore:
+        """Resolve a live/final score by PLAYER NAMES across both tours. This is the
+        path that works for odds-API-sourced matches, whose ids ('oa:...') never match
+        ESPN's event ids."""
+        want = {_ln(name_a), _ln(name_b)}
+        if "" in want or len(want) < 2:
+            return LiveScore(status="scheduled")
+        today = dt.date.today()
+        for lg in ("atp", "wta"):
+            for d in (today, today - dt.timedelta(days=1), today + dt.timedelta(days=1)):
+                data = _scoreboard(lg, d)
+                for comp, _ in _iter_matches(data, lg.upper()):
+                    names = {_ln(_comp_name(c)) for c in (comp.get("competitors") or [])}
+                    if names == want:
+                        return self._livescore_aligned(comp, name_a, name_b)
+        return LiveScore(status="scheduled")
+
+    @staticmethod
     def _stats_from_summary(data) -> MatchStats:
         """Best-effort serve/return line from ESPN's summary boxscore. Many matches
         (especially early-round) carry none — we return an empty MatchStats and the UI
@@ -383,7 +438,32 @@ class ESPNTennisProvider(TennisProvider):
         return {}
 
     def final_results(self, day):
-        return {}
+        """Finished results for a day, keyed by the surname-pair (order-independent)
+        so the reconcile loop can match odds-API matches by player name. Value:
+        {status, winner_ln, sets}. winner_ln is the surname of the winner; sets is
+        {surname: [set scores]}."""
+        d = day.date() if isinstance(day, dt.datetime) else day
+        out = {}
+        for lg in ("atp", "wta"):
+            try:
+                data = _scoreboard(lg, d)
+            except Exception:
+                continue
+            for comp, _ in _iter_matches(data, lg.upper()):
+                a, b = _order_ab(comp.get("competitors"))
+                if not a or not b:
+                    continue
+                na, nb = _comp_name(a), _comp_name(b)
+                la, lb = _ln(na), _ln(nb)
+                if not la or not lb:
+                    continue
+                ls = self._livescore_from_comp(comp)   # a/b per ESPN order
+                winner_ln = la if ls.winner == "a" else (lb if ls.winner == "b" else None)
+                out[tuple(sorted([la, lb]))] = {
+                    "status": ls.status, "winner_ln": winner_ln,
+                    "sets": {la: ls.sets_a, lb: ls.sets_b},
+                }
+        return out
 
     def player_serve_averages(self, *a, **k):
         return None

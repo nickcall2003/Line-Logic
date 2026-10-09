@@ -54,6 +54,16 @@ RECONCILE_EVERY_TICKS = int(os.environ.get("LIVE_RECONCILE_EVERY_TICKS", "15"))
 RECONCILE_MAX_DAYS = 4
 
 
+def _ln(name) -> str:
+    """Last token of a normalized name (surname) — matches a stored match to an ESPN
+    result across sources that format first names differently."""
+    import unicodedata
+    s = "".join(c for c in unicodedata.normalize("NFKD", str(name or ""))
+                if not unicodedata.combining(c)).lower().replace("-", " ")
+    s = " ".join("".join(ch for ch in s if ch.isalnum() or ch == " ").split())
+    return s.split()[-1] if s else ""
+
+
 def _score_to_dict(s: LiveScore) -> dict:
     return {
         "sets_a": s.sets_a, "sets_b": s.sets_b,
@@ -118,7 +128,7 @@ class LiveEngine:
             for m in stuck:
                 if m.scheduled:
                     by_day.setdefault(m.scheduled.date(), []).append(
-                        (m.id, str(m.provider_match_id)))
+                        (m.id, m.player_a, m.player_b))
         if not by_day:
             return
         fixed = 0
@@ -131,9 +141,14 @@ class LiveEngine:
             if not res:
                 continue
             with SessionLocal() as db:
-                for mid, pid in items:
-                    got = res.get(pid)
-                    if not got or got[0] != "finished":
+                for mid, pa, pb in items:
+                    la, lb = _ln(pa), _ln(pb)
+                    got = res.get(tuple(sorted([la, lb]))) if (la and lb) else None
+                    # tolerate the legacy (status, winner) tuple shape too
+                    if isinstance(got, tuple):
+                        got = {"status": got[0], "winner_ln": None,
+                               "winner": got[1] if len(got) > 1 else None}
+                    if not got or got.get("status") != "finished":
                         continue
                     m = db.get(Match, mid)
                     if m is not None:
@@ -143,8 +158,17 @@ class LiveEngine:
                         live = LiveState(match_id=mid)
                         db.add(live)
                     live.status = "finished"
-                    if got[1] in ("a", "b"):
-                        live.winner = got[1]
+                    wl = got.get("winner_ln")
+                    if wl == la:
+                        live.winner = "a"
+                    elif wl == lb:
+                        live.winner = "b"
+                    elif got.get("winner") in ("a", "b"):
+                        live.winner = got["winner"]
+                    sets = got.get("sets") or {}
+                    if sets:
+                        live.sets_a = ",".join(str(x) for x in (sets.get(la) or []))
+                        live.sets_b = ",".join(str(x) for x in (sets.get(lb) or []))
                     fixed += 1
                 db.commit()
         if fixed:
@@ -204,7 +228,14 @@ class LiveEngine:
             # get_live_score is a BLOCKING network call. Run it in a thread so it
             # never freezes the event loop (which would make the whole site hang).
             try:
-                score = await asyncio.to_thread(self.provider.get_live_score, pid)
+                # Prefer name-based resolution: odds-API matches carry 'oa:' ids that
+                # never match the ESPN scoreboard's event ids, so an id lookup always
+                # returns 'scheduled'. Names resolve the match across either tour.
+                if hasattr(self.provider, "get_live_score_by_names"):
+                    score = await asyncio.to_thread(
+                        self.provider.get_live_score_by_names, name_a, name_b)
+                else:
+                    score = await asyncio.to_thread(self.provider.get_live_score, pid)
             except Exception as e:
                 print(f"[live] score fetch failed for {match_id}: {e}")
                 continue
