@@ -176,7 +176,7 @@ def score_batter(b, pitcher, order=None):
     }
     grid = _metric_grid(b, lb)
     return {
-        "player": b.get("name"), "type": "batter", "logic_score": venom,
+        "player": b.get("name"), "id": b.get("id"), "type": "batter", "logic_score": venom,
         "baseline": baseline, "opportunity": round(opp, 1), "edge_pct": edge_pct,
         "metrics": {k: b.get(k) for k in
                     ("xwoba", "xba", "xslg", "woba", "ba", "slg", "exit_velo",
@@ -260,7 +260,7 @@ def score_pitcher(p, opp_batters):
             z = -z
         grid.append({"label": label, "value": val, "kind": kind, "grade": _grade(z)})
     return {
-        "player": p.get("name"), "type": "pitcher", "logic_score": logic,
+        "player": p.get("name"), "id": p.get("id"), "type": "pitcher", "logic_score": logic,
         "baseline": baseline, "opportunity": round(opp, 1), "edge_pct": edge_pct,
         "metrics": {k: p.get(k) for k in ("k_pct", "whiff_pct", "xwoba", "hard_hit_pct", "pitches")},
         "grid": grid, "radar": radar, "projections": proj,
