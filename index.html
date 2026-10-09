@@ -378,6 +378,30 @@ font-family:var(--body);color:var(--fg)}
 .pe-leaks{display:flex;flex-direction:column;gap:6px}
 .pe-leak{font-family:var(--mono);font-size:11px;line-height:1.35;color:#cfcabb;background:#13140f;border:1px solid #2c2d26;border-left:2px solid #3a3b33;border-radius:7px;padding:8px 10px}
 .pe-leak.on{border-left-color:var(--gold);color:#f3ead4;box-shadow:0 0 10px rgba(240,185,78,.12)}
+
+.ga-impact{margin:14px 0 4px}
+.ga-h{font-family:var(--disp);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:800;margin:0 2px 9px}
+.gai-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:560px){.gai-grid{grid-template-columns:1fr}}
+.gai-card{background:#13140f;border:1px solid #2c2d26;border-radius:11px;padding:10px;cursor:pointer}
+.gai-top{display:flex;align-items:center;gap:9px}
+.gai-av{position:relative;width:34px;height:34px;border-radius:50%;flex:none;overflow:hidden;background:radial-gradient(130% 130% at 30% 20%,#ffd77a,var(--gold));display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:900;font-size:13px;color:#161310}
+.gai-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#1a1d19}
+.gai-id{flex:1;min-width:0}
+.gai-nm{font-family:var(--disp);font-weight:800;font-size:13.5px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gai-sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.04em}
+.gai-sc{text-align:right;flex:none}
+.gai-pill{font-family:var(--disp);font-weight:900;font-size:14px;color:#161310;background:linear-gradient(180deg,#ffd77a,var(--gold));border-radius:9px;padding:3px 9px;min-width:44px;display:inline-block}
+.gai-pill.mid{background:linear-gradient(180deg,#cfc08a,#9a9065)}
+.gai-pill.low{background:linear-gradient(180deg,#8f9488,#6f7468);color:#11130f}
+.gai-edge{font-family:var(--mono);font-size:8.5px;margin-top:3px;font-weight:700}
+.gai-edge.pos{color:var(--good)}
+.gai-edge.neg{color:var(--bad)}
+.gai-row{margin-top:8px}
+.gai-proj{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.gai-proj b{color:#f3ead4;font-size:12px}
+.gai-leak{font-family:var(--mono);font-size:9.5px;line-height:1.3;color:#cfcabb;margin-top:7px;border-left:2px solid var(--gold);padding-left:7px}
+.gai-foot{font-family:var(--mono);font-size:10px;color:var(--gold);margin:9px 2px 0;cursor:pointer;font-weight:700}
 </style>
 </head>
 <body>
@@ -1663,7 +1687,7 @@ function renderMLBDetail(g){const fin=g.status==="finished",live=g.status==="liv
     '<img src="'+(g.home.logo||"")+'" onerror="this.style.visibility=\'hidden\'"></div>'+
     '<div class="proj-line"><span class="pr">'+g.away.abbr+' <b>'+g.exp_runs_away+'</b></span> projected runs <span class="pr"><b>'+g.exp_runs_home+'</b> '+g.home.abbr+'</span></div>'+
     (g.status==="live"?mlbLiveBarHTML(g):dPredBar(g.away.abbr,pa,g.home.abbr,ph))+(g.status==="live"?mlbSituationHTML(g):"")+'</div>';
-  const tabs='<div class="d-tabs"><button class="d-tab '+(mlbDetailTab==="prediction"?"active":"")+'" onclick="setMLBTab(\'prediction\')">Prediction</button>'+
+  const tabs='<div class="d-tabs"><button class="d-tab '+(mlbDetailTab==="prediction"?"active":"")+'" onclick="setMLBTab(\'prediction\')">Game Analysis</button>'+
     '<button class="d-tab '+(mlbDetailTab==="props"?"active":"")+'" onclick="setMLBTab(\'props\')">Props</button>'+
     '<button class="d-tab '+(mlbDetailTab==="matchups"?"active":"")+'" onclick="setMLBTab(\'matchups\')">Matchups</button>'+
     '<button class="d-tab '+(mlbDetailTab==="injuries"?"active":"")+'" onclick="setMLBTab(\'injuries\')">Injuries</button>'+
@@ -1815,13 +1839,13 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
     heroStatHTML(g,sp)+
     ((g.status==="live"&&sp==="ncaabb")?ncaabbLiveBarHTML(g):(g.status==="live"&&(sp==="nfl"||sp==="ncaaf"))?nflLiveBarHTML(g):(g.status==="live"&&sp==="nba")?nbaLiveBarHTML(g):(g.status==="live"&&sp==="nhl")?nhlLiveBarHTML(g):(g.status==="live"&&sp==="ncaab")?ncaabLiveBarHTML(g):(g.status==="live"&&sp==="wncaab")?wncaabLiveBarHTML(g):g.status==="live"?predBarHTML(g.away.abbr,pa,g.home.abbr,ph,g.status):dPredBar(g.away.abbr,pa,g.home.abbr,ph))+((g.status==="live"&&(sp==="nfl"||sp==="ncaaf"))?nflFieldHTML(g):(g.status==="live"&&sp==="ncaabb")?mlbSituationHTML(g):"")+'</div>';
   const propsTab=(sp==="nba"||sp==="wnba"||sp==="nfl"||sp==="nhl")?'<button class="d-tab '+(teamDetailTab==="props"?"active":"")+'" onclick="setTeamTab(\'props\')">Props</button>':'';
-  const tabs='<div class="d-tabs"><button class="d-tab '+(teamDetailTab==="prediction"?"active":"")+'" onclick="setTeamTab(\'prediction\')">Prediction</button>'+propsTab+
+  const tabs='<div class="d-tabs"><button class="d-tab '+(teamDetailTab==="prediction"?"active":"")+'" onclick="setTeamTab(\'prediction\')">Game Analysis</button>'+propsTab+
     '<button class="d-tab '+(teamDetailTab==="box"?"active":"")+'" onclick="setTeamTab(\'box\')">Live Stats</button></div>';
   let body;
   if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
   else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl")?'<div class="panel"><div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
   else{const mp=writeupHTML(g.analysis);
-    body='<div class="panel">'+predictionReportHTML(g,sp)+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
+    body='<div class="panel">'+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl")?'<div id="ga-impact" class="ga-impact"></div>':"")+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
     teamFactorsHTML(g,sp)+
     injuryPanelHTML(g)+
     teamLinesHTML(g)+
@@ -1829,7 +1853,8 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
     '<div class="note">Predictions use an Elo model seeded from season records with home-court/field advantage. Lines are the model\u2019s own fair probabilities, not sportsbook numbers. Not betting advice.</div></div>'+depthHTML(g);}
   document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to games</button>'+head+mvMount(sp,g.id)+tabs+body;
   if(teamDetailTab!=="box"&&teamDetailTab!=="props")setTimeout(function(){loadOfficials(sp,g.id);},30);
-  if((sp==="nfl"||sp==="nhl")&&teamDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id,sp,"home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);}
+  if((sp==="nfl"||sp==="nhl")&&teamDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id,sp,"home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);
+  if((sp==="nfl"||sp==="nhl")&&teamDetailTab==="prediction")setTimeout(function(){try{loadGameImpact(g.id,sp,"home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);}
 // ===================== SOCCER (multi-league) =====================
 async function loadUFC(){
   let d;try{d=await getJSON("/api/ufc/games?date="+ymd(selected));}catch(e){d={games:[],event:"UFC"};}
@@ -2479,7 +2504,7 @@ function renderSoccerDetail(g){
     '<div class="d-score"><span>'+g.away.name+(g.away.record?" &middot; "+g.away.record:"")+'</span></div>'+
     '<div class="d-score"><span>'+g.home.name+(g.home.record?" &middot; "+g.home.record:"")+'</span></div>'+
     heroStatHTML(g,'soccer')+soccerBarHTML(g,true)+'</div>';
-  const tabs='<div class="d-tabs"><button class="d-tab '+(soccerDetailTab==="prediction"?"active":"")+'" onclick="setSoccerTab(\'prediction\')">Prediction</button>'+
+  const tabs='<div class="d-tabs"><button class="d-tab '+(soccerDetailTab==="prediction"?"active":"")+'" onclick="setSoccerTab(\'prediction\')">Game Analysis</button>'+
     '<button class="d-tab '+(soccerDetailTab==="events"?"active":"")+'" onclick="setSoccerTab(\'events\')">Match Events</button>'+
     '<button class="d-tab '+(soccerDetailTab==="box"?"active":"")+'" onclick="setSoccerTab(\'box\')">Live Stats</button><button class="d-tab '+(soccerDetailTab==="props"?"active":"")+'" onclick="setSoccerTab(\'props\')">Props</button></div>';
   let body;
@@ -5550,7 +5575,7 @@ function peCard(gid,c,i,props,sport,activeProp){
           '<div class="vscore-r"><div class="vbar"><div class="l"><span>Baseline</span><b>'+Number(c.baseline).toFixed(1)+'</b></div><div class="tk"><div class="fl" style="width:'+c.baseline+'%"></div></div></div>'+
           '<div class="vbar opp"><div class="l"><span>Opportunity</span><b>'+Number(c.opportunity).toFixed(1)+'</b></div><div class="tk"><div class="fl" style="width:'+c.opportunity+'%"></div></div></div></div>'+
         '</div></div>'+
-      ((c.leaks&&c.leaks.length)?('<div class="vsec"><div class="vsec-h">Matchup leaks'+(c.opp?' · '+c.opp+' defense':'')+'</div><div class="pe-leaks">'+c.leaks.map(function(l){return '<div class="pe-leak'+(l.strong?' on':'')+'">'+l.text+'</div>';}).join("")+'</div></div>'):"")+
+      ((c.leaks&&c.leaks.length)?('<div class="vsec"><div class="vsec-h">Matchup leaks'+(c.opp?' · '+c.opp:'')+'</div><div class="pe-leaks">'+c.leaks.map(function(l){return '<div class="pe-leak'+(l.strong?' on':'')+'">'+l.text+'</div>';}).join("")+'</div></div>'):"")+
       (projTiles?'<div class="vsec"><div class="vsec-h">Projections · model vs line</div><div class="proj">'+projTiles+'</div></div>':"")+
       (grid?'<div class="vsec"><div class="vsec-h">'+secH+'</div>'+vsLine+
         (chips?'<div class="chips">'+chips+'</div>':"")+
@@ -5599,6 +5624,38 @@ function _peProps(key){
   return (g&&g!=="loading"&&g.props)?g.props:[];}
 function _pePaint(key){var mount=document.getElementById("pe-mount"),d=_peData[key];
   if(!mount||!d)return; mount.innerHTML=peRender(key,d,_peProps(key)); if(!d._prop)peToggle(key,0);}
+/* ===== Game Analysis: impact-player strip (top Player Edge movers in the game view) ===== */
+function gaImpactCard(c){
+  var u=peHeadshot(c);
+  var av='<div class="gai-av"><span>'+peInit(c.player)+'</span>'+(u?('<img src="'+u+'" alt="" loading="lazy" onerror="this.remove()">'):"")+'</div>';
+  var pk=PE_PROJ_ORDER.filter(function(k){return c.projections&&c.projections[k]!=null;})[0];
+  var proj=pk?('<span class="gai-proj"><b>'+Number(c.projections[pk]).toFixed(1)+'</b> '+(PE_PROJ_LABEL[pk]||pk)+'</span>'):"";
+  var leak=(c.leaks&&c.leaks.length)?('<div class="gai-leak">'+c.leaks[0].text+'</div>'):"";
+  var edge=(c.edge_pct>=0?"+":"")+Number(c.edge_pct).toFixed(1)+"%";
+  var edgeCls=c.edge_pct>=0?"pos":"neg";
+  return '<div class="gai-card" onclick="if(typeof setTeamTab===\'function\')setTeamTab(\'props\');">'+
+    '<div class="gai-top">'+av+
+      '<div class="gai-id"><div class="gai-nm">'+c.player+'</div>'+
+        '<div class="gai-sub">'+(c.pos||"")+' · '+(c.team||"")+(c.opp?' vs '+c.opp:"")+'</div></div>'+
+      '<div class="gai-sc"><div class="gai-pill '+peScoreCls(c.logic_score)+'">'+Number(c.logic_score).toFixed(1)+'</div>'+
+        '<div class="gai-edge '+edgeCls+'">'+edge+' edge</div></div></div>'+
+    (proj?('<div class="gai-row">'+proj+'</div>'):"")+leak+'</div>';}
+function renderGameImpact(mountId,d){
+  var m=document.getElementById(mountId); if(!m||!d||!d.cards||!d.cards.length)return;
+  var top=d.cards.slice().sort(function(a,b){return (b.logic_score||0)-(a.logic_score||0);}).slice(0,4);
+  m.innerHTML='<div class="ga-h">Impact players · biggest edges</div><div class="gai-grid">'+
+    top.map(gaImpactCard).join("")+'</div>'+
+    '<div class="gai-foot" onclick="if(typeof setTeamTab===\'function\')setTeamTab(\'props\');">See all players &amp; props ›</div>';}
+function loadGameImpact(gid,sport,params){
+  var mountId="ga-impact",m=document.getElementById(mountId); if(!m)return;
+  var key=(sport+"_"+gid).replace(/[^a-z0-9_]/gi,"_");
+  if(_peData[key]){renderGameImpact(mountId,_peData[key]); return;}
+  var dateq=(typeof selected!=="undefined"&&typeof ymd==="function")?("date="+ymd(selected)):"";
+  var qs=[dateq,params].filter(Boolean).join("&");
+  getJSON("/api/"+sport+"/venom/"+gid+(qs?("?"+qs):"")).then(function(d){
+    if(!d||d.error||!(d.cards&&d.cards.length))return;
+    d._sport=sport; _peData[key]=d; renderGameImpact(mountId,d);
+  }).catch(function(){});}
 function loadPlayerEdge(gid,sport,params){
   sport=sport||"mlb";
   var mount=document.getElementById("pe-mount"); if(!mount)return;
