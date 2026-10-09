@@ -752,7 +752,8 @@ function matchCardHTML(m){const sc=m.score||{},fin=m.status==="finished",live=m.
     '<div class="row">'+nm(m.player_a,pickA,servA,wonA)+'<span class="sets">'+(sc.sets_a||[]).join(" ")+'</span><span class="game">'+(live?sc.game_a:"")+'</span></div>'+
     '<div class="row">'+nm(m.player_b,pickB,servB,wonB)+'<span class="sets">'+(sc.sets_b||[]).join(" ")+'</span><span class="game">'+(live?sc.game_b:"")+'</span></div>'+
     edgeLineHTML({prob_home:pa,odds:m.odds||null},pa)+
-    (live?'<div style="margin-top:10px">'+predBarHTML(favN,favP,dogN,100-favP,"live")+'</div>':'<div class="pred"><div class="bar a" style="width:'+(pa>=0.5?pa:pb)*100+'%">'+favN+' '+favP+'%</div><div class="bar b" style="width:'+(pa>=0.5?pb:pa)*100+'%">'+(100-favP)+'% '+dogN+'</div></div>');}
+    (live?'<div style="margin-top:10px">'+predBarHTML(favN,favP,dogN,100-favP,"live")+'</div>':'<div class="pred"><div class="bar a" style="width:'+(pa>=0.5?pa:pb)*100+'%">'+favN+' '+favP+'%</div><div class="bar b" style="width:'+(pa>=0.5?pb:pa)*100+'%">'+(100-favP)+'% '+dogN+'</div></div>')+
+    shareRowHTML(matchCardUrl(m),matchShareText(m));}
 function favPct(x){var p;
   if(x&&x.prediction&&x.prediction.prob_a!=null)p=x.prediction.prob_a;
   else if(x&&x.prob_home!=null)p=x.prob_home;else p=0.5;
@@ -1491,7 +1492,8 @@ function teamCardHTML(g){const fin=g.status==="finished",live=g.status==="live";
   const edgeLine=edgeLineHTML(g,g.prob_home);
   return '<div class="card-top"><span class="tier" style="background:'+(TIER_COLOR[sport]||"#3f7fc4")+'">'+SPORT_LABEL[sport]+'</span><span class="tourn">'+(g.venue||"")+'</span>'+lc+'<span class="status">'+mark+'</span></div>'+
     '<div class="mlb-card">'+teamColHTML(g.away,winAway)+mid+teamColHTML(g.home,winHome)+'</div>'+proj+edgeLine+whyChipsHTML(g)+
-    '<div style="margin-top:11px">'+predBarHTML(g.away.abbr,pa,g.home.abbr,ph,g.status)+'</div>';}
+    '<div style="margin-top:11px">'+predBarHTML(g.away.abbr,pa,g.home.abbr,ph,g.status)+'</div>'+
+    shareRowHTML(gameCardUrl(g,sport),gameShareText(g,sport));}
 function renderTabsTeam(){const liveCount=teamGames.filter(g=>g.status==="live").length;const el=document.getElementById("tabs");el.innerHTML="";
   [["all","All games"],["live","Live "+(liveCount?'<span class="lv">('+liveCount+')</span>':"")]].forEach(p=>{
     const b=document.createElement("button");b.className="tab"+(tabMode===p[0]?" active":"");b.innerHTML=p[1];b.onclick=()=>{tabMode=p[0];renderTeam();};el.appendChild(b);});appendSortToggle(el);}
@@ -4811,13 +4813,104 @@ function pickCardHTML(p,isFree){const pct=Math.round(p.prob*100);const slabel=(S
     '<div class="pick-reason">'+(p.reason||"")+'</div>'+lineMoveHTML(p)+premiumBlock+
     '<div class="pick-acts">'+
       '<button class="pick-track" data-sport="'+p.sport+'" data-odds="'+(p.market_odds!=null?p.market_odds:"")+'" data-desc="'+_attr(p.pick+(p.match?" \u2014 "+p.match:""))+'" onclick="trackPickFromEl(event,this)">+ Track this pick</button>'+
-      '<button class="pick-share" title="Copy a shareable card" data-share="'+_attrNL(sharePayload(p))+'" onclick="sharePick(event,this)">\u2934 Share</button>'+
+      '<button class="pick-share" title="Generate a shareable pick card" data-card="'+_attr(cardUrl(p))+'" data-share="'+_attrNL(sharePayload(p))+'" onclick="sharePick(event,this)">\u2934 Share card</button>'+
     '</div></div>';}
 // ===== Share a pick =====
 // Lowers the friction for someone to market for you. Deliberately shares a
 // RECEIPT, not a hype line: the model's number, the market's number, the edge,
 // and the transparency claim. It reads like evidence, which is the only kind of
 // sharing that survives contact with a sceptical timeline.
+// Build the branded PNG-card URL for a pick from exactly what's on the tile, so
+// the image can never drift from what the user is looking at. Backend renders it
+// (share_cards.py); missing fields just render as em-dashes.
+function cardUrl(p){
+  var m=(p.match||"").split(/\s+@\s+/);
+  var away=m.length===2?m[0].trim():"";
+  var home=m.length===2?m[1].trim():(p.match||"");
+  var q=[];
+  function add(k,v){if(v!==undefined&&v!==null&&v!=="")q.push(k+"="+encodeURIComponent(v));}
+  add("sport",p.sport);
+  add("away",away);
+  add("home",home);
+  add("pick",(p.pick||"").replace(/\s+to win\s*$/i,""));
+  add("fair",p.fair_odds);
+  add("market",p.market_odds);
+  add("book",p.market_book);          // present only when the board captured a book
+  add("edge",p.edge_pct);
+  add("prob",p.prob);
+  add("date",p.event_time);
+  return "/api/card/pick?"+q.join("&");
+}
+// Shared query builder (skips empty values).
+function _cq(pairs){var q=[];pairs.forEach(function(kv){var v=kv[1];if(v!==undefined&&v!==null&&v!=="")q.push(kv[0]+"="+encodeURIComponent(v));});return q.join("&");}
+function _fairFrom(prob){var mp=prob>=0.5?prob:(1-prob);return mp>=0.5?-Math.round(100*mp/(1-mp)):Math.round(100*(1-mp)/mp);}
+// Team game (mlb/nfl/nba/nhl/ncaa) -> pick card URL, mirroring edgeLineHTML so the
+// image shows the same model/market/edge the card does.
+function gameCardUrl(g,sp){
+  var favHome=g.prob_home>=0.5,modelProb=favHome?g.prob_home:(1-g.prob_home);
+  var o=g.odds||null,mkt=o?(favHome?o.ml_home:o.ml_away):null;
+  var book=o?(favHome?o.ml_home_book:o.ml_away_book):null;
+  var edge=null;
+  if(mkt!=null){var mImp=mkt>0?100/(mkt+100):Math.abs(mkt)/(Math.abs(mkt)+100);edge=Math.round((modelProb-mImp)*1000)/10;}
+  var pickName=favHome?((g.home&&(g.home.name||g.home.abbr))||"Home"):((g.away&&(g.away.name||g.away.abbr))||"Away");
+  return "/api/card/pick?"+_cq([["sport",sp],["away",g.away&&(g.away.name||g.away.abbr)],
+    ["home",g.home&&(g.home.name||g.home.abbr)],["pick",pickName],["fair",_fairFrom(modelProb)],
+    ["market",mkt],["book",book],["edge",edge],["prob",modelProb],["date",g.event_time]]);
+}
+// Tennis match -> pick card URL with the vs separator.
+function matchCardUrl(m){
+  var p=m.prediction||{},pa=p.prob_a==null?0.5:p.prob_a,favA=pa>=0.5,modelProb=favA?pa:(1-pa);
+  var o=m.odds||null;
+  var priceA=o?(o.ml_home!=null?o.ml_home:o.ml_a):null,priceB=o?(o.ml_away!=null?o.ml_away:o.ml_b):null;
+  var mkt=favA?priceA:priceB;
+  var book=o?(favA?(o.ml_home_book||o.ml_a_book):(o.ml_away_book||o.ml_b_book)):null;
+  var edge=(m.edge_pct!=null&&!isNaN(m.edge_pct))?m.edge_pct:null;
+  if(edge==null&&mkt!=null){var mImp=mkt>0?100/(mkt+100):Math.abs(mkt)/(Math.abs(mkt)+100);edge=Math.round((modelProb-mImp)*1000)/10;}
+  return "/api/card/pick?"+_cq([["sport","tennis"],["vs",1],["away",m.player_a],["home",m.player_b],
+    ["pick",favA?m.player_a:m.player_b],["fair",_fairFrom(modelProb)],["market",mkt],["book",book],
+    ["edge",edge],["prob",modelProb]]);
+}
+// Player Edge prop tile -> prop card URL. props is the game's props array (in scope
+// inside peCard); prop is the projection key being shared.
+function peCardUrl(c,props,sp,prop){
+  var label=(typeof PE_PROJ_LABEL!=="undefined"&&PE_PROJ_LABEL[prop])||prop||"";
+  var proj=(c.projections&&c.projections[prop]!=null)?c.projections[prop]:null;
+  var pairs=[["sport",sp],["player",c.player],["pos",c.pos],["team",c.team],["opp",c.opp],
+    ["prop",label],["proj",proj],["score",c.logic_score]];
+  var lo=(typeof peFindLine==="function")?peFindLine(props,c.player,prop):null;
+  if(lo&&lo.line!=null&&proj!=null){
+    var op=(typeof peOverProb==="function")?peOverProb(Number(proj),Number(lo.line)):null;
+    if(op!=null){var over=op>=0.5;
+      pairs.push(["line",lo.line],["side",over?"over":"under"],["hit",over?op:1-op],
+        ["book",over?lo.over_book:lo.under_book],["odds",over?lo.over_best_odds:lo.under_best_odds]);
+    }else pairs.push(["line",lo.line]);
+  }
+  return "/api/card/prop?"+_cq(pairs);
+}
+// A compact Share button + a right-aligned row to drop it in, reused by every card.
+function shareBtnHTML(url,text){
+  return '<button class="cardshare" title="Share this as a card" data-card="'+_attr(url)+'" data-share="'+_attrNL(text||"")+'" onclick="sharePick(event,this)">⤴ Share card</button>';
+}
+function shareRowHTML(url,text){return '<div class="cardshare-row">'+shareBtnHTML(url,text)+'</div>';}
+function gameShareText(g,sp){
+  var favHome=g.prob_home>=0.5,pct=Math.round((favHome?g.prob_home:1-g.prob_home)*100);
+  var pick=favHome?((g.home&&(g.home.name||g.home.abbr))||"Home"):((g.away&&(g.away.name||g.away.abbr))||"Away");
+  var L=["📊 "+((SPORT_LABEL[sp]||sp).toUpperCase())+" — "+pick,
+    ((g.away&&(g.away.name||g.away.abbr))||"")+" @ "+((g.home&&(g.home.name||g.home.abbr))||""),
+    "Model "+pct+"%","","Every pick graded, win or lose.","thelinelogic.com"];
+  return L.join("\n");
+}
+function matchShareText(m){
+  var p=m.prediction||{},pa=p.prob_a==null?0.5:p.prob_a,favA=pa>=0.5,pct=Math.round((favA?pa:1-pa)*100);
+  return ["🎾 TENNIS — "+(favA?m.player_a:m.player_b),
+    m.player_a+" vs "+m.player_b,"Model "+pct+"%","","Every pick graded, win or lose.","thelinelogic.com"].join("\n");
+}
+function propShareText(c,sp,prop){
+  var label=(typeof PE_PROJ_LABEL!=="undefined"&&PE_PROJ_LABEL[prop])||prop||"";
+  var proj=(c.projections&&c.projections[prop]!=null)?Number(c.projections[prop]).toFixed(1):"";
+  return ["📊 "+((SPORT_LABEL[sp]||sp).toUpperCase())+" — "+c.player,
+    (c.team||"")+(c.opp?" vs "+c.opp:""),label+" projection: "+proj,"","thelinelogic.com"].join("\n");
+}
 function sharePayload(p){
   var L=[];
   var pct=Math.round((p.prob||0)*100);
@@ -4833,21 +4926,34 @@ function sharePayload(p){
   L.push("thelinelogic.com");
   return L.join("\n");
 }
-function sharePick(ev,el){
+async function sharePick(ev,el){
   if(ev){ev.stopPropagation();ev.preventDefault();}
+  var url=el.getAttribute("data-card")||"";
   var txt=el.getAttribute("data-share")||"";
-  function done(){
-    var old=el.innerHTML;el.innerHTML="\u2713 Copied";el.classList.add("ok");
-    setTimeout(function(){el.innerHTML=old;el.classList.remove("ok");},1600);
+  var abs=url?(location.origin+url):"";
+  var old=el.innerHTML;
+  function flash(msg,bad){el.innerHTML=msg;el.classList.add(bad?"bad":"ok");
+    setTimeout(function(){el.innerHTML=old;el.classList.remove("ok");el.classList.remove("bad");},1800);}
+  // Best experience: fetch the rendered card and hand the actual IMAGE to the
+  // native share sheet, so it posts straight to Instagram/X/iMessage as a photo.
+  if(url&&navigator.canShare){
+    try{
+      el.innerHTML="\u2026 building";
+      var r=await fetch(url,{cache:"no-store"});
+      if(r.ok){
+        var b=await r.blob();
+        var f=new File([b],"linelogic-pick.png",{type:"image/png"});
+        if(navigator.canShare({files:[f]})){
+          try{await navigator.share({files:[f],text:txt});flash("\u2713 Shared");return;}
+          catch(e){if(e&&e.name==="AbortError"){el.innerHTML=old;return;}}
+        }
+      }
+    }catch(e){/* fall through to open-in-tab */}
   }
-  // Native share sheet on mobile is the better experience where it exists;
-  // clipboard everywhere else; and a manual-select fallback for old browsers so
-  // the button is never a dead end.
-  if(navigator.share){
-    navigator.share({text:txt}).then(done).catch(function(){copyText(txt,done,el);});
-    return;
-  }
-  copyText(txt,done,el);
+  // Desktop / browsers without image share: open the card so they can save it,
+  // and drop the text receipt + link on the clipboard to paste alongside it.
+  if(abs)window.open(abs,"_blank","noopener");
+  copyText(txt+(abs?("\n"+abs):""),function(){flash("\u2713 Card opened");},el);
 }
 function copyText(txt,ok,el){
   try{
@@ -5640,7 +5746,14 @@ function peCard(gid,c,i,props,sport,activeProp){
         (chips?'<div class="chips">'+chips+'</div>':"")+
         '<div class="leg"><span class="b"><span class="d"></span>'+legPos+'</span><span class="n"><span class="d"></span>Neutral</span><span class="p"><span class="d"></span>'+legNeg+'</span></div>'+
         '<div class="grid">'+grid+'</div></div>':"")+
+      peShareRow(c,props,sport,activeProp||projKeys[0])+
     '</div>';}
+// Share the player's prop as a branded card. Defers to the global helpers defined
+// in index.html (same runtime scope as this concatenated bundle).
+function peShareRow(c,props,sport,prop){
+  if(!prop||typeof shareRowHTML!=="function"||typeof peCardUrl!=="function")return "";
+  return shareRowHTML(peCardUrl(c,props,sport,prop),
+    (typeof propShareText==="function")?propShareText(c,sport,prop):"");}
 function peToggle(gid,i){var b=document.getElementById("body"+gid+"_"+i),r=document.getElementById("row"+gid+"_"+i);
   if(!b)return; var open=b.classList.toggle("show"); r.classList.toggle("open",open);
   if(open){var d=_peData[gid]; if(d&&d.cards[i])peRadar(gid+"_"+i,d.cards[i].radar);}}

@@ -6114,6 +6114,167 @@ def clv_report(days: int = 30):
             "odds_enabled": odds_api.enabled()}
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# SHARE CARDS — branded, post-ready PNGs straight from the DB (share_cards.py).
+#   /api/card/pick   — a single pick: matchup, fair vs best-market + book, edge.
+#   /api/card/recap  — transparency: W-L, units, ROI, CLV + per-sport breakdown.
+# Rendered with Pillow (no browser), so they work on any host. Public by design
+# (meant to be shared); cache lightly.
+# ═══════════════════════════════════════════════════════════════════════════════
+def _f(v):
+    """Parse an optional float query param; '' / None -> None."""
+    if v is None or str(v).strip() == "":
+        return None
+    try:
+        return float(v)
+    except Exception:
+        return None
+
+
+@app.get("/api/card/pick")
+def card_pick(sport: str = "", away: str = "", home: str = "", pick: str = "",
+              line: str = "", fair: str = "", market: str = "", book: str = "",
+              edge: str = "", prob: str = "", date: str = "", vs: int = 0):
+    """Render a branded PICK card as a PNG. The frontend passes exactly what's on
+    screen (so the image can never drift from the card the user is looking at);
+    every field is optional and missing ones render as em dashes. vs=1 shows the
+    two sides as 'A vs B' (tennis/MMA) instead of 'Away @ Home'."""
+    try:
+        import share_cards
+        png = share_cards.render_pick_card({
+            "sport": sport, "away": away, "home": home, "pick": pick,
+            "line": line, "fair": _f(fair), "market": _f(market),
+            "book": book, "edge": _f(edge), "prob": _f(prob),
+            "event_time": date or None, "vs": bool(vs),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:200]}, status_code=500)
+    return Response(content=png, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=300",
+                             "Content-Disposition": 'inline; filename="linelogic-pick.png"'})
+
+
+@app.get("/api/card/prop")
+def card_prop(sport: str = "", player: str = "", pos: str = "", team: str = "",
+              opp: str = "", prop: str = "", proj: str = "", line: str = "",
+              side: str = "", hit: str = "", book: str = "", odds: str = "",
+              score: str = ""):
+    """Render a branded Player-Edge PROP card as a PNG from exactly what's on the
+    expanded player tile: the model projection, the line/side, hit %, Logic Score
+    and best book. Every field optional; missing ones render as em dashes."""
+    try:
+        import share_cards
+        png = share_cards.render_prop_card({
+            "sport": sport, "player": player, "pos": pos, "team": team,
+            "opp": opp, "prop": prop, "proj": _f(proj), "line": line or None,
+            "side": side, "hit": _f(hit), "book": book, "odds": _f(odds),
+            "score": _f(score),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:200]}, status_code=500)
+    return Response(content=png, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=300",
+                             "Content-Disposition": 'inline; filename="linelogic-prop.png"'})
+
+
+def _recap_data(days: int = 30, sport: str | None = None):
+    """Aggregate settled picks into W-L / units / ROI / CLV + a per-sport breakdown.
+    Units use flat 1u staking at the taken price (same convention as /api/mlb/diag),
+    so the number is honest and reproducible. CLV = did we beat the close."""
+    from models import PickResult
+    from collections import defaultdict
+
+    def imp(o):
+        if o is None:
+            return None
+        o = float(o)
+        return (-o / (-o + 100.0)) if o < 0 else (100.0 / (o + 100.0))
+
+    def payout(o, won):
+        if o is None:
+            return 0.0
+        o = float(o)
+        if won:
+            return (o / 100.0) if o > 0 else (100.0 / -o)
+        return -1.0
+
+    since = dt.datetime.now() - dt.timedelta(days=days)
+    with SessionLocal() as db:
+        q = db.query(PickResult).filter(PickResult.settled_date >= since)
+        if sport:
+            q = q.filter(PickResult.sport == sport)
+        rows = q.all()
+
+    agg = defaultdict(lambda: {"w": 0, "l": 0, "p": 0, "u": 0.0, "np": 0,
+                               "clv_sum": 0.0, "clv_n": 0, "beat": 0})
+    tot = {"w": 0, "l": 0, "p": 0, "u": 0.0, "np": 0,
+           "clv_sum": 0.0, "clv_n": 0, "beat": 0}
+
+    def _add(bkt, r):
+        if _is_push(r):
+            bkt["p"] += 1
+            return
+        if r.correct:
+            bkt["w"] += 1
+        else:
+            bkt["l"] += 1
+        if r.taken_odds is not None:
+            bkt["u"] += payout(r.taken_odds, r.correct)
+            bkt["np"] += 1
+            if r.close_odds is not None:
+                c = imp(r.close_odds) - imp(r.taken_odds)
+                bkt["clv_sum"] += c
+                bkt["clv_n"] += 1
+                if c > 0:
+                    bkt["beat"] += 1
+
+    for r in rows:
+        _add(agg[r.sport], r)
+        _add(tot, r)
+
+    by_sport = []
+    for sp, b in agg.items():
+        if b["w"] + b["l"] + b["p"] == 0:
+            continue
+        by_sport.append({"sport": sp, "wins": b["w"], "losses": b["l"],
+                         "units": round(b["u"], 2) if b["np"] else None})
+    by_sport.sort(key=lambda x: (x["units"] if x["units"] is not None else -999),
+                  reverse=True)
+
+    win_pct = round(100.0 * tot["w"] / (tot["w"] + tot["l"]), 1) if (tot["w"] + tot["l"]) else 0.0
+    roi = round(100.0 * tot["u"] / tot["np"], 1) if tot["np"] else None
+    avg_clv = round(100.0 * tot["clv_sum"] / tot["clv_n"], 1) if tot["clv_n"] else None
+    beat_pct = round(100.0 * tot["beat"] / tot["clv_n"], 1) if tot["clv_n"] else None
+    return {
+        "window": ("LAST %d DAYS" % days) if days not in (0, None) else "ALL TIME",
+        "wins": tot["w"], "losses": tot["l"], "pushes": tot["p"],
+        "win_pct": win_pct,
+        "units": round(tot["u"], 2) if tot["np"] else None,
+        "roi_pct": roi, "avg_clv": avg_clv, "beat_close_pct": beat_pct,
+        "graded": tot["w"] + tot["l"] + tot["p"],
+        "by_sport": by_sport,
+    }
+
+
+@app.get("/api/card/recap")
+def card_recap(days: int = 30, sport: str = "", debug: int = 0):
+    """Render a branded TRANSPARENCY RECAP card as a PNG from every graded pick in
+    the window. ?debug=1 returns the computed numbers as JSON instead."""
+    try:
+        data = _recap_data(days=days, sport=(sport or None))
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:200]}, status_code=500)
+    if debug:
+        return JSONResponse(data)
+    try:
+        import share_cards
+        png = share_cards.render_recap_card(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:200]}, status_code=500)
+    return Response(content=png, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=600",
+                             "Content-Disposition": 'inline; filename="linelogic-recap.png"'})
+
 
 
 
