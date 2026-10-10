@@ -2316,6 +2316,16 @@ def _odds_rec_books(home_name, o):
     return o.get("ml_away_book"), o.get("ml_home_book")
 
 
+def _odds_rec_spreads(home_name, o):
+    """Oriented spread + best-spread-book per side: (sp_home, sp_away, book_home,
+    book_away). Same home/away remap as _odds_rec_sides."""
+    if _norm_team(home_name) == _norm_team(o.get("home_team", "")):
+        return (o.get("spread_home"), o.get("spread_away"),
+                o.get("spread_home_book"), o.get("spread_away_book"))
+    return (o.get("spread_away"), o.get("spread_home"),
+            o.get("spread_away_book"), o.get("spread_home_book"))
+
+
 def _attach_odds(sport, games):
     """Attach real market odds to each game and snapshot the pick's line.
 
@@ -2351,9 +2361,12 @@ def _attach_odds(sport, games):
         if o:
             mlh, mla = _odds_rec_sides(g["home"]["name"], o)
             hb, ab = _odds_rec_books(g["home"]["name"], o)
+            sph, spa, spbh, spba = _odds_rec_spreads(g["home"]["name"], o)
             g["odds"] = {"ml_home": mlh, "ml_away": mla,
                          "ml_home_book": hb, "ml_away_book": ab,
-                         "spread_home": o.get("spread_home"), "total": o.get("total"),
+                         "spread_home": sph, "spread_away": spa,
+                         "spread_home_book": spbh, "spread_away_book": spba,
+                         "total": o.get("total"),
                          "books": o.get("books")}
         elif sgo is not None:
             try:
@@ -2394,9 +2407,12 @@ def _attach_odds_one(sport, g):
     if o:
         mlh, mla = _odds_rec_sides(g["home"]["name"], o)
         hb, ab = _odds_rec_books(g["home"]["name"], o)
+        sph, spa, spbh, spba = _odds_rec_spreads(g["home"]["name"], o)
         g["odds"] = {"ml_home": mlh, "ml_away": mla,
                      "ml_home_book": hb, "ml_away_book": ab,
-                     "spread_home": o.get("spread_home"), "total": o.get("total"),
+                     "spread_home": sph, "spread_away": spa,
+                     "spread_home_book": spbh, "spread_away_book": spba,
+                     "total": o.get("total"),
                      "books": o.get("books")}
         return g
     try:
@@ -6134,11 +6150,14 @@ def _f(v):
 @app.get("/api/card/pick")
 def card_pick(sport: str = "", away: str = "", home: str = "", pick: str = "",
               line: str = "", fair: str = "", market: str = "", book: str = "",
-              edge: str = "", prob: str = "", date: str = "", vs: int = 0):
+              edge: str = "", prob: str = "", date: str = "", vs: int = 0,
+              model_spread: str = "", market_spread: str = "",
+              spread_book: str = "", best_book: str = ""):
     """Render a branded PICK card as a PNG. The frontend passes exactly what's on
     screen (so the image can never drift from the card the user is looking at);
     every field is optional and missing ones render as em dashes. vs=1 shows the
-    two sides as 'A vs B' (tennis/MMA) instead of 'Away @ Home'."""
+    two sides as 'A vs B' (tennis/MMA) instead of 'Away @ Home'. Spread fields add
+    a model-vs-market spread row and name the best book to place the wager."""
     try:
         import share_cards
         png = share_cards.render_pick_card({
@@ -6146,6 +6165,8 @@ def card_pick(sport: str = "", away: str = "", home: str = "", pick: str = "",
             "line": line, "fair": _f(fair), "market": _f(market),
             "book": book, "edge": _f(edge), "prob": _f(prob),
             "event_time": date or None, "vs": bool(vs),
+            "model_spread": _f(model_spread), "market_spread": _f(market_spread),
+            "spread_book": spread_book, "best_book": best_book,
         })
     except Exception as e:
         return JSONResponse({"error": str(e)[:200]}, status_code=500)

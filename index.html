@@ -4853,9 +4853,17 @@ function gameCardUrl(g,sp){
   var edge=null;
   if(mkt!=null){var mImp=mkt>0?100/(mkt+100):Math.abs(mkt)/(Math.abs(mkt)+100);edge=Math.round((modelProb-mImp)*1000)/10;}
   var pickName=favHome?((g.home&&(g.home.name||g.home.abbr))||"Home"):((g.away&&(g.away.name||g.away.abbr))||"Away");
+  // model spread = the pick side laying the projected margin; market spread + its
+  // best book from the oriented odds record.
+  var modelSpread=(g.exp_margin!=null&&!isNaN(g.exp_margin))?-Math.abs(g.exp_margin):null;
+  var marketSpread=o?(favHome?o.spread_home:o.spread_away):null;
+  var spreadBook=o?(favHome?o.spread_home_book:o.spread_away_book):null;
+  var bestBook=spreadBook||book;   // where to place the wager (spread first)
   return "/api/card/pick?"+_cq([["sport",sp],["away",g.away&&(g.away.name||g.away.abbr)],
     ["home",g.home&&(g.home.name||g.home.abbr)],["pick",pickName],["fair",_fairFrom(modelProb)],
-    ["market",mkt],["book",book],["edge",edge],["prob",modelProb],["date",g.event_time]]);
+    ["market",mkt],["book",book],["edge",edge],["prob",modelProb],["date",g.event_time],
+    ["model_spread",modelSpread],["market_spread",marketSpread],["spread_book",spreadBook],
+    ["best_book",bestBook]]);
 }
 // Tennis match -> pick card URL with the vs separator.
 function matchCardUrl(m){
@@ -4868,7 +4876,7 @@ function matchCardUrl(m){
   if(edge==null&&mkt!=null){var mImp=mkt>0?100/(mkt+100):Math.abs(mkt)/(Math.abs(mkt)+100);edge=Math.round((modelProb-mImp)*1000)/10;}
   return "/api/card/pick?"+_cq([["sport","tennis"],["vs",1],["away",m.player_a],["home",m.player_b],
     ["pick",favA?m.player_a:m.player_b],["fair",_fairFrom(modelProb)],["market",mkt],["book",book],
-    ["edge",edge],["prob",modelProb]]);
+    ["edge",edge],["prob",modelProb],["best_book",book]]);
 }
 // Player Edge prop tile -> prop card URL. props is the game's props array (in scope
 // inside peCard); prop is the projection key being shared.
