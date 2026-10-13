@@ -443,6 +443,12 @@ font-family:var(--body);color:var(--fg)}
 .pew .rs-logh{font-family:var(--mono);font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:#6f7468;margin:14px 0 6px}
 .pew .rs-log td.g{color:var(--good,#5fd38a);font-weight:700}
 .pew .rs-log td.r{color:var(--bad,#ff6b6b);font-weight:700}
+.pew .rs-step{display:flex;align-items:center;justify-content:center;gap:12px;margin:12px 0 2px}
+.pew .rs-sb{appearance:none;width:34px;height:34px;border-radius:9px;border:1px solid #2c2d26;background:#13140f;color:var(--gold);font-family:var(--mono);font-size:18px;font-weight:700;cursor:pointer;line-height:1}
+.pew .rs-sb:active{transform:scale(.95)}
+.pew .rs-stepv{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#8f9488;min-width:92px;text-align:center}
+.pew .rs-stepv b{color:var(--gold);font-size:15px;margin-left:4px}
+.pew .vsec.rz{border-top:1px solid #23241d;padding-top:14px}
 
 /* ── Signals fired (threshold detail) ── */
 .pew .vsec.sd{border-top:1px solid #23241d;padding-top:14px}
@@ -1980,7 +1986,7 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
     '<button class="d-tab '+(teamDetailTab==="box"?"active":"")+'" onclick="setTeamTab(\'box\')">Live Stats</button></div>';
   let body;
   if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
-  else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div class="panel"><div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
+  else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div class="panel">'+gameScriptHTML(g)+'<div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
   else{const mp=writeupHTML(g.analysis);
     body='<div class="panel">'+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
     teamFactorsHTML(g,sp)+
@@ -5838,6 +5844,7 @@ function peCard(gid,c,i,props,sport,activeProp){
       peTax(c)+
       peCoverage(c)+
       peBlueprint(c)+
+      peRedZone(c)+
       peResearch(c,props,activeProp)+
       ((c.leaks&&c.leaks.length)?('<div class="vsec"><div class="vsec-h">Matchup leaks'+(c.opp?' · '+c.opp:'')+'</div><div class="pe-leaks">'+c.leaks.map(function(l){return '<div class="pe-leak'+(l.strong?' on':'')+'">'+l.text+'</div>';}).join("")+'</div></div>'):"")+
       (projTiles?'<div class="vsec"><div class="vsec-h">Projections · model vs line</div><div class="proj">'+projTiles+'</div></div>':"")+
@@ -5852,53 +5859,72 @@ function peCard(gid,c,i,props,sport,activeProp){
 var PE_RSTAT={rec_yards:["recyd","Rec Yds"],receptions:["rec","Rec"],rush_yards:["rushyd","Rush Yds"],
   rush_tds:["rushtd","Rush TD"],rec_tds:["rectd","Rec TD"],pass_yards:["passyd","Pass Yds"],
   pass_tds:["passtd","Pass TD"],completions:["rec","Comp"]};
+var _peRS={};
 function peResearch(c,props,activeProp){
   var log=c.log; if(!log||!log.length)return "";
-  // pick the stat: active prop, else by position
   var key=activeProp&&PE_RSTAT[activeProp]?activeProp:
     (c.pos==="RB"?"rush_yards":(c.pos==="QB"?"pass_yards":"rec_yards"));
   var sk=PE_RSTAT[key]; if(!sk)return ""; var field=sk[0],label=sk[1];
   var games=log.filter(function(e){return e[field]!=null;});
   if(games.length<3)return "";
-  games=games.slice().reverse();                   // oldest -> newest (left to right)
   var line=null, lo=(typeof peFindLine==="function")?peFindLine(props,c.player,key):null;
   if(lo&&lo.line!=null)line=Number(lo.line);
-  var vals=games.map(function(e){return Number(e[field]);});
-  var mx=Math.max.apply(null,vals.concat(line!=null?[line]:[]))||1;
-  var bars=games.map(function(e){var v=Number(e[field]);var h=Math.round(100*v/mx);
-    var over=line!=null?v>=line:true;
-    return '<div class="rs-b"><div class="rs-v">'+(Number.isInteger(v)?v:v.toFixed(0))+'</div>'+
-      '<div class="rs-bar '+(line==null?"nn":(over?"ov":"un"))+'" style="height:'+Math.max(3,h)+'%"></div>'+
-      '<div class="rs-x">'+(e.opp||"")+'</div></div>';}).join("");
-  var lineTop=line!=null?(100-Math.round(100*line/mx)):null;
-  var lineEl=line!=null?'<div class="rs-line" style="top:'+lineTop+'%"><span>'+line+'</span></div>':"";
-  // hit-rate splits
-  function hit(n){var g=games.slice(-n);if(!g.length||line==null)return null;
-    var o=g.filter(function(e){return Number(e[field])>=line;}).length;return Math.round(100*o/g.length);}
-  function avg(n){var g=games.slice(-n);if(!g.length)return null;
-    return (g.reduce(function(a,e){return a+Number(e[field]);},0)/g.length);}
-  var splits=[["L5",hit(5),avg(5)],["L10",hit(10),avg(10)],["Season",hit(games.length),avg(games.length)]];
-  var sc=splits.map(function(s){
+  var avgAll=games.reduce(function(a,e){return a+Number(e[field]);},0)/games.length;
+  if(line==null)line=Math.max(0.5,Math.round(avgAll*2)/2);   // seed a line if the book hasn't posted
+  var uid='rs_'+String(c.player||'').replace(/[^a-z0-9]/gi,'').toLowerCase()+'_'+field;
+  _peRS[uid]={field:field,label:label,log:log,pos:c.pos,line:line,opp:c.opp||"",
+    series:games.slice().reverse().map(function(e){return {v:Number(e[field]),opp:e.opp||"",season:e.season};})};
+  return '<div class="vsec rs"><div class="vsec-h">Research</div>'+
+    '<div id="'+uid+'" class="rs-wrap">'+peRSBody(uid)+'</div></div>';
+}
+function peRSBody(uid){
+  var st=_peRS[uid]; if(!st)return "";
+  var line=st.line,field=st.field,label=st.label,series=st.series,log=st.log,pos=st.pos,opp=st.opp;
+  var shown=series.slice(-12);                       // bar chart: most recent 12 (across seasons)
+  var mx=Math.max.apply(null,shown.map(function(s){return s.v;}).concat([line]))||1;
+  var bars=shown.map(function(s){var h=Math.round(100*s.v/mx);var over=s.v>=line;
+    return '<div class="rs-b"><div class="rs-v">'+(Number.isInteger(s.v)?s.v:s.v.toFixed(0))+'</div>'+
+      '<div class="rs-bar '+(over?"ov":"un")+'" style="height:'+Math.max(3,h)+'%"></div>'+
+      '<div class="rs-x">'+s.opp+'</div></div>';}).join("");
+  var lineEl='<div class="rs-line" style="top:'+(100-Math.round(100*line/mx))+'%"><span>'+line+'</span></div>';
+  function hf(arr){if(!arr.length)return null;return Math.round(100*arr.filter(function(s){return s.v>=line;}).length/arr.length);}
+  function af(arr){if(!arr.length)return null;return arr.reduce(function(a,s){return a+s.v;},0)/arr.length;}
+  function hit(n){return hf(series.slice(-n));}
+  function avg(n){return af(series.slice(-n));}
+  function nrm(x){return String(x||"").toUpperCase().replace(/[^A-Z]/g,"");}
+  var seasons=series.map(function(s){return s.season;}).filter(function(x){return x!=null;});
+  var maxS=seasons.length?Math.max.apply(null,seasons):null;
+  var h2h=opp?series.filter(function(s){return nrm(s.opp)===nrm(opp);}):[];
+  var cur=maxS!=null?series.filter(function(s){return s.season===maxS;}):[];
+  var prev=maxS!=null?series.filter(function(s){return s.season===maxS-1;}):[];
+  var yy=function(s){return "’"+String(s).slice(-2);};
+  var splits=[["L5",hit(5),avg(5)],["L10",hit(10),avg(10)],["H2H",hf(h2h),af(h2h)]];
+  if(maxS!=null){splits.push([yy(maxS),hf(cur),af(cur)],[yy(maxS-1),hf(prev),af(prev)]);}
+  else{splits.push(["Season",hit(series.length),avg(series.length)]);}
+  var sc=splits.map(function(s){var p=s[1];
     return '<div class="rs-split"><div class="rs-sk">'+s[0]+'</div>'+
-      '<div class="rs-sp '+(s[1]==null?"":(s[1]>=50?"ov":"un"))+'">'+(s[1]==null?"—":s[1]+"%")+'</div>'+
-      '<div class="rs-sa">'+(s[2]==null?"":s[2].toFixed(1))+'</div></div>';}).join("");
-  var hdr='Last '+games.length+' · '+label+(line!=null?(' · '+(hit(5)!=null?hit(5)+'% over '+line+' in L5':'')):'');
-  // full game log table, columns by position
-  var cols = c.pos==="QB" ? [["opp","OPP"],["passyd","PASS"],["passtd","TD"]] :
-             c.pos==="RB" ? [["opp","OPP"],["rushyd","R YD"],["car","CAR"],["rushtd","R TD"]] :
-                            [["opp","OPP"],["rec","REC"],["tgt","TGT"],["recyd","REC YD"]];
-  var logrows=log.slice(0,12).map(function(e){
-    return '<tr>'+cols.map(function(cc,ci){
-      var v=e[cc[0]]; var disp=(cc[0]==="opp")?(v||""):(v==null?"—":(Number.isInteger(+v)?v:(+v).toFixed(0)));
-      var cls=(ci===0)?"":(line!=null&&cc[0]===field?((+v>=line)?"g":"r"):"");
-      return '<td class="'+cls+'">'+disp+'</td>';}).join("")+'</tr>';}).join("");
+    '<div class="rs-sp '+(p==null?"":(p>=50?"ov":"un"))+'">'+(p==null?"—":p+"%")+'</div>'+
+    '<div class="rs-sa">'+(s[2]==null?"":s[2].toFixed(1))+'</div></div>';}).join("");
+  var hdr='Last '+series.length+' · '+label+' · '+(hit(5)!=null?hit(5)+'% over '+line+' in L5':'');
+  var step='<div class="rs-step"><button class="rs-sb" onclick="peRSAdj(\''+uid+'\',-0.5)">–</button>'+
+    '<div class="rs-stepv">Line <b>'+line+'</b></div>'+
+    '<button class="rs-sb" onclick="peRSAdj(\''+uid+'\',0.5)">+</button></div>';
+  var cols=pos==="QB"?[["opp","OPP"],["passyd","PASS"],["passtd","TD"]]:
+           pos==="RB"?[["opp","OPP"],["rushyd","R YD"],["car","CAR"],["rushtd","R TD"]]:
+                      [["opp","OPP"],["rec","REC"],["tgt","TGT"],["recyd","REC YD"]];
+  var logrows=log.slice(0,12).map(function(e){return '<tr>'+cols.map(function(cc,ci){
+    var v=e[cc[0]];var disp=(cc[0]==="opp")?(v||""):(v==null?"—":(Number.isInteger(+v)?v:(+v).toFixed(0)));
+    var cls=(ci===0)?"":(cc[0]===field?((+v>=line)?"g":"r"):"");
+    return '<td class="'+cls+'">'+disp+'</td>';}).join("")+'</tr>';}).join("");
   var logtab='<div class="rs-logh">Game log</div><div class="bp-wrap"><table class="bp-tab rs-log"><thead><tr>'+
     cols.map(function(cc){return '<th>'+cc[1]+'</th>';}).join("")+'</tr></thead><tbody>'+logrows+'</tbody></table></div>';
-  return '<div class="vsec rs"><div class="vsec-h">Research</div>'+
-    '<div class="rs-sub">'+hdr+'</div>'+
-    '<div class="rs-chart">'+lineEl+'<div class="rs-bars">'+bars+'</div></div>'+
-    '<div class="rs-splits">'+sc+'</div>'+logtab+'</div>';
+  return '<div class="rs-sub">'+hdr+'</div>'+
+    '<div class="rs-chart">'+lineEl+'<div class="rs-bars">'+bars+'</div></div>'+step+
+    '<div class="rs-splits">'+sc+'</div>'+logtab;
 }
+function peRSAdj(uid,d){var st=_peRS[uid];if(!st)return;
+  st.line=Math.max(0,Math.round((st.line+d)*2)/2);
+  var el=document.getElementById(uid);if(el)el.innerHTML=peRSBody(uid);}
 // ── SIGNALS FIRED: the on signals with their threshold note (Venom's cheat-code list) ──
 function peSignalDetail(c){
   var s=c.signals; if(!s||!s.length)return "";
@@ -5919,6 +5945,22 @@ function peComponents(c){
     return '<div class="cs-row"><div class="cs-l"><span>'+k+'</span><b class="'+cl+'">'+v+'</b></div>'+
       '<div class="cs-tk"><div class="cs-fl '+cl+'" style="width:'+Math.max(2,v)+'%"></div></div></div>';}).join("");
   return '<div class="vsec cs"><div class="vsec-h">Component Scores · percentile vs league</div>'+rows+'</div>';
+}
+// ── RED ZONE ROLE: scoring-opportunity usage from the Blueprint zone data ──
+function peRedZone(c){
+  var bp=c.blueprint&&c.blueprint.scoring; if(!bp||c.pos==="QB")return "";
+  var zones=bp.zones||[];
+  var tot=zones.reduce(function(a,z){return a+(z.carries||0)+(z.targets||0);},0);
+  if(tot<1)return "";
+  var gl=bp.goal_touches||0, rz=bp.rz_touches||0, g=c.games||0;
+  var rzShare=Math.round(100*rz/tot);
+  var rzpg=g?(rz/g):null, glpg=(bp.goal_touches_pg!=null?bp.goal_touches_pg:(g?gl/g:null));
+  return '<div class="vsec rz"><div class="vsec-h">Red Zone Role</div>'+
+    '<div class="bp-tiles">'+
+      '<div class="bp-tile"><div class="bp-k">RZ Share</div><div class="bp-v">'+rzShare+'%</div></div>'+
+      '<div class="bp-tile"><div class="bp-k">RZ Touch/g</div><div class="bp-v">'+(rzpg!=null?rzpg.toFixed(1):"—")+'</div></div>'+
+      '<div class="bp-tile"><div class="bp-k">Goal-Line/g</div><div class="bp-v">'+(glpg!=null?Number(glpg).toFixed(1):"—")+'</div></div>'+
+    '</div><div class="bp-sub">Share of his touches inside the 20 — the scoring-opportunity role</div></div>';
 }
 // ── MATCHUP TAX: HIM vs what the defense allows to his position, with rank ──
 function peTax(c){
