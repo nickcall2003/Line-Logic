@@ -379,6 +379,26 @@ font-family:var(--body);color:var(--fg)}
 .pe-leak{font-family:var(--mono);font-size:11px;line-height:1.35;color:#cfcabb;background:#13140f;border:1px solid #2c2d26;border-left:2px solid #3a3b33;border-radius:7px;padding:8px 10px}
 .pe-leak.on{border-left-color:var(--gold);color:#f3ead4;box-shadow:0 0 10px rgba(240,185,78,.12)}
 
+/* ── Blueprint section (scoring debt + zone/box tables + signals) ── */
+.pew .vsec.bp{border-top:1px solid #23241d;padding-top:14px}
+.pew .pe-sigs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:11px}
+.pew .pe-sig{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#8f9488;background:#13140f;border:1px solid #2c2d26;border-radius:999px;padding:4px 9px}
+.pew .pe-sig.on{color:#161310;background:var(--gold);border-color:var(--gold)}
+.pew .bp-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:9px}
+.pew .bp-tile{background:#13140f;border:1px solid #2c2d26;border-radius:9px;padding:9px 10px;text-align:center}
+.pew .bp-k{font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:#7b8073;margin-bottom:4px}
+.pew .bp-v{font-family:var(--disp);font-size:22px;font-weight:800;color:#f3ead4;line-height:1}
+.pew .bp-reg{font-family:var(--mono);font-size:10.5px;font-weight:700;margin-bottom:12px}
+.pew .bp-reg span{color:#8f9488;font-weight:400}
+.pew .bp-sub{font-family:var(--mono);font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:#6f7468;margin:10px 0 6px}
+.pew .bp-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.pew .bp-tab{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+.pew .bp-tab th{text-align:right;font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;color:#6f7468;font-weight:700;padding:3px 6px;border-bottom:1px solid #23241d}
+.pew .bp-tab th:first-child,.pew .bp-tab td:first-child{text-align:left}
+.pew .bp-tab td{text-align:right;color:#cfcabb;padding:5px 6px;border-bottom:1px solid #1a1b15}
+.pew .bp-tab td.g{color:var(--gold);font-weight:700}
+.pew .bp-tell{font-family:var(--mono);font-size:10.5px;color:#f3ead4;background:rgba(240,185,78,.08);border:1px solid #3a3b33;border-radius:7px;padding:7px 9px;margin-top:8px}
+
 .ga-impact{margin:14px 0 4px}
 .ga-h{font-family:var(--disp);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:800;margin:0 2px 9px}
 .gai-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:8px}
@@ -5748,6 +5768,7 @@ function peCard(gid,c,i,props,sport,activeProp){
           '<div class="vscore-r"><div class="vbar"><div class="l"><span>Baseline</span><b>'+Number(c.baseline).toFixed(1)+'</b></div><div class="tk"><div class="fl" style="width:'+c.baseline+'%"></div></div></div>'+
           '<div class="vbar opp"><div class="l"><span>Opportunity</span><b>'+Number(c.opportunity).toFixed(1)+'</b></div><div class="tk"><div class="fl" style="width:'+c.opportunity+'%"></div></div></div></div>'+
         '</div></div>'+
+      peBlueprint(c)+
       ((c.leaks&&c.leaks.length)?('<div class="vsec"><div class="vsec-h">Matchup leaks'+(c.opp?' · '+c.opp:'')+'</div><div class="pe-leaks">'+c.leaks.map(function(l){return '<div class="pe-leak'+(l.strong?' on':'')+'">'+l.text+'</div>';}).join("")+'</div></div>'):"")+
       (projTiles?'<div class="vsec"><div class="vsec-h">Projections · model vs line</div><div class="proj">'+projTiles+'</div></div>':"")+
       (grid?'<div class="vsec"><div class="vsec-h">'+secH+'</div>'+vsLine+
@@ -5756,6 +5777,39 @@ function peCard(gid,c,i,props,sport,activeProp){
         '<div class="grid">'+grid+'</div></div>':"")+
       peShareRow(c,props,sport,activeProp||projKeys[0])+
     '</div>';}
+// ── BLUEPRINT: scoring (zone xTD / Scoring Debt) + box-count splits + signals ──
+var PE_ZCLR={up:"var(--good,#5fd38a)",down:"var(--bad,#ff6b6b)",flat:"#8f9488"};
+function peBlueprint(c){
+  var b=c.blueprint; if(!b||!b.scoring)return "";
+  var s=b.scoring, dcol=s.debt>0?PE_ZCLR.up:(s.debt<0?PE_ZCLR.down:PE_ZCLR.flat);
+  // signal chips
+  var sig=(b.signals||[]).map(function(x){return '<span class="pe-sig'+(x.on?" on":"")+'">'+x.label+'</span>';}).join("");
+  // headline tiles
+  var tiles='<div class="bp-tiles">'+
+    '<div class="bp-tile"><div class="bp-k">Expected TDs</div><div class="bp-v">'+s.xtd.toFixed(1)+'</div></div>'+
+    '<div class="bp-tile"><div class="bp-k">Scored</div><div class="bp-v">'+s.scored+'</div></div>'+
+    '<div class="bp-tile"><div class="bp-k">Scoring Debt</div><div class="bp-v" style="color:'+dcol+'">'+(s.debt>0?"+":"")+s.debt.toFixed(1)+'</div></div>'+
+    '</div>';
+  var reg='<div class="bp-reg" style="color:'+dcol+'">'+s.regress.label+' · <span>'+s.regress.note+'</span></div>';
+  // zone table
+  var zrows=(s.zones||[]).map(function(z){
+    return '<tr><td>'+z.label+'</td><td>'+z.carries+'</td><td>'+z.targets+'</td><td class="g">'+z.xtd.toFixed(2)+'</td></tr>';}).join("");
+  var ztab=zrows?('<div class="bp-wrap"><table class="bp-tab"><thead><tr><th>Zone</th><th>Car</th><th>Tgt</th><th>xTD</th></tr></thead><tbody>'+zrows+'</tbody></table></div>'):"";
+  // box table (backs)
+  var box="";
+  if(b.box&&b.box.rows&&b.box.rows.length){
+    var brows=b.box.rows.map(function(r){
+      return '<tr><td>'+r.label+'</td><td>'+r.att+'</td><td class="g">'+r.ypc.toFixed(2)+'</td><td>'+r.td_rate+'%</td><td>'+r.share+'%</td></tr>';}).join("");
+    box='<div class="bp-sub">Box count · rushing by defenders in the box</div>'+
+      '<div class="bp-wrap"><table class="bp-tab"><thead><tr><th>Box</th><th>Att</th><th>YPC</th><th>TD%</th><th>Share</th></tr></thead><tbody>'+brows+'</tbody></table></div>'+
+      (b.box.tell?'<div class="bp-tell">'+b.box.tell+'</div>':"");
+  }
+  return '<div class="vsec bp"><div class="vsec-h">Blueprint · scoring &amp; situation</div>'+
+    (sig?'<div class="pe-sigs">'+sig+'</div>':"")+
+    tiles+reg+
+    '<div class="bp-sub">Touchdowns priced by where his touches happen</div>'+ztab+box+
+    '</div>';
+}
 // Share the player's prop as a branded card. Defers to the global helpers defined
 // in index.html (same runtime scope as this concatenated bundle).
 function peShareRow(c,props,sport,prop){
