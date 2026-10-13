@@ -320,8 +320,12 @@ font-family:var(--body);color:var(--fg)}
 .pew .vbar.opp .fl{background:linear-gradient(90deg,#4a7d5a,var(--good))}
 .pew /* section */
 .vsec{margin-top:14px;border-top:1px solid var(--line);padding-top:13px}
-.pew .vsec-h{font-family:var(--disp);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.pew .vsec-h{font-family:var(--disp);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:7px;cursor:pointer;-webkit-user-select:none;user-select:none}
 .pew .vsec-h:before{content:"";width:5px;height:13px;border-radius:3px;background:var(--gold)}
+.pew .vsec-h:after{content:"";margin-left:auto;width:7px;height:7px;border-right:2px solid var(--gold);border-bottom:2px solid var(--gold);transform:rotate(-135deg);transition:transform .15s;opacity:.85;flex:0 0 auto}
+.pew .vsec.collapsed .vsec-h{margin-bottom:0}
+.pew .vsec.collapsed .vsec-h:after{transform:rotate(45deg)}
+.pew .vsec.collapsed>*:not(.vsec-h){display:none!important}
 .pew /* projections */
 .proj{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
 .pew .proj .t{background:var(--panel-3);border:1px solid var(--line);border-radius:10px;padding:9px 4px;text-align:center}
@@ -5846,9 +5850,9 @@ function peCard(gid,c,i,props,sport,activeProp){
       peBlueprint(c)+
       peRedZone(c)+
       peResearch(c,props,activeProp)+
-      ((c.leaks&&c.leaks.length)?('<div class="vsec"><div class="vsec-h">Matchup leaks'+(c.opp?' · '+c.opp:'')+'</div><div class="pe-leaks">'+c.leaks.map(function(l){return '<div class="pe-leak'+(l.strong?' on':'')+'">'+l.text+'</div>';}).join("")+'</div></div>'):"")+
+      ((c.leaks&&c.leaks.length)?('<div class="vsec collapsed"><div class="vsec-h">Matchup leaks'+(c.opp?' · '+c.opp:'')+'</div><div class="pe-leaks">'+c.leaks.map(function(l){return '<div class="pe-leak'+(l.strong?' on':'')+'">'+l.text+'</div>';}).join("")+'</div></div>'):"")+
       (projTiles?'<div class="vsec"><div class="vsec-h">Projections · model vs line</div><div class="proj">'+projTiles+'</div></div>':"")+
-      (grid?'<div class="vsec"><div class="vsec-h">'+secH+'</div>'+vsLine+
+      (grid?'<div class="vsec collapsed"><div class="vsec-h">'+secH+'</div>'+vsLine+
         (chips?'<div class="chips">'+chips+'</div>':"")+
         '<div class="leg"><span class="b"><span class="d"></span>'+legPos+'</span><span class="n"><span class="d"></span>Neutral</span><span class="p"><span class="d"></span>'+legNeg+'</span></div>'+
         '<div class="grid">'+grid+'</div></div>':"")+
@@ -5874,7 +5878,7 @@ function peResearch(c,props,activeProp){
   var uid='rs_'+String(c.player||'').replace(/[^a-z0-9]/gi,'').toLowerCase()+'_'+field;
   _peRS[uid]={field:field,label:label,log:log,pos:c.pos,line:line,opp:c.opp||"",
     series:games.slice().reverse().map(function(e){return {v:Number(e[field]),opp:e.opp||"",season:e.season};})};
-  return '<div class="vsec rs"><div class="vsec-h">Research</div>'+
+  return '<div class="vsec rs collapsed"><div class="vsec-h">Research</div>'+
     '<div id="'+uid+'" class="rs-wrap">'+peRSBody(uid)+'</div></div>';
 }
 function peRSBody(uid){
@@ -5944,7 +5948,7 @@ function peComponents(c){
     var cl=v>=66?"hi":(v<=33?"lo":"");
     return '<div class="cs-row"><div class="cs-l"><span>'+k+'</span><b class="'+cl+'">'+v+'</b></div>'+
       '<div class="cs-tk"><div class="cs-fl '+cl+'" style="width:'+Math.max(2,v)+'%"></div></div></div>';}).join("");
-  return '<div class="vsec cs"><div class="vsec-h">Component Scores · percentile vs league</div>'+rows+'</div>';
+  return '<div class="vsec cs collapsed"><div class="vsec-h">Component Scores</div>'+rows+'</div>';
 }
 // ── RED ZONE ROLE: scoring-opportunity usage from the Blueprint zone data ──
 function peRedZone(c){
@@ -5955,7 +5959,7 @@ function peRedZone(c){
   var gl=bp.goal_touches||0, rz=bp.rz_touches||0, g=c.games||0;
   var rzShare=Math.round(100*rz/tot);
   var rzpg=g?(rz/g):null, glpg=(bp.goal_touches_pg!=null?bp.goal_touches_pg:(g?gl/g:null));
-  return '<div class="vsec rz"><div class="vsec-h">Red Zone Role</div>'+
+  return '<div class="vsec rz collapsed"><div class="vsec-h">Red Zone Role</div>'+
     '<div class="bp-tiles">'+
       '<div class="bp-tile"><div class="bp-k">RZ Share</div><div class="bp-v">'+rzShare+'%</div></div>'+
       '<div class="bp-tile"><div class="bp-k">RZ Touch/g</div><div class="bp-v">'+(rzpg!=null?rzpg.toFixed(1):"—")+'</div></div>'+
@@ -6019,7 +6023,7 @@ function peBlueprint(c){
       '<div class="bp-wrap"><table class="bp-tab"><thead><tr><th>Box</th><th>Att</th><th>YPC</th><th>TD%</th><th>Share</th></tr></thead><tbody>'+brows+'</tbody></table></div>'+
       (b.box.tell?'<div class="bp-tell">'+b.box.tell+'</div>':"");
   }
-  return '<div class="vsec bp"><div class="vsec-h">Blueprint · scoring &amp; situation</div>'+
+  return '<div class="vsec bp"><div class="vsec-h">Blueprint</div>'+
     (sig?'<div class="pe-sigs">'+sig+'</div>':"")+
     tiles+reg+
     (ztab?('<div class="bp-sub">'+(L.sub||"Touchdowns priced by where his touches happen")+'</div>'+ztab):"")+box+
@@ -6122,6 +6126,17 @@ function loadPlayerEdge(gid,sport,params){
       if(m0)m0.innerHTML='<div class="pe-empty">Player Edge fills in once lineups / profiles are available.'+((d&&d.error)?(" ("+d.error+")"):"")+'</div>';return;}
     d._sport=sport; _peData[key]=d; _pePaint(key);
   }).catch(function(e){var mm=document.getElementById("pe-mount"); if(mm)mm.innerHTML='<div class="pe-empty">Could not load Player Edge.</div>';});}
+// Collapsible sections: tap any section header to fold/unfold it. One delegated
+// listener survives every re-render of the Player Edge mount.
+if(typeof document!=="undefined"&&!window._peVsecBound){
+  window._peVsecBound=true;
+  document.addEventListener("click",function(e){
+    var t=e.target; if(!t||!t.closest)return;
+    var h=t.closest(".pew .vsec-h"); if(!h)return;
+    var sec=h.parentNode;
+    if(sec&&sec.classList&&sec.classList.contains("vsec")) sec.classList.toggle("collapsed");
+  },false);
+}
 </script>
 </body>
 </html>
