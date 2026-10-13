@@ -440,6 +440,26 @@ font-family:var(--body);color:var(--fg)}
 .pew .rs-sp{font-family:var(--disp);font-size:18px;font-weight:800;color:#cfcabb;line-height:1}
 .pew .rs-sp.ov{color:var(--good,#5fd38a)}.pew .rs-sp.un{color:var(--bad,#ff6b6b)}
 .pew .rs-sa{font-family:var(--mono);font-size:9px;color:#8f9488;margin-top:2px}
+.pew .rs-logh{font-family:var(--mono);font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:#6f7468;margin:14px 0 6px}
+.pew .rs-log td.g{color:var(--good,#5fd38a);font-weight:700}
+.pew .rs-log td.r{color:var(--bad,#ff6b6b);font-weight:700}
+
+/* ── Signals fired (threshold detail) ── */
+.pew .vsec.sd{border-top:1px solid #23241d;padding-top:14px}
+.pew .sd-row{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid #1a1b15}
+.pew .sd-chip{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#161310;background:var(--gold);border-radius:999px;padding:3px 9px;white-space:nowrap}
+.pew .sd-note{font-family:var(--mono);font-size:10.5px;color:#cfcabb}
+
+/* ── Component Scores (percentile bars) ── */
+.pew .vsec.cs{border-top:1px solid #23241d;padding-top:14px}
+.pew .cs-row{margin-bottom:10px}
+.pew .cs-l{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.pew .cs-l span{font-family:var(--disp);font-size:12px;color:#cfcabb}
+.pew .cs-l b{font-family:var(--mono);font-size:12px;font-weight:700;color:#8f9488}
+.pew .cs-l b.hi{color:var(--good,#5fd38a)}.pew .cs-l b.lo{color:var(--bad,#ff6b6b)}
+.pew .cs-tk{height:6px;border-radius:4px;background:#1a1b15;overflow:hidden}
+.pew .cs-fl{height:100%;border-radius:4px;background:#3a3b33}
+.pew .cs-fl.hi{background:var(--good,#5fd38a)}.pew .cs-fl.lo{background:var(--bad,#ff6b6b)}
 
 .ga-impact{margin:14px 0 4px}
 .ga-h{font-family:var(--disp);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:800;margin:0 2px 9px}
@@ -5808,6 +5828,7 @@ function peCard(gid,c,i,props,sport,activeProp){
     '</div>'+
     '<div class="vbody" id="body'+gid+'_'+i+'">'+
       peTagStrip(c)+
+      peSignalDetail(c)+
       '<div class="vhero"><div class="vmask"><svg id="rad'+gid+'_'+i+'" viewBox="0 0 340 300"></svg></div>'+
         '<div class="vscore-wrap"><div class="vscore-l"><div class="vscore-k">Logic Score</div><div class="vscore-n">'+Number(c.logic_score).toFixed(1)+'</div>'+
           '<div class="vscore-edge" style="color:'+edgeCol+'">'+(c.edge_pct>=0?"+":"")+Number(c.edge_pct).toFixed(1)+'% edge</div></div>'+
@@ -5824,6 +5845,7 @@ function peCard(gid,c,i,props,sport,activeProp){
         (chips?'<div class="chips">'+chips+'</div>':"")+
         '<div class="leg"><span class="b"><span class="d"></span>'+legPos+'</span><span class="n"><span class="d"></span>Neutral</span><span class="p"><span class="d"></span>'+legNeg+'</span></div>'+
         '<div class="grid">'+grid+'</div></div>':"")+
+      peComponents(c)+
       peShareRow(c,props,sport,activeProp||projKeys[0])+
     '</div>';}
 // ── RESEARCH: last-N bars vs the book line + hit-rate splits + game log ──
@@ -5861,10 +5883,42 @@ function peResearch(c,props,activeProp){
       '<div class="rs-sp '+(s[1]==null?"":(s[1]>=50?"ov":"un"))+'">'+(s[1]==null?"—":s[1]+"%")+'</div>'+
       '<div class="rs-sa">'+(s[2]==null?"":s[2].toFixed(1))+'</div></div>';}).join("");
   var hdr='Last '+games.length+' · '+label+(line!=null?(' · '+(hit(5)!=null?hit(5)+'% over '+line+' in L5':'')):'');
+  // full game log table, columns by position
+  var cols = c.pos==="QB" ? [["opp","OPP"],["passyd","PASS"],["passtd","TD"]] :
+             c.pos==="RB" ? [["opp","OPP"],["rushyd","R YD"],["car","CAR"],["rushtd","R TD"]] :
+                            [["opp","OPP"],["rec","REC"],["tgt","TGT"],["recyd","REC YD"]];
+  var logrows=log.slice(0,12).map(function(e){
+    return '<tr>'+cols.map(function(cc,ci){
+      var v=e[cc[0]]; var disp=(cc[0]==="opp")?(v||""):(v==null?"—":(Number.isInteger(+v)?v:(+v).toFixed(0)));
+      var cls=(ci===0)?"":(line!=null&&cc[0]===field?((+v>=line)?"g":"r"):"");
+      return '<td class="'+cls+'">'+disp+'</td>';}).join("")+'</tr>';}).join("");
+  var logtab='<div class="rs-logh">Game log</div><div class="bp-wrap"><table class="bp-tab rs-log"><thead><tr>'+
+    cols.map(function(cc){return '<th>'+cc[1]+'</th>';}).join("")+'</tr></thead><tbody>'+logrows+'</tbody></table></div>';
   return '<div class="vsec rs"><div class="vsec-h">Research</div>'+
     '<div class="rs-sub">'+hdr+'</div>'+
     '<div class="rs-chart">'+lineEl+'<div class="rs-bars">'+bars+'</div></div>'+
-    '<div class="rs-splits">'+sc+'</div></div>';
+    '<div class="rs-splits">'+sc+'</div>'+logtab+'</div>';
+}
+// ── SIGNALS FIRED: the on signals with their threshold note (Venom's cheat-code list) ──
+function peSignalDetail(c){
+  var s=c.signals; if(!s||!s.length)return "";
+  var on=s.filter(function(x){return x.on&&x.note;});
+  if(!on.length)return "";
+  var rows=on.map(function(x){
+    return '<div class="sd-row"><span class="sd-chip">'+x.label+'</span><span class="sd-note">'+x.note+'</span></div>';}).join("");
+  return '<div class="vsec sd"><div class="vsec-h">Signals · why they fired</div>'+rows+'</div>';
+}
+// ── COMPONENT SCORES: the baseline drivers as labeled percentile bars ──
+function peComponents(c){
+  if(!c.radar)return "";
+  var skip={Matchup:1,Logic:1};
+  var ks=Object.keys(c.radar).filter(function(k){return !skip[k];});
+  if(!ks.length)return "";
+  var rows=ks.map(function(k){var v=Math.round(c.radar[k]||0);
+    var cl=v>=66?"hi":(v<=33?"lo":"");
+    return '<div class="cs-row"><div class="cs-l"><span>'+k+'</span><b class="'+cl+'">'+v+'</b></div>'+
+      '<div class="cs-tk"><div class="cs-fl '+cl+'" style="width:'+Math.max(2,v)+'%"></div></div></div>';}).join("");
+  return '<div class="vsec cs"><div class="vsec-h">Component Scores · percentile vs league</div>'+rows+'</div>';
 }
 // ── MATCHUP TAX: HIM vs what the defense allows to his position, with rank ──
 function peTax(c){
