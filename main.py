@@ -4583,12 +4583,12 @@ def sports_meta():
     out-of-season sports."""
     meta = sports.public_meta()
     mo = dt.date.today().month
-    # Force-hide sports regardless of season. NHL is now in season, so the
-    # default only hides NBA (starts late Oct). Override with the HIDDEN_SPORTS
-    # env var (comma-separated keys, or empty to show all).
+    # Force-hide sports regardless of season. NBA is now in season (tips late Oct),
+    # so it's shown; WNBA's season is over, so it's hidden by default. Override with
+    # the HIDDEN_SPORTS env var (comma-separated keys, or empty to show all).
     _hs = os.environ.get("HIDDEN_SPORTS")
     hidden = {s.strip().lower() for s in
-              ((_hs if _hs is not None else "nba").split(",")) if s.strip()}
+              ((_hs if _hs is not None else "wnba").split(",")) if s.strip()}
     for entry in meta:
         in_season = mo in SPORT_SEASON.get(entry["key"], set(range(1, 13)))
         entry["active"] = in_season and entry["key"] not in hidden

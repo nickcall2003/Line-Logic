@@ -153,6 +153,43 @@ def _batter_leaks(pitcher):
     return out[:3]
 
 
+# ---- MLB Blueprint: expected-vs-actual regression + batted-ball signals ----
+def _mlb_blueprint(b, opp_pctile=50.0):
+    """Signals + descriptor for a hitter, Venom-style. Uses the Savant xStats the
+    profile already carries. Expected-vs-actual (xwOBA - wOBA) is the regression
+    tell: hitting into bad luck = due to heat up; overperforming = cool-down risk."""
+    sig = []
+    xw, w = b.get("xwoba"), b.get("woba")
+    gap = None
+    if xw is not None and w is not None:
+        gap = round(xw - w, 3)
+        if gap >= 0.020:
+            sig.append({"key": "heat", "label": "Due To Heat Up", "on": True,
+                        "note": "xwOBA %.3f vs wOBA %.3f" % (xw, w)})
+        elif gap <= -0.020:
+            sig.append({"key": "cool", "label": "Regression Watch", "on": False,
+                        "note": "outhitting xwOBA by %.3f" % (-gap)})
+    bar = b.get("barrel_pct")
+    if bar is not None and bar >= 10:
+        sig.append({"key": "barrel", "label": "Barrel Merchant", "on": True,
+                    "note": "%.1f%% barrels" % bar})
+    hh = b.get("hard_hit_pct")
+    if hh is not None and hh >= 45:
+        sig.append({"key": "hard", "label": "Hard-Hit", "on": True, "note": "%.0f%% hard-hit" % hh})
+    wh = b.get("whiff_pct")
+    if wh is not None and wh <= 20:
+        sig.append({"key": "contact", "label": "Contact Bat", "on": True})
+    if opp_pctile >= 66:
+        sig.append({"key": "arm", "label": "Hittable Arm", "on": True})
+    # descriptor: hitter trait + matchup trait
+    trait = ("Barrel merchant" if (bar and bar >= 10) else
+             "Hard contact" if (hh and hh >= 45) else
+             "Contact bat" if (wh and wh <= 20) else "Balanced bat")
+    mtrait = "Hittable arm" if opp_pctile >= 66 else ("Due to heat up" if (gap and gap >= 0.02) else None)
+    desc = " + ".join([x for x in (trait, mtrait) if x]) or None
+    return sig, desc, gap
+
+
 def score_batter(b, pitcher, order=None):
     """Full Venom card for one batter vs one pitcher (pitcher may be None)."""
     load()
@@ -206,6 +243,7 @@ def score_batter(b, pitcher, order=None):
         "Matchup": round(opp, 1), "Logic": venom,
     }
     grid = _metric_grid(b, lb)
+    _mlb_sig, _mlb_desc, _mlb_gap = _mlb_blueprint(b, opp)
     return {
         "player": b.get("name"), "id": b.get("id"), "type": "batter", "logic_score": venom,
         "baseline": baseline, "opportunity": round(opp, 1), "edge_pct": edge_pct,
@@ -217,6 +255,7 @@ def score_batter(b, pitcher, order=None):
         "grid": grid, "radar": radar, "projections": proj,
         "pitcher": (pitcher or {}).get("name"), "arsenal": arsenal,
         "leaks": _batter_leaks(pitcher),
+        "signals": _mlb_sig, "descriptor": _mlb_desc,
     }
 
 

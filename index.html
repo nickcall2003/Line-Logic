@@ -399,6 +399,48 @@ font-family:var(--body);color:var(--fg)}
 .pew .bp-tab td.g{color:var(--gold);font-weight:700}
 .pew .bp-tell{font-family:var(--mono);font-size:10.5px;color:#f3ead4;background:rgba(240,185,78,.08);border:1px solid #3a3b33;border-radius:7px;padding:7px 9px;margin-top:8px}
 
+/* ── auto descriptor under the player name ── */
+.pew .vr-desc{font-family:var(--mono);font-size:10px;color:#8f9488;margin-top:2px;letter-spacing:.01em}
+
+/* ── Matchup Tax table ── */
+.pew .vsec.tax{border-top:1px solid #23241d;padding-top:14px}
+.pew .tx-head{font-family:var(--mono);font-size:11px;line-height:1.35;color:#cfcabb;margin-bottom:9px}
+.pew .tx-tab td.rk{padding-right:2px}
+.pew .tx-r{display:inline-block;min-width:22px;text-align:center;font-family:var(--mono);font-size:10px;font-weight:700;color:#8f9488;background:#13140f;border:1px solid #2c2d26;border-radius:6px;padding:2px 6px}
+.pew .tx-r.batter{color:#161310;background:var(--gold);border-color:var(--gold)}
+.pew .tx-r.pitcher{color:#ffd9d9;background:rgba(255,107,107,.14);border-color:#5a2c2c}
+.pew .tx-note{font-family:var(--mono);font-size:8.5px;color:#6f7468;margin-top:7px}
+
+/* ── Coverage matchup ── */
+.pew .vsec.cov{border-top:1px solid #23241d;padding-top:14px}
+.pew .cv-role{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold);margin-bottom:9px}
+.pew .cv-cell{min-width:78px}
+.pew .cv-cell b{font-weight:700;color:#f3ead4;margin-left:1px}
+.pew .cv-bar{height:4px;border-radius:3px;background:#1a1b15;margin-bottom:3px;overflow:hidden}
+.pew .cv-bar span{display:block;height:100%;background:var(--gold);border-radius:3px}
+.pew .cv-tab td:nth-child(3){color:#8f9488;font-size:10px}
+
+/* ── Research: last-N bars vs book line + hit splits ── */
+.pew .vsec.rs{border-top:1px solid #23241d;padding-top:14px}
+.pew .rs-sub{font-family:var(--mono);font-size:10px;color:#8f9488;margin-bottom:10px}
+.pew .rs-chart{position:relative;height:120px;margin:4px 0 2px}
+.pew .rs-bars{display:flex;align-items:flex-end;gap:3px;height:100%}
+.pew .rs-b{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.pew .rs-v{font-family:var(--mono);font-size:8px;color:#9a9f93;margin-bottom:2px}
+.pew .rs-bar{width:100%;max-width:20px;border-radius:3px 3px 0 0;background:#3a3b33}
+.pew .rs-bar.ov{background:var(--good,#5fd38a)}
+.pew .rs-bar.un{background:var(--bad,#ff6b6b)}
+.pew .rs-bar.nn{background:var(--gold)}
+.pew .rs-x{font-family:var(--mono);font-size:7px;color:#6f7468;margin-top:3px;white-space:nowrap;transform:scale(.9)}
+.pew .rs-line{position:absolute;left:0;right:0;border-top:1px dashed #d8b968;pointer-events:none}
+.pew .rs-line span{position:absolute;right:0;top:-8px;font-family:var(--mono);font-size:8px;font-weight:700;color:#161310;background:var(--gold);border-radius:4px;padding:1px 5px}
+.pew .rs-splits{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.pew .rs-split{background:#13140f;border:1px solid #2c2d26;border-radius:8px;padding:8px;text-align:center}
+.pew .rs-sk{font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:#7b8073;margin-bottom:3px}
+.pew .rs-sp{font-family:var(--disp);font-size:18px;font-weight:800;color:#cfcabb;line-height:1}
+.pew .rs-sp.ov{color:var(--good,#5fd38a)}.pew .rs-sp.un{color:var(--bad,#ff6b6b)}
+.pew .rs-sa{font-family:var(--mono);font-size:9px;color:#8f9488;margin-top:2px}
+
 .ga-impact{margin:14px 0 4px}
 .ga-h{font-family:var(--disp);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:800;margin:0 2px 9px}
 .gai-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:8px}
@@ -460,7 +502,6 @@ font-family:var(--body);color:var(--fg)}
           <div class="menu-item" data-sport="mlb">&#9918; MLB</div>
           <div class="menu-item" data-sport="tennis">&#127934; Tennis</div>
           <div class="menu-item" data-sport="nba">&#127936; NBA</div>
-          <div class="menu-item" data-sport="wnba">&#127936; WNBA</div>
           <div class="menu-item" data-sport="golf">&#9971; Golf</div>
           <div class="menu-item" data-sport="nfl">&#127944; NFL</div>
           <div class="menu-item" data-sport="ncaabb">&#9918; NCAA Baseball</div>
@@ -5664,8 +5705,12 @@ function peTags(c){
       .sort(function(a,b){return b.v-a.v;})
       .slice(0,2).forEach(function(s){ if(s.v>=80)add(s.k,true); else if(s.v>=66)add(s.k,false); });}
   if(c.opportunity!=null){ if(c.opportunity>=66)add("Soft Matchup",true); else if(c.opportunity<=34)add("Tough Draw",false); }
+  if(c.leaks&&c.leaks.some(function(l){return l.strong;}))add("Active Leak",true);
+  if(c.blueprint&&c.blueprint.scoring){var dbt=c.blueprint.scoring.debt;
+    if(dbt>=1.5)add("Due For Points",true); else if(dbt<=-1.5)add("Regression Watch",false);}
+  if(c.signals&&c.signals.length)c.signals.forEach(function(s){add(s.label,!!s.on);});
   if(c.edge_pct>=6)add("Plus Edge",true);
-  return out.slice(0,4);}
+  return out.slice(0,6);}
 function peTagStrip(c){var t=peTags(c); if(!t.length)return "";
   return '<div class="pe-tags">'+t.map(function(x){return '<span class="pe-ptag'+(x.glow?' on':'')+'">'+String(x.t).toUpperCase()+'</span>';}).join("")+'</div>';}
 function peSortVal(c,prop,props){
@@ -5757,7 +5802,8 @@ function peCard(gid,c,i,props,sport,activeProp){
       '<div class="vr-rank"><div class="n">'+c.rank+'</div><div class="l">'+rankLab+'</div></div>'+
       peAvatar(c)+
       '<div class="vr-mid"><div class="vr-nm">'+c.player+' '+tag+'</div>'+
-        '<div class="vr-sub">'+logo+sub+'</div></div>'+
+        '<div class="vr-sub">'+logo+sub+'</div>'+
+        (c.descriptor?'<div class="vr-desc">'+c.descriptor+'</div>':"")+'</div>'+
       '<div class="vr-score">'+scoreMain+'<span class="vr-exp">▾</span></div>'+
     '</div>'+
     '<div class="vbody" id="body'+gid+'_'+i+'">'+
@@ -5768,7 +5814,10 @@ function peCard(gid,c,i,props,sport,activeProp){
           '<div class="vscore-r"><div class="vbar"><div class="l"><span>Baseline</span><b>'+Number(c.baseline).toFixed(1)+'</b></div><div class="tk"><div class="fl" style="width:'+c.baseline+'%"></div></div></div>'+
           '<div class="vbar opp"><div class="l"><span>Opportunity</span><b>'+Number(c.opportunity).toFixed(1)+'</b></div><div class="tk"><div class="fl" style="width:'+c.opportunity+'%"></div></div></div></div>'+
         '</div></div>'+
+      peTax(c)+
+      peCoverage(c)+
       peBlueprint(c)+
+      peResearch(c,props,activeProp)+
       ((c.leaks&&c.leaks.length)?('<div class="vsec"><div class="vsec-h">Matchup leaks'+(c.opp?' · '+c.opp:'')+'</div><div class="pe-leaks">'+c.leaks.map(function(l){return '<div class="pe-leak'+(l.strong?' on':'')+'">'+l.text+'</div>';}).join("")+'</div></div>'):"")+
       (projTiles?'<div class="vsec"><div class="vsec-h">Projections · model vs line</div><div class="proj">'+projTiles+'</div></div>':"")+
       (grid?'<div class="vsec"><div class="vsec-h">'+secH+'</div>'+vsLine+
@@ -5777,18 +5826,88 @@ function peCard(gid,c,i,props,sport,activeProp){
         '<div class="grid">'+grid+'</div></div>':"")+
       peShareRow(c,props,sport,activeProp||projKeys[0])+
     '</div>';}
+// ── RESEARCH: last-N bars vs the book line + hit-rate splits + game log ──
+var PE_RSTAT={rec_yards:["recyd","Rec Yds"],receptions:["rec","Rec"],rush_yards:["rushyd","Rush Yds"],
+  rush_tds:["rushtd","Rush TD"],rec_tds:["rectd","Rec TD"],pass_yards:["passyd","Pass Yds"],
+  pass_tds:["passtd","Pass TD"],completions:["rec","Comp"]};
+function peResearch(c,props,activeProp){
+  var log=c.log; if(!log||!log.length)return "";
+  // pick the stat: active prop, else by position
+  var key=activeProp&&PE_RSTAT[activeProp]?activeProp:
+    (c.pos==="RB"?"rush_yards":(c.pos==="QB"?"pass_yards":"rec_yards"));
+  var sk=PE_RSTAT[key]; if(!sk)return ""; var field=sk[0],label=sk[1];
+  var games=log.filter(function(e){return e[field]!=null;});
+  if(games.length<3)return "";
+  games=games.slice().reverse();                   // oldest -> newest (left to right)
+  var line=null, lo=(typeof peFindLine==="function")?peFindLine(props,c.player,key):null;
+  if(lo&&lo.line!=null)line=Number(lo.line);
+  var vals=games.map(function(e){return Number(e[field]);});
+  var mx=Math.max.apply(null,vals.concat(line!=null?[line]:[]))||1;
+  var bars=games.map(function(e){var v=Number(e[field]);var h=Math.round(100*v/mx);
+    var over=line!=null?v>=line:true;
+    return '<div class="rs-b"><div class="rs-v">'+(Number.isInteger(v)?v:v.toFixed(0))+'</div>'+
+      '<div class="rs-bar '+(line==null?"nn":(over?"ov":"un"))+'" style="height:'+Math.max(3,h)+'%"></div>'+
+      '<div class="rs-x">'+(e.opp||"")+'</div></div>';}).join("");
+  var lineTop=line!=null?(100-Math.round(100*line/mx)):null;
+  var lineEl=line!=null?'<div class="rs-line" style="top:'+lineTop+'%"><span>'+line+'</span></div>':"";
+  // hit-rate splits
+  function hit(n){var g=games.slice(-n);if(!g.length||line==null)return null;
+    var o=g.filter(function(e){return Number(e[field])>=line;}).length;return Math.round(100*o/g.length);}
+  function avg(n){var g=games.slice(-n);if(!g.length)return null;
+    return (g.reduce(function(a,e){return a+Number(e[field]);},0)/g.length);}
+  var splits=[["L5",hit(5),avg(5)],["L10",hit(10),avg(10)],["Season",hit(games.length),avg(games.length)]];
+  var sc=splits.map(function(s){
+    return '<div class="rs-split"><div class="rs-sk">'+s[0]+'</div>'+
+      '<div class="rs-sp '+(s[1]==null?"":(s[1]>=50?"ov":"un"))+'">'+(s[1]==null?"—":s[1]+"%")+'</div>'+
+      '<div class="rs-sa">'+(s[2]==null?"":s[2].toFixed(1))+'</div></div>';}).join("");
+  var hdr='Last '+games.length+' · '+label+(line!=null?(' · '+(hit(5)!=null?hit(5)+'% over '+line+' in L5':'')):'');
+  return '<div class="vsec rs"><div class="vsec-h">Research</div>'+
+    '<div class="rs-sub">'+hdr+'</div>'+
+    '<div class="rs-chart">'+lineEl+'<div class="rs-bars">'+bars+'</div></div>'+
+    '<div class="rs-splits">'+sc+'</div></div>';
+}
+// ── MATCHUP TAX: HIM vs what the defense allows to his position, with rank ──
+function peTax(c){
+  var t=c.tax; if(!t||!t.rows||!t.rows.length)return "";
+  var rows=t.rows.map(function(r){
+    var rb=(r.rank==null)?'<span class="tx-r">—</span>':
+      '<span class="tx-r '+r.grade+'">'+r.rank+'</span>';
+    return '<tr><td>'+r.label+'</td><td>'+(r.him==null?"—":r.him)+'</td><td>'+r.allows+'</td><td class="rk">'+rb+'</td></tr>';
+  }).join("");
+  return '<div class="vsec tax"><div class="vsec-h">Matchup Tax'+(t.opp?' · vs '+t.opp:'')+'</div>'+
+    '<div class="tx-head">'+t.headline+'</div>'+
+    '<div class="bp-wrap"><table class="bp-tab tx-tab"><thead><tr><th>Stat</th><th>Him</th><th>Allows</th><th>Rank</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="tx-note">Rank 1 = most generous in the league · lower is softer</div></div>';
+}
+// ── COVERAGE MATCHUP: where he's targeted vs how the defense defends that depth ──
+function peCoverage(c){
+  var v=c.coverage; if(!v||!v.rows||!v.rows.length)return "";
+  var rows=v.rows.map(function(r){
+    var rb=(r.rank==null)?'<span class="tx-r">—</span>':'<span class="tx-r '+r.grade+'">'+r.rank+'</span>';
+    var bar=Math.max(2,r.share);
+    return '<tr><td>'+r.label+'</td>'+
+      '<td class="cv-cell"><div class="cv-bar"><span style="width:'+bar+'%"></span></div><b>'+r.share+'%</b></td>'+
+      '<td>'+r.coverage+'</td>'+
+      '<td class="rk">'+rb+'</td></tr>';}).join("");
+  return '<div class="vsec cov"><div class="vsec-h">Coverage Matchup'+(v.opp?' · vs '+v.opp:'')+'</div>'+
+    '<div class="cv-role">'+v.role+(v.adot!=null?' · aDOT '+v.adot:'')+'</div>'+
+    '<div class="bp-wrap"><table class="bp-tab cv-tab"><thead><tr><th>Depth</th><th>His tgts</th><th>Covered by</th><th>D rank</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    (v.edge_note?'<div class="bp-tell">'+v.edge_note+'</div>':'<div class="tx-note">Rank 1 = softest vs that depth · the look he faces changes by where he lines up</div>')+
+    '</div>';
+}
 // ── BLUEPRINT: scoring (zone xTD / Scoring Debt) + box-count splits + signals ──
 var PE_ZCLR={up:"var(--good,#5fd38a)",down:"var(--bad,#ff6b6b)",flat:"#8f9488"};
 function peBlueprint(c){
   var b=c.blueprint; if(!b||!b.scoring)return "";
   var s=b.scoring, dcol=s.debt>0?PE_ZCLR.up:(s.debt<0?PE_ZCLR.down:PE_ZCLR.flat);
+  var L=s.labels||{};   // sport-specific labels (NHL: Expected Goals / Goal Debt)
   // signal chips
   var sig=(b.signals||[]).map(function(x){return '<span class="pe-sig'+(x.on?" on":"")+'">'+x.label+'</span>';}).join("");
   // headline tiles
   var tiles='<div class="bp-tiles">'+
-    '<div class="bp-tile"><div class="bp-k">Expected TDs</div><div class="bp-v">'+s.xtd.toFixed(1)+'</div></div>'+
-    '<div class="bp-tile"><div class="bp-k">Scored</div><div class="bp-v">'+s.scored+'</div></div>'+
-    '<div class="bp-tile"><div class="bp-k">Scoring Debt</div><div class="bp-v" style="color:'+dcol+'">'+(s.debt>0?"+":"")+s.debt.toFixed(1)+'</div></div>'+
+    '<div class="bp-tile"><div class="bp-k">'+(L.xtd||"Expected TDs")+'</div><div class="bp-v">'+s.xtd.toFixed(1)+'</div></div>'+
+    '<div class="bp-tile"><div class="bp-k">'+(L.scored||"Scored")+'</div><div class="bp-v">'+s.scored+'</div></div>'+
+    '<div class="bp-tile"><div class="bp-k">'+(L.debt||"Scoring Debt")+'</div><div class="bp-v" style="color:'+dcol+'">'+(s.debt>0?"+":"")+s.debt.toFixed(1)+'</div></div>'+
     '</div>';
   var reg='<div class="bp-reg" style="color:'+dcol+'">'+s.regress.label+' · <span>'+s.regress.note+'</span></div>';
   // zone table
@@ -5807,7 +5926,7 @@ function peBlueprint(c){
   return '<div class="vsec bp"><div class="vsec-h">Blueprint · scoring &amp; situation</div>'+
     (sig?'<div class="pe-sigs">'+sig+'</div>':"")+
     tiles+reg+
-    '<div class="bp-sub">Touchdowns priced by where his touches happen</div>'+ztab+box+
+    (ztab?('<div class="bp-sub">'+(L.sub||"Touchdowns priced by where his touches happen")+'</div>'+ztab):"")+box+
     '</div>';
 }
 // Share the player's prop as a branded card. Defers to the global helpers defined
