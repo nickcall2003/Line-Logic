@@ -9,3 +9,5 @@ anthropic>=0.39  # optional: only needed if you set ANTHROPIC_API_KEY for AI wri
 yfinance
 curl_cffi>=0.7
 Pillow>=10.0
+pandas>=2.0
+pyarrow>=14.0
