@@ -7639,6 +7639,17 @@ def tennis_schedule_diag():
             out["active_tennis_keys"] = odds_api._active_tennis_keys()
         except Exception as e:
             out["active_tennis_keys_error"] = str(e)
+        # UNFILTERED list of every tennis tournament the Odds API offers right now,
+        # plus which ones the ODDS_SKIP_TENNIS filter is currently dropping. This is
+        # how you tell "Odds API doesn't carry this tournament" from "we filtered it".
+        try:
+            allk = odds_api.all_tennis_keys()
+            out["all_tennis_keys"] = allk
+            if isinstance(allk, list):
+                out["skipped_tennis_keys"] = [k for k in allk if odds_api._is_minor_tennis(k)]
+                out["ODDS_SKIP_TENNIS"] = os.environ.get("ODDS_SKIP_TENNIS", "challenger,itf,futures,qual")
+        except Exception as e:
+            out["all_tennis_keys_error"] = str(e)
         try:
             evs = odds_api.get_tennis_events()
             out["events_count"] = len(evs)
