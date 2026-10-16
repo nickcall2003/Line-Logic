@@ -944,6 +944,13 @@ try:
 except Exception as _stocks_err:
     print(f"[startup] stocks router not loaded: {_stocks_err}")
 
+# FBS transfer-portal board (thelinelogic.com/portal) — see portal_routes.py.
+try:
+    from portal_routes import router as portal_router
+    app.include_router(portal_router)
+except Exception as _portal_err:
+    print(f"[startup] portal router not loaded: {_portal_err}")
+
 
 @app.middleware("http")
 async def _no_cache_api(request, call_next):

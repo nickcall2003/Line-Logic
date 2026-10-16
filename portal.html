@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Transfer Portal Board — Line Logic</title>
+<meta name="theme-color" content="#111211">
+<link rel="icon" href="/favicon.ico">
+<style>
+:root{
+  --bg:#0d0d0f; --panel:#141416; --panel2:#1a1a1d; --line:#26262b;
+  --ink:#f3efe7; --mut:#9a968c; --gold:#c6a15b; --gold2:#e4c784;
+  --pos:#56c278; --neg:#e0564f; --chip:#201f22;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;padding:0 0 60px}
+a{color:var(--gold2);text-decoration:none}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+header.top{border-bottom:1px solid var(--line);background:linear-gradient(180deg,#151417,#0d0d0f);
+  padding:18px 0 16px;margin-bottom:14px}
+.kick{letter-spacing:.18em;text-transform:uppercase;font-size:11px;color:var(--gold);font-weight:700}
+h1{margin:4px 0 2px;font-size:26px;letter-spacing:-.01em}
+.sub{color:var(--mut);font-size:13px}
+.back{font-size:13px;color:var(--mut)}
+.back:hover{color:var(--gold2)}
+
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 14px}
+.controls input,.controls select{
+  background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  border-radius:10px;padding:9px 11px;font-size:14px;outline:none}
+.controls input{flex:1;min-width:150px}
+.controls input:focus,.controls select:focus{border-color:var(--gold)}
+.metricnote{font-size:12px;color:var(--mut);margin:-6px 0 14px}
+.metricnote b{color:var(--ink);font-weight:600}
+
+.row{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  margin-bottom:8px;overflow:hidden;transition:border-color .15s}
+.row.open{border-color:#3a3a40}
+.head{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}
+.head:hover{background:var(--panel2)}
+.rk{font-weight:800;font-size:15px;color:var(--gold);min-width:34px;text-align:center;
+  font-variant-numeric:tabular-nums}
+.logo{width:30px;height:30px;object-fit:contain;flex:0 0 30px;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+.logo.ph{display:flex;align-items:center;justify-content:center;background:var(--chip);
+  border-radius:7px;font-size:12px;font-weight:700;color:var(--mut)}
+.name{flex:1;min-width:0}
+.name .t{font-weight:650;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.name .c{font-size:11.5px;color:var(--mut)}
+.net{font-weight:800;font-variant-numeric:tabular-nums;font-size:15px;min-width:64px;text-align:right}
+.net.p{color:var(--pos)} .net.n{color:var(--neg)} .net.z{color:var(--mut)}
+.caret{color:var(--mut);transition:transform .15s;flex:0 0 14px;font-size:12px}
+.row.open .caret{transform:rotate(90deg)}
+.pills{display:flex;gap:6px;margin-top:3px;flex-wrap:wrap}
+.pill{font-size:11px;padding:1px 7px;border-radius:999px;background:var(--chip);color:var(--mut);
+  font-variant-numeric:tabular-nums}
+.pill.in{color:var(--pos)} .pill.out{color:var(--neg)}
+.pill.blue{color:var(--gold2)}
+
+.body{display:none;border-top:1px solid var(--line);padding:4px 0 2px}
+.row.open .body{display:block}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:0}
+@media(max-width:560px){.cols{grid-template-columns:1fr}}
+.col{padding:10px 14px}
+.col+.col{border-left:1px solid var(--line)}
+@media(max-width:560px){.col+.col{border-left:0;border-top:1px solid var(--line)}}
+.col h4{margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.col.inc h4{color:var(--pos)} .col.out h4{color:var(--neg)}
+.plyr{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid #1e1e22;font-size:13px}
+.plyr:first-of-type{border-top:0}
+.plyr .pos{font-size:10px;font-weight:700;color:var(--mut);background:var(--chip);
+  border-radius:5px;padding:1px 5px;min-width:30px;text-align:center}
+.plyr .pn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plyr .pn small{color:var(--mut);font-size:11px}
+.stars{color:var(--gold);font-size:11px;letter-spacing:-1px;white-space:nowrap}
+.rtg{color:var(--mut);font-size:11.5px;font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+.empty{color:var(--mut);font-size:12.5px;font-style:italic;padding:4px 0}
+
+.state{text-align:center;color:var(--mut);padding:50px 20px}
+.state b{color:var(--ink)}
+.state code{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:2px 7px;color:var(--gold2);font-size:12.5px}
+.skel{height:58px;background:linear-gradient(90deg,var(--panel),var(--panel2),var(--panel));
+  background-size:200% 100%;animation:sh 1.2s infinite;border-radius:12px;margin-bottom:8px}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="back" href="/">&larr; Line Logic</a>
+  <div class="kick">FBS Transfer Portal</div>
+  <h1>Portal Board</h1>
+  <div class="sub" id="sub">Loading the board&hellip;</div>
+</div></header>
+
+<div class="wrap">
+  <div class="controls">
+    <input id="q" type="search" placeholder="Search a team&hellip;" autocomplete="off">
+    <select id="sort">
+      <option value="net">Rank · Net haul</option>
+      <option value="added">Most added</option>
+      <option value="lost">Biggest losses</option>
+      <option value="in_n">Most incoming</option>
+      <option value="out_n">Most departures</option>
+      <option value="az">A–Z</option>
+    </select>
+    <select id="conf"><option value="">All conferences</option></select>
+  </div>
+  <div class="metricnote"><b>Net</b> = incoming recruit-rating points minus outgoing, on the 247-style composite scale. Tap a team for its full ins &amp; outs.</div>
+  <div id="board">
+    <div class="skel"></div><div class="skel"></div><div class="skel"></div>
+    <div class="skel"></div><div class="skel"></div>
+  </div>
+</div>
+
+<script>
+var DATA=null, FILT=[];
+function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function stars(n){n=+n||0;return n>=3?"★".repeat(n):"";}
+function rtg(r){r=+r||0;return r>0?r.toFixed(3).replace(/^0/,""):"—";}
+function netClass(v){return v>0.0005?"p":(v<-0.0005?"n":"z");}
+function sign(v){v=+v||0;return (v>0?"+":"")+v.toFixed(2);}
+
+function playerRow(p,side){
+  var where = side==="in" ? ("from "+esc(p.origin)) : ("to "+esc(p.destination));
+  return '<div class="plyr"><span class="pos">'+esc(p.pos||"—")+'</span>'+
+    '<span class="pn">'+esc(p.name)+' <small>'+where+'</small></span>'+
+    '<span class="stars">'+stars(p.stars)+'</span>'+
+    '<span class="rtg">'+rtg(p.rating)+'</span></div>';
+}
+
+function teamRow(t){
+  var logo = t.logo
+    ? '<img class="logo" src="'+esc(t.logo)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+    : '<div class="logo ph">'+esc((t.team||"?").slice(0,2).toUpperCase())+'</div>';
+  var inc = t.incoming.length
+    ? t.incoming.map(function(p){return playerRow(p,"in");}).join("")
+    : '<div class="empty">No incoming transfers.</div>';
+  var out = t.outgoing.length
+    ? t.outgoing.map(function(p){return playerRow(p,"out");}).join("")
+    : '<div class="empty">No departures.</div>';
+  var pills = '<span class="pill in">+'+t.in_n+' in</span>'+
+              '<span class="pill out">−'+t.out_n+' out</span>'+
+              (t.in_bluechip? '<span class="pill blue">'+t.in_bluechip+'★ added</span>':'');
+  return '<div class="row" data-k="'+esc((t.team||"").toLowerCase())+'">'+
+    '<div class="head">'+
+      '<span class="rk">'+t.rank+'</span>'+ logo +
+      '<div class="name"><div class="t">'+esc(t.team)+'</div>'+
+        '<div class="c">'+esc(t.conference||"")+'</div>'+
+        '<div class="pills">'+pills+'</div></div>'+
+      '<span class="net '+netClass(t.net)+'">'+sign(t.net)+'</span>'+
+      '<span class="caret">▶</span>'+
+    '</div>'+
+    '<div class="body"><div class="cols">'+
+      '<div class="col inc"><h4>Incoming ('+t.in_n+')</h4>'+inc+'</div>'+
+      '<div class="col out"><h4>Outgoing ('+t.out_n+')</h4>'+out+'</div>'+
+    '</div></div></div>';
+}
+
+function render(){
+  var q=document.getElementById("q").value.trim().toLowerCase();
+  var conf=document.getElementById("conf").value;
+  var sort=document.getElementById("sort").value;
+  var rows=DATA.teams.slice();
+  if(conf) rows=rows.filter(function(t){return t.conference===conf;});
+  if(q) rows=rows.filter(function(t){return (t.team||"").toLowerCase().indexOf(q)>=0;});
+  var cmp={ net:function(a,b){return a.rank-b.rank;},
+    added:function(a,b){return b.added-a.added;},
+    lost:function(a,b){return b.lost-a.lost;},
+    in_n:function(a,b){return b.in_n-a.in_n;},
+    out_n:function(a,b){return b.out_n-a.out_n;},
+    az:function(a,b){return (a.team||"").localeCompare(b.team||"");} };
+  rows.sort(cmp[sort]||cmp.net);
+  var b=document.getElementById("board");
+  b.innerHTML = rows.length ? rows.map(teamRow).join("")
+    : '<div class="empty" style="padding:30px 0;text-align:center">No teams match that.</div>';
+}
+
+function boot(data){
+  DATA=data;
+  document.getElementById("sub").innerHTML =
+    (data.season? data.season+" cycle · ":"")+
+    data.ranked+" FBS teams · "+data.count_entries+" portal entries";
+  // conference options
+  var confs={}; data.teams.forEach(function(t){if(t.conference)confs[t.conference]=1;});
+  var sel=document.getElementById("conf");
+  Object.keys(confs).sort().forEach(function(c){
+    var o=document.createElement("option");o.value=c;o.textContent=c;sel.appendChild(o);});
+  render();
+  ["q","sort","conf"].forEach(function(id){
+    document.getElementById(id).addEventListener(id==="q"?"input":"change",render);});
+  document.getElementById("board").addEventListener("click",function(e){
+    var h=e.target.closest(".head"); if(!h)return;
+    h.parentNode.classList.toggle("open");});
+}
+
+fetch("/api/portal").then(function(r){
+  if(!r.ok) throw new Error(r.status); return r.json();
+}).then(boot).catch(function(){
+  document.getElementById("sub").textContent="Board not built yet";
+  document.getElementById("board").innerHTML =
+    '<div class="state"><p><b>The portal board hasn’t been built yet.</b></p>'+
+    '<p>Pull the latest data from CFBD by visiting<br>'+
+    '<code>/api/portal/build?confirm=yes</code></p>'+
+    '<p style="font-size:12px">Needs <code>CFBD_API_KEY</code> set on the server.</p></div>';
+});
+</script>
+</body>
+</html>
