@@ -75,8 +75,16 @@ h1{margin:4px 0 2px;font-size:26px;letter-spacing:-.01em}
   border-radius:5px;padding:1px 5px;min-width:30px;text-align:center}
 .plyr .pn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .plyr .pn small{color:var(--mut);font-size:11px}
-.stars{color:var(--gold);font-size:11px;letter-spacing:-1px;white-space:nowrap}
-.rtg{color:var(--mut);font-size:11.5px;font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+.tag{font-size:9.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  padding:1px 6px;border-radius:5px;white-space:nowrap}
+.tag.over{color:#7ee0a0;background:rgba(86,194,120,.14)}
+.tag.under{color:#ef8a84;background:rgba(224,86,79,.14)}
+.tag.prod{color:var(--gold2);background:rgba(198,161,91,.14)}
+.tag.unp{color:var(--mut);background:var(--chip)}
+.imp{font-weight:800;font-variant-numeric:tabular-nums;font-size:13.5px;min-width:30px;
+  text-align:right}
+.imp.hi{color:var(--pos)} .imp.mid{color:var(--gold2)} .imp.lo{color:var(--mut)}
+.str{color:var(--mut);font-size:10px;letter-spacing:-1px;white-space:nowrap;min-width:14px}
 .empty{color:var(--mut);font-size:12.5px;font-style:italic;padding:4px 0}
 
 .state{text-align:center;color:var(--mut);padding:50px 20px}
@@ -109,7 +117,7 @@ h1{margin:4px 0 2px;font-size:26px;letter-spacing:-.01em}
     </select>
     <select id="conf"><option value="">All conferences</option></select>
   </div>
-  <div class="metricnote"><b>Net</b> = incoming recruit-rating points minus outgoing, on the 247-style composite scale. Tap a team for its full ins &amp; outs.</div>
+  <div class="metricnote"><b>Impact</b> (0&ndash;100) scores each transfer on <b>what they produced</b> in prior seasons vs. what their stars predicted &mdash; not pedigree. <b>Net</b> = proven value a team added minus lost. Tap a team for its full ins &amp; outs.</div>
   <div id="board">
     <div class="skel"></div><div class="skel"></div><div class="skel"></div>
     <div class="skel"></div><div class="skel"></div>
@@ -120,17 +128,22 @@ h1{margin:4px 0 2px;font-size:26px;letter-spacing:-.01em}
 var DATA=null, FILT=[];
 function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
-function stars(n){n=+n||0;return n>=3?"★".repeat(n):"";}
-function rtg(r){r=+r||0;return r>0?r.toFixed(3).replace(/^0/,""):"—";}
+function stars(n){n=+n||0;return n>=3?"★"+n:"";}
 function netClass(v){return v>0.0005?"p":(v<-0.0005?"n":"z");}
 function sign(v){v=+v||0;return (v>0?"+":"")+v.toFixed(2);}
+var TAG={Overachiever:["over","Over"],Underachiever:["under","Under"],
+  Producer:["prod","Producer"],Unproven:["unp","Unproven"]};
+function impClass(v){v=+v||0;return v>=66?"hi":(v>=45?"mid":"lo");}
 
 function playerRow(p,side){
   var where = side==="in" ? ("from "+esc(p.origin)) : ("to "+esc(p.destination));
+  var tg = TAG[p.tag]||TAG.Unproven;
+  var imp = p.proven ? Math.round(p.impact) : "–";
   return '<div class="plyr"><span class="pos">'+esc(p.pos||"—")+'</span>'+
     '<span class="pn">'+esc(p.name)+' <small>'+where+'</small></span>'+
-    '<span class="stars">'+stars(p.stars)+'</span>'+
-    '<span class="rtg">'+rtg(p.rating)+'</span></div>';
+    '<span class="str">'+stars(p.stars)+'</span>'+
+    '<span class="tag '+tg[0]+'">'+tg[1]+'</span>'+
+    '<span class="imp '+impClass(p.impact)+'">'+imp+'</span></div>';
 }
 
 function teamRow(t){
@@ -145,7 +158,7 @@ function teamRow(t){
     : '<div class="empty">No departures.</div>';
   var pills = '<span class="pill in">+'+t.in_n+' in</span>'+
               '<span class="pill out">−'+t.out_n+' out</span>'+
-              (t.in_bluechip? '<span class="pill blue">'+t.in_bluechip+'★ added</span>':'');
+              (t.in_proven? '<span class="pill blue">'+t.in_proven+' proven in</span>':'');
   return '<div class="row" data-k="'+esc((t.team||"").toLowerCase())+'">'+
     '<div class="head">'+
       '<span class="rk">'+t.rank+'</span>'+ logo +
