@@ -549,14 +549,22 @@ def register(app):
             probe["roster_sample"] = samp
             # Dump the NEW statistics structure so the parser can be rewritten
             # to read 'results'/'teamTotals' instead of the gone 'athletes' key.
-            import json as _j
             sdata = EP._get(surl.format(team=tid), {"region": "us"}) or {}
-            res = sdata.get("results")
-            probe["results_type"] = type(res).__name__
-            if isinstance(res, dict):
-                probe["results_keys"] = list(res.keys())[:12]
-            probe["results_dump"] = _j.dumps(res)[:2200]
-            probe["teamTotals_dump"] = _j.dumps(sdata.get("teamTotals"))[:700]
+            res = sdata.get("results") or []
+            # Compact map of every stat category: how many players it lists and a
+            # sample, so the parser knows the stat->category mapping and whether
+            # leaders cover the full rotation or just a top-N.
+            cats = []
+            for c in (res if isinstance(res, list) else []):
+                leaders = (c.get("leaders") or []) if isinstance(c, dict) else []
+                s0 = leaders[0] if leaders else {}
+                cats.append({
+                    "name": c.get("name"), "display": c.get("displayName"),
+                    "abbr": c.get("abbreviation"), "n_players": len(leaders),
+                    "sample_player": (s0.get("athlete") or {}).get("displayName"),
+                    "sample_value": s0.get("displayValue"),
+                })
+            probe["result_categories"] = cats
         except Exception as e:
             probe["error"] = str(e)[:80]
         out["probe"] = probe
