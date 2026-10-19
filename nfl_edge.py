@@ -543,6 +543,8 @@ def game_cards(home, away, players_by_team, defense):
             if pl.get("boosted_by"):
                 c["boosted_by"] = pl["boosted_by"]
                 c["boosted_status"] = pl.get("boosted_status") or "OUT"
+            if pl.get("traded_from"):
+                c["traded_from"] = pl["traded_from"]
             cards.append(c)
     cards.sort(key=lambda c: c.get("logic_score") or 0, reverse=True)
     for i, c in enumerate(cards, 1):
@@ -587,6 +589,30 @@ def register(app):
                   (pl.get("att_pg") or 0)
             if (pl.get("games") or 0) >= 2 and use >= MIN.get(pos, 1):
                 by_team[t].append(pl)
+        # Trade remap: a profiled player now on THIS game's roster but tagged to
+        # his old team in the profile (e.g. a midseason trade) is shown under his
+        # new team and flagged. Best-effort — a failed roster read just skips it.
+        try:
+            import espn_provider as _ep
+            _d = dt.date.fromisoformat(date) if date else None
+            _g = _ep.get_game("nfl", _d, game_id) if _d else None
+            if _g:
+                _idx = {_norm(pl.get("name")): pl for pl in players.values()}
+                _here = {_norm(p.get("name")) for lst in by_team.values() for p in lst}
+                for _side, _tn, _ab in (("home", H, home), ("away", A, away)):
+                    _tid = (_g.get(_side) or {}).get("team_id")
+                    if not _tid:
+                        continue
+                    for _nm in _ep._team_roster_ids("nfl", _tid):
+                        _k = _norm(_nm)
+                        _pl = _idx.get(_k)
+                        if _pl and _k not in _here and _tnorm(_pl.get("team")) != _tn:
+                            _mv = dict(_pl)
+                            _mv["team"], _mv["traded_from"] = _ab, _pl.get("team")
+                            by_team[_tn].append(_mv)
+                            _here.add(_k)
+        except Exception:
+            pass
         roster = {H: by_team[H], A: by_team[A]}
         apply_injuries(roster)          # drop OUT starters, boost the next man up
         cards = game_cards(H, A, roster, data.get("defense", {}))
