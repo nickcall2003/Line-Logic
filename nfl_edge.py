@@ -589,28 +589,35 @@ def register(app):
                   (pl.get("att_pg") or 0)
             if (pl.get("games") or 0) >= 2 and use >= MIN.get(pos, 1):
                 by_team[t].append(pl)
-        # Trade remap: a profiled player now on THIS game's roster but tagged to
-        # his old team in the profile (e.g. a midseason trade) is shown under his
-        # new team and flagged. Best-effort — a failed roster read just skips it.
+        # Trade remap vs each team's CURRENT roster: drop a profiled player who is
+        # no longer on the team (traded away), and add one who is now on it but
+        # tagged elsewhere (traded in), flagged. Best-effort — a failed/empty
+        # roster read leaves that team untouched.
         try:
             import espn_provider as _ep
-            _d = dt.date.fromisoformat(date) if date else None
-            _g = _ep.get_game("nfl", _d, game_id) if _d else None
+            _d = dt.date.fromisoformat(date) if date else dt.date.today()
+            _g = _ep.get_game("nfl", _d, game_id)
             if _g:
                 _idx = {_norm(pl.get("name")): pl for pl in players.values()}
-                _here = {_norm(p.get("name")) for lst in by_team.values() for p in lst}
                 for _side, _tn, _ab in (("home", H, home), ("away", A, away)):
                     _tid = (_g.get(_side) or {}).get("team_id")
                     if not _tid:
                         continue
-                    for _nm in _ep._team_roster_ids("nfl", _tid):
-                        _k = _norm(_nm)
+                    _cur = _ep.team_roster_names("nfl", _tid)   # {norm: displayName}
+                    if len(_cur) < 20:
+                        continue                                # roster read too thin to trust
+                    # REMOVE: a profiled player not on the current roster has left
+                    by_team[_tn] = [p for p in by_team[_tn]
+                                    if _norm(p.get("name")) in _cur]
+                    _have = {_norm(p.get("name")) for p in by_team[_tn]}
+                    # ADD: a rostered player profiled under another team was traded in
+                    for _k in _cur:
                         _pl = _idx.get(_k)
-                        if _pl and _k not in _here and _tnorm(_pl.get("team")) != _tn:
+                        if _pl and _k not in _have and _tnorm(_pl.get("team")) != _tn:
                             _mv = dict(_pl)
                             _mv["team"], _mv["traded_from"] = _ab, _pl.get("team")
                             by_team[_tn].append(_mv)
-                            _here.add(_k)
+                            _have.add(_k)
         except Exception:
             pass
         roster = {H: by_team[H], A: by_team[A]}
@@ -618,5 +625,39 @@ def register(app):
         cards = game_cards(H, A, roster, data.get("defense", {}))
         return {"game_id": game_id, "home_team": home, "away_team": away,
                 "count": len(cards), "cards": cards}
+
+    @app.get("/api/nfl/trade-diag")
+    def nfl_trade_diag(game_id: str, date: str | None = None,
+                       home: str | None = None, away: str | None = None,
+                       player: str = "harrison"):
+        """What the trade remap sees from ESPN for one game. Hit this to confirm
+        whether a player (e.g. 'harrison') is on each team's CURRENT roster and
+        what team the frozen profile has him on."""
+        import espn_provider as _ep
+        data = load()
+        out = {"game_id": game_id, "player_query": player.lower()}
+        try:
+            _d = dt.date.fromisoformat(date) if date else dt.date.today()
+            g = _ep.get_game("nfl", _d, game_id)
+            out["game_resolved"] = bool(g)
+            prof = (data or {}).get("players", {})
+            prof_hits = [{"name": p.get("name"), "profile_team": p.get("team"), "pos": p.get("pos")}
+                         for p in prof.values()
+                         if player.lower() in _norm(p.get("name"))]
+            out["profile_matches"] = prof_hits
+            sides = {}
+            for s in ("home", "away"):
+                tid = (g.get(s) or {}).get("team_id") if g else None
+                abbr = (g.get(s) or {}).get("abbr") if g else None
+                names = _ep.team_roster_names("nfl", tid) if tid else {}
+                hits = [v for k, v in names.items() if player.lower() in k]
+                sides[s] = {"abbr": abbr, "team_id": tid, "roster_count": len(names),
+                            "query_on_roster": hits,
+                            "sample": list(names.values())[:5]}
+            out["teams"] = sides
+        except Exception as e:
+            out["error"] = f"{type(e).__name__}: {e}"
+        from fastapi.responses import JSONResponse as _J
+        return _J(out, headers={"Cache-Control": "no-store"})
 
     print("[nfl] edge endpoint registered")

@@ -831,6 +831,42 @@ def _team_roster_ids(sport, team_id):
     return ids
 
 
+_ROSTER_URL = {
+    "nfl": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/{team}/roster",
+    "nhl": "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/teams/{team}/roster",
+    "nba": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team}/roster",
+    "wnba": "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/teams/{team}/roster",
+}
+_roster_names_cache = {}
+
+
+def team_roster_names(sport, team_id):
+    """{norm_name: displayName} for a team's CURRENT roster from the dedicated
+    roster endpoint — NOT stats-gated, so a just-traded/arrived player appears.
+    This is the reliable 'who is on this team right now' source for trade remaps."""
+    import re
+    key = (sport, str(team_id))
+    if key in _roster_names_cache:
+        return _roster_names_cache[key]
+    out = {}
+    try:
+        url = _ROSTER_URL.get(sport)
+        if url and team_id:
+            data = _get(url.format(team=team_id), {})
+            for grp in (data.get("athletes") or []):
+                items = (grp.get("items")
+                         if isinstance(grp, dict) and isinstance(grp.get("items"), list)
+                         else [grp])
+                for a in (items or []):
+                    nm = (a or {}).get("displayName") or (a or {}).get("fullName")
+                    if nm:
+                        out[re.sub(r"[^a-z0-9]", "", nm.lower())] = nm
+    except Exception:
+        pass
+    _roster_names_cache[key] = out
+    return out
+
+
 def _game_roster_ids(sport, date, game_id):
     ids = {}
     try:
