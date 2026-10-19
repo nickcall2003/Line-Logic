@@ -5121,6 +5121,10 @@ window.addEventListener("hashchange",()=>{if(!location.hash&&detailId)closeDetai
   }
   try{connectWS();}catch(e){}
 })();
+// First-party pageview beacon (privacy-safe: our path + referrer host only).
+try{if(!navigator.webdriver){var _bp=JSON.stringify({p:location.pathname,r:document.referrer});
+if(navigator.sendBeacon){navigator.sendBeacon('/api/hit',new Blob([_bp],{type:'text/plain'}));}
+else{fetch('/api/hit',{method:'POST',body:_bp,keepalive:true});}}}catch(e){}
 setInterval(()=>{
   if(detailId||view!=="sport")return;
   if(ymd(selected)!==ymd(startOfDay(new Date())))return;

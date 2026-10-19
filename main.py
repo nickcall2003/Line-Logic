@@ -959,6 +959,14 @@ try:
 except Exception as _seo_err:
     print(f"[startup] seo router not loaded: {_seo_err}")
 
+# First-party page analytics (beacon /api/hit, /api/stats, /stats dashboard) —
+# privacy-safe, no third-party account. See analytics.py.
+try:
+    from analytics import router as analytics_router
+    app.include_router(analytics_router)
+except Exception as _an_err:
+    print(f"[startup] analytics router not loaded: {_an_err}")
+
 
 @app.middleware("http")
 async def _no_cache_api(request, call_next):

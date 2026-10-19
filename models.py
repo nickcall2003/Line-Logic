@@ -460,3 +460,19 @@ class TournamentConfig(Base):
     start_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     end_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PageView(Base):
+    """A single first-party page view, logged by a tiny beacon on each page.
+    Privacy-safe: no IP, no cookie, no user id — only our own path, the
+    referrer HOST (not the full URL/query), and a day bucket for cheap
+    grouping. Powers the self-owned /stats dashboard (no third-party
+    analytics account needed). Resets with the DB on ephemeral disk; point
+    DATABASE_URL at persistent Postgres to keep history."""
+    __tablename__ = "page_views"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)        # YYYY-MM-DD (UTC)
+    path: Mapped[str] = mapped_column(String(80), index=True)       # our own path, e.g. /nfl-predictions
+    ref: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)  # referrer host only

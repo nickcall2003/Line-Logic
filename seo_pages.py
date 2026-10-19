@@ -120,6 +120,8 @@ h1{{font-family:"Archivo",sans-serif;font-weight:800;font-size:clamp(27px,5.4vw,
 .rec .b{{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:16px 10px;text-align:center}}
 .rec .n{{font-family:"Archivo",sans-serif;font-size:clamp(20px,6vw,26px);font-weight:900;letter-spacing:-.02em;white-space:nowrap}}
 .rec .n.pos{{color:var(--win)}}.rec .n.neg{{color:var(--loss)}}
+.rec a.reclink{{text-decoration:none;display:flex;flex-direction:column;justify-content:center}}
+.rec a.reclink:hover{{border-color:var(--gold)}}
 .rec .k{{font-family:"Space Mono",monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:6px;line-height:1.3}}
 .rec small{{display:block;color:var(--muted-2);font-size:11px;margin-top:10px;grid-column:1/-1;text-align:center;font-family:"Space Mono",monospace}}
 section{{padding:10px 0 6px}}
@@ -163,17 +165,37 @@ ul{{margin:0 0 16px;padding-left:20px;color:#D4D3CC}}li{{margin:6px 0}}
     if(!s) return;
     var w=s.alltime_wins||0, l=s.alltime_losses||0;
     var u=s.units_at, roi=s.roi_at;
+    var wp=(w+l)?Math.round(w/(w+l)*1000)/10:null;
     function cell(id,val,cls){{var n=document.getElementById(id);if(n){{n.textContent=val;if(cls)n.className='n '+cls;}}}}
     cell('r-wl', w+'–'+l, (w>l?'pos':(l>w?'neg':'')));
+    cell('r-wp', (wp==null?'—':wp+'%'), '');
     cell('r-u', (u==null?'—':(u>=0?'+':'')+u+'u'), (u==null?'':(u>=0?'pos':'neg')));
     cell('r-roi', (roi==null?'—':(roi>=0?'+':'')+roi+'%'), (roi==null?'':(roi>=0?'pos':'neg')));
   }}).catch(function(){{}});
 }})();
+// First-party pageview beacon (privacy-safe: our path + referrer host only).
+try{{if(!navigator.webdriver){{var _bp=JSON.stringify({{p:location.pathname,r:document.referrer}});
+if(navigator.sendBeacon){{navigator.sendBeacon('/api/hit',new Blob([_bp],{{type:'text/plain'}}));}}
+else{{fetch('/api/hit',{{method:'POST',body:_bp,keepalive:true}});}}}}}}catch(e){{}}
 </script>
 </body></html>"""
 
 
-def _rec_box(label):
+def _rec_box(label, mode="full"):
+    if mode == "sport":
+        # Conversion pages lead with record + win rate (honest, positive framing),
+        # with a labeled link to the full units/ROI on the track-record page.
+        return (
+            '<div class="rec" id="rec">'
+            '<div class="b"><div class="n" id="r-wl">—</div><div class="k">'+label+' record</div></div>'
+            '<div class="b"><div class="n" id="r-wp">—</div><div class="k">Win rate (all-time)</div></div>'
+            '<a class="b reclink" href="/model-track-record">'
+            '<div class="n" style="color:var(--gold);font-size:17px">Full record</div>'
+            '<div class="k">units &amp; ROI →</div></a>'
+            '<small>Live from the tracker — every graded pick, win or lose.</small>'
+            '</div>'
+        )
+    # Track-record page: the full, nothing-hidden picture.
     return (
         '<div class="rec" id="rec">'
         '<div class="b"><div class="n" id="r-wl">—</div><div class="k">'+label+' record</div></div>'
@@ -227,7 +249,7 @@ def _predictions_page(sport):
   <a class="btn p" href="/#{sport}">See today's {lab} board →</a>
   <a class="btn s" href="{DISCORD}" rel="nofollow">Join the Discord</a>
 </div>
-{_rec_box(lab)}
+{_rec_box(lab, "sport")}
 <section>
 <h2>How the {lab} model works</h2>
 <p>{blurb}</p>
@@ -280,7 +302,7 @@ disagree — with backups boosted the moment a starter is ruled out.</p>
   <a class="btn p" href="/#{sport}">See today's {lab} board →</a>
   <a class="btn s" href="{DISCORD}" rel="nofollow">Join the Discord</a>
 </div>
-{_rec_box(lab)}
+{_rec_box(lab, "sport")}
 <section>
 <h2>How {lab} prop projections work</h2>
 <ul>
