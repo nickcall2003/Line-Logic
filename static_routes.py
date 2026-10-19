@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v51";   // bumped: multi-sport SEO/share meta
+const CACHE = "ll-shell-v52";   // bumped: SEO landing pages + sport deep-links
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));

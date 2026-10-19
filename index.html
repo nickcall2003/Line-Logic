@@ -5113,6 +5113,7 @@ window.addEventListener("hashchange",()=>{if(!location.hash&&detailId)closeDetai
     if(h.indexOf("#m")===0){view="sport";sport="tennis";document.getElementById("home").classList.remove("show");document.getElementById("main").style.display="";toTop();await reload();openDetail(parseInt(h.slice(2)));}
     else if(h.indexOf("#g")===0){setSport("mlb");openMLBDetail(h.slice(2));}
     else if(h.indexOf("#t")===0){openHome();}
+    else if(h.length>1&&{mlb:1,tennis:1,nba:1,golf:1,nfl:1,ncaabb:1,nhl:1,ncaaf:1,ncaab:1,wncaab:1,soccer:1,ufc:1}[h.slice(1)]){setSport(h.slice(1));}
     else{openHome();}
   }catch(e){
     console.error("init failed",e);

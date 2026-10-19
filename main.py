@@ -951,6 +951,14 @@ try:
 except Exception as _portal_err:
     print(f"[startup] portal router not loaded: {_portal_err}")
 
+# SEO landing pages (/nfl-predictions, /nfl-player-props, /model-track-record, ...)
+# + sitemap.xml / robots.txt — organic-traffic engine, see seo_pages.py.
+try:
+    from seo_pages import router as seo_router
+    app.include_router(seo_router)
+except Exception as _seo_err:
+    print(f"[startup] seo router not loaded: {_seo_err}")
+
 
 @app.middleware("http")
 async def _no_cache_api(request, call_next):
