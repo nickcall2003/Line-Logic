@@ -87,50 +87,55 @@ def _shell(*, title, desc, canonical, h1, body_html, jsonld, data_sport="", data
 <meta name="twitter:description" content="{desc}">
 <meta name="twitter:image" content="{OG_IMG}">
 <link rel="icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Hanken+Grotesque:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script type="application/ld+json">{jsonld}</script>
 <style>
-:root{{--bg:#13140f;--card:#1b1d16;--line:#34362f;--ink:#f1f2ea;--mut:#9ea292;--acc:#c6d64a;--pos:#7bd88f;--neg:#ef6a6a}}
+:root{{--bg:#111211;--panel:#171817;--panel-2:#1E1F1D;--panel-3:#272826;--line:#2A2B29;
+--ink:#EDEBE6;--muted:#8E8F8A;--muted-2:#57584F;--win:#5FCF86;--loss:#EE6A54;
+--gold:#E8B04B;--gold-soft:#C9932F;--clay-bright:#F2C46A}}
 *{{box-sizing:border-box}}
-body{{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}}
-a{{color:var(--acc);text-decoration:none}}
-.wrap{{max-width:860px;margin:0 auto;padding:0 20px}}
-header.top{{border-bottom:1px solid var(--line);background:#12130e;position:sticky;top:0;z-index:5}}
-header.top .wrap{{display:flex;align-items:center;gap:14px;height:56px}}
-.brand{{font-weight:800;letter-spacing:.3px;color:var(--ink);font-size:18px}}
-.brand b{{color:var(--acc)}}
-.xnav{{display:flex;gap:14px;overflow-x:auto;margin-left:auto;white-space:nowrap;scrollbar-width:none}}
+body{{margin:0;background:radial-gradient(130% 80% at 82% -8%,#1a1710 0%,var(--bg) 55%);background-attachment:fixed;color:var(--ink);font:16px/1.6 "Hanken Grotesque",system-ui,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}}
+a{{color:var(--gold);text-decoration:none}}
+.wrap{{max-width:880px;margin:0 auto;padding:0 20px}}
+header.top{{border-bottom:1px solid var(--line);background:rgba(17,18,17,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);position:sticky;top:0;z-index:5}}
+header.top .wrap{{display:flex;align-items:center;gap:14px;height:58px}}
+.brand{{font-family:"Archivo",sans-serif;font-weight:800;letter-spacing:-.02em;color:var(--ink);font-size:20px}}
+.brand .dot{{color:var(--gold)}}
+.xnav{{display:flex;gap:16px;overflow-x:auto;margin-left:auto;white-space:nowrap;scrollbar-width:none}}
 .xnav::-webkit-scrollbar{{display:none}}
-.xnav a{{color:var(--mut);font-size:13px;font-weight:600}}
+.xnav a{{color:var(--muted);font-size:13px;font-weight:600;font-family:"Archivo",sans-serif}}
 .xnav a:hover{{color:var(--ink)}}
 .hero{{padding:46px 0 10px}}
-h1{{font-size:clamp(26px,5.4vw,40px);line-height:1.15;margin:0 0 14px;letter-spacing:-.5px}}
-.lede{{font-size:18px;color:var(--mut);margin:0 0 24px;max-width:62ch}}
+h1{{font-family:"Archivo",sans-serif;font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.12;margin:0 0 16px;letter-spacing:-.03em}}
+.lede{{font-size:18px;color:var(--muted);margin:0 0 24px;max-width:62ch}}
 .cta{{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0 28px}}
-.btn{{display:inline-flex;align-items:center;gap:8px;padding:13px 20px;border-radius:12px;font-weight:700;font-size:15px}}
-.btn.p{{background:var(--acc);color:#1a1c12}}
-.btn.p:hover{{filter:brightness(1.07)}}
-.btn.s{{background:transparent;color:var(--ink);border:1px solid var(--line)}}
-.btn.s:hover{{border-color:var(--acc)}}
+.btn{{display:inline-flex;align-items:center;gap:8px;padding:13px 20px;border-radius:12px;font-weight:700;font-size:15px;font-family:"Archivo",sans-serif}}
+.btn.p{{background:linear-gradient(180deg,var(--clay-bright),var(--gold));color:#1a1407}}
+.btn.p:hover{{filter:brightness(1.05)}}
+.btn.s{{background:var(--panel-2);color:var(--ink);border:1px solid var(--line)}}
+.btn.s:hover{{border-color:var(--gold)}}
 .rec{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 30px}}
-.rec .b{{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 14px;text-align:center}}
-.rec .n{{font-size:26px;font-weight:800;letter-spacing:-.5px}}
-.rec .n.pos{{color:var(--pos)}}.rec .n.neg{{color:var(--neg)}}
-.rec .k{{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin-top:4px}}
-.rec small{{display:block;color:var(--mut);font-size:11px;margin-top:10px;grid-column:1/-1;text-align:center}}
+.rec .b{{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:16px 10px;text-align:center}}
+.rec .n{{font-family:"Archivo",sans-serif;font-size:clamp(20px,6vw,26px);font-weight:900;letter-spacing:-.02em;white-space:nowrap}}
+.rec .n.pos{{color:var(--win)}}.rec .n.neg{{color:var(--loss)}}
+.rec .k{{font-family:"Space Mono",monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:6px;line-height:1.3}}
+.rec small{{display:block;color:var(--muted-2);font-size:11px;margin-top:10px;grid-column:1/-1;text-align:center;font-family:"Space Mono",monospace}}
 section{{padding:10px 0 6px}}
-h2{{font-size:22px;margin:30px 0 10px;letter-spacing:-.3px}}
-h3{{font-size:16px;margin:18px 0 4px}}
-p{{margin:0 0 14px;color:#dfe2d6}}
-ul{{margin:0 0 16px;padding-left:20px;color:#dfe2d6}}li{{margin:6px 0}}
+h2{{font-family:"Archivo",sans-serif;font-weight:800;font-size:22px;margin:30px 0 10px;letter-spacing:-.02em}}
+h3{{font-family:"Archivo",sans-serif;font-size:16px;margin:18px 0 4px}}
+p{{margin:0 0 14px;color:#D4D3CC}}
+ul{{margin:0 0 16px;padding-left:20px;color:#D4D3CC}}li{{margin:6px 0}}
 .faq .q{{font-weight:700;margin:18px 0 4px;color:var(--ink)}}
-.foot{{border-top:1px solid var(--line);margin-top:40px;padding:26px 0 48px;color:var(--mut);font-size:13px}}
+.foot{{border-top:1px solid var(--line);margin-top:40px;padding:26px 0 48px;color:var(--muted);font-size:13px}}
 .foot .links{{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:14px}}
-.foot a{{color:var(--mut);font-weight:600}}.foot a:hover{{color:var(--ink)}}
-.note{{font-size:12px;color:var(--mut);margin-top:18px}}
+.foot a{{color:var(--muted);font-weight:600}}.foot a:hover{{color:var(--ink)}}
+.note{{font-size:12px;color:var(--muted);margin-top:18px}}
 </style></head>
 <body{(' data-sport="'+data_sport+'"') if data_sport else ''}{(' data-scope="'+data_scope+'"') if data_scope else ''}>
 <header class="top"><div class="wrap">
-  <a class="brand" href="/">Line<b>Logic</b></a>{_nav()}
+  <a class="brand" href="/">Line Logic<span class="dot">.</span></a>{_nav()}
 </div></header>
 <main class="wrap">
 <div class="hero"><h1>{h1}</h1>
