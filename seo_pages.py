@@ -30,14 +30,54 @@ DISCORD = "https://discord.gg/WmpF9GdWGE"
 
 # ---- page catalog -----------------------------------------------------------
 # slug -> config. Predictions + props pages share a builder; track-record is its own.
+import datetime as _dt
+
 _SPORTS = {
     "nfl": "NFL",
     "nba": "NBA",
     "mlb": "MLB",
     "nhl": "NHL",
+    "ncaaf": "College Football",
+    "soccer": "Soccer",
 }
-# which slugs get a "player props" page too
+# URL slug per predictions page (SEO: spell out college football, not "ncaaf").
+_PRED_SLUG = {
+    "nfl": "nfl-predictions",
+    "nba": "nba-predictions",
+    "mlb": "mlb-predictions",
+    "nhl": "nhl-predictions",
+    "ncaaf": "college-football-predictions",
+    "soccer": "soccer-predictions",
+}
+# Short label for the (horizontally scrolling) top nav.
+_NAV_LABEL = {"nfl": "NFL", "nba": "NBA", "mlb": "MLB", "nhl": "NHL",
+              "ncaaf": "CFB", "soccer": "Soccer"}
+# which sports get a "player props" page too
 _PROP_SPORTS = ["nfl", "nba"]
+
+
+def _labor_day(y):
+    d = _dt.date(y, 9, 1)
+    while d.weekday() != 0:  # 0 = Monday
+        d += _dt.timedelta(days=1)
+    return d
+
+
+def _nfl_week(today=None):
+    """Current NFL regular-season week (1-18), or None out of season.
+    NFL opener = Thursday after Labor Day (Labor Day + 3 days). Lets the NFL
+    page auto-title 'NFL Week N Predictions' — the exact phrase people search —
+    and roll over on its own each week, no manual edits."""
+    today = today or _dt.date.today()
+    opener = _labor_day(today.year) + _dt.timedelta(days=3)
+    if today < opener:  # before this year's opener — maybe still last season's playoffs run
+        opener_prev = _labor_day(today.year - 1) + _dt.timedelta(days=3)
+        if today >= opener_prev:
+            opener = opener_prev
+        else:
+            return None
+    n = (today - opener).days // 7 + 1
+    return n if 1 <= n <= 18 else None
 
 # Human intent copy per sport (kept honest + specific; no guaranteed-winner hype).
 _SPORT_BLURB = {
@@ -53,15 +93,21 @@ _SPORT_BLURB = {
     "nhl": "Every NHL game gets a model line — projected goals, win probability and "
            "puck-line value from team ratings, goaltending and injuries — compared "
            "against the market to find mispriced sides and totals.",
+    "ncaaf": "Every FBS college football game gets a model line — projected spread, "
+           "total and win probability from team ratings, matchup and injuries — then "
+           "compared against the market across the whole Saturday slate to find the edges.",
+    "soccer": "Every match gets a model price — projected result probabilities, goals "
+           "and value on the 1X2, totals and both-teams-to-score markets — compared "
+           "against the book to surface where the line is mispriced.",
 }
 
 
 def _nav():
     items = []
-    for s, lab in _SPORTS.items():
-        items.append(f'<a href="/{s}-predictions">{lab} Predictions</a>')
+    for s in _SPORTS:
+        items.append(f'<a href="/{_PRED_SLUG[s]}">{_NAV_LABEL[s]} Predictions</a>')
     for s in _PROP_SPORTS:
-        items.append(f'<a href="/{s}-player-props">{_SPORTS[s]} Props</a>')
+        items.append(f'<a href="/{s}-player-props">{_NAV_LABEL[s]} Props</a>')
     items.append('<a href="/model-track-record">Track Record</a>')
     return '<nav class="xnav">' + "".join(items) + "</nav>"
 
@@ -146,7 +192,7 @@ ul{{margin:0 0 16px;padding-left:20px;color:#D4D3CC}}li{{margin:6px 0}}
 </main>
 <footer class="foot"><div class="wrap">
   <div class="links">
-    {''.join(f'<a href="/{s}-predictions">{l} predictions</a>' for s,l in _SPORTS.items())}
+    {''.join(f'<a href="/{_PRED_SLUG[s]}">{l} predictions</a>' for s,l in _SPORTS.items())}
     {''.join(f'<a href="/{s}-player-props">{_SPORTS[s]} props</a>' for s in _PROP_SPORTS)}
     <a href="/model-track-record">Track record</a>
     <a href="{DISCORD}" rel="nofollow">Discord</a>
@@ -222,12 +268,21 @@ def _j(s):
 def _predictions_page(sport):
     lab = _SPORTS[sport]
     blurb = _SPORT_BLURB[sport]
-    title = f"{lab} Predictions & Model Picks Today | Line Logic"
-    desc = (f"Today's {lab} predictions from a transparent betting model: projected "
-            f"spreads, totals and win probabilities vs. the live market — with a public, "
-            f"graded track record. Every pick, win or lose.")
-    canon = f"{BASE}/{sport}-predictions"
-    h1 = f"{lab} Predictions Today — Model vs. the Market"
+    # NFL auto-targets the exact weekly search ("NFL Week 7 predictions") and rolls
+    # over on its own; other sports (and NFL offseason) use the evergreen "Today".
+    wk = _nfl_week() if sport == "nfl" else None
+    if wk:
+        head = f"{lab} Week {wk} Predictions"          # "NFL Week 6 Predictions"
+        desc_lead = f"NFL Week {wk} predictions"
+    else:
+        head = f"{lab} Predictions Today"              # "College Football Predictions Today"
+        desc_lead = f"Today's {lab} predictions"
+    title = f"{head} & Model Picks | Line Logic"
+    desc = (f"{desc_lead} from a transparent betting model: projected spreads, totals "
+            f"and win probabilities vs. the live market — with a public, graded track "
+            f"record. Every pick, win or lose.")
+    canon = f"{BASE}/{_PRED_SLUG[sport]}"
+    h1 = f"{head} — Model vs. the Market"
     qas = [
         (f"How does Line Logic make {lab} predictions?",
          f"Line Logic rates every team, projects each game (spread, total and win "
@@ -390,7 +445,7 @@ for _s in _SPORTS:
         def _r():
             return _html(_predictions_page(s))
         return _r
-    router.add_api_route(f"/{_s}-predictions", _mk_pred(), methods=["GET"], include_in_schema=False)
+    router.add_api_route(f"/{_PRED_SLUG[_s]}", _mk_pred(), methods=["GET"], include_in_schema=False)
 
 for _s in _PROP_SPORTS:
     def _mk_prop(s=_s):
@@ -408,7 +463,7 @@ def _track():
 @router.get("/sitemap.xml", include_in_schema=False)
 def _sitemap():
     urls = [BASE + "/"]
-    urls += [f"{BASE}/{s}-predictions" for s in _SPORTS]
+    urls += [f"{BASE}/{_PRED_SLUG[s]}" for s in _SPORTS]
     urls += [f"{BASE}/{s}-player-props" for s in _PROP_SPORTS]
     urls += [BASE + "/model-track-record", BASE + "/portal"]
     body = (
