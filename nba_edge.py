@@ -381,13 +381,20 @@ def game_cards(sport, game_id, date):
         oname = g[opp].get("name") or oabbr
         own_adv = _adv_for(g[side].get("name") or tabbr)
         opp_adv = _adv_for(oname)
+        # Player projections need season averages. On opening week the CURRENT
+        # season has no games yet, and ESPN's "season" year convention is
+        # ambiguous (start vs end year), so walk back recent seasons until one
+        # actually returns players instead of guessing a single year.
         avgs = EP._team_athlete_avgs(sport, tid)
         if not avgs:
-            last = dt.date.today().year - (1 if dt.date.today().month >= 8 else 2)
-            try:
-                avgs = EP._team_athlete_avgs(sport, tid, season=last) or {}
-            except Exception:
-                avgs = {}
+            yr = dt.date.today().year
+            for _yr in (yr, yr - 1, yr - 2):
+                try:
+                    avgs = EP._team_athlete_avgs(sport, tid, season=_yr) or {}
+                except Exception:
+                    avgs = {}
+                if avgs:
+                    break
         try:
             roster = EP._team_roster_ids(sport, tid) or {}
         except Exception:
@@ -445,5 +452,40 @@ def register(app):
         if res is None:
             return JSONResponse({"error": "wnba edge unavailable", "cards": []})
         return res
+
+    @app.get("/api/nba/props-diag/{game_id}")
+    def nba_props_diag(game_id: str, date: str | None = None, sport: str = "nba"):
+        """What each player-data source yields for a game — so an empty Player
+        Edge can be diagnosed without guessing (season year, roster, etc.)."""
+        import espn_provider as EP
+        try:
+            d = dt.date.fromisoformat(date) if date else dt.date.today()
+        except Exception:
+            d = dt.date.today()
+        g = EP.get_game(sport, d, game_id)
+        out = {"sport": sport, "game_found": bool(g)}
+        if not g:
+            return JSONResponse(out)
+        yr = dt.date.today().year
+        for side in ("home", "away"):
+            tid = g[side].get("team_id")
+            ab = g[side].get("abbr") or side
+            try:
+                cur = len(EP._team_athlete_avgs(sport, tid) or {})
+            except Exception as e:
+                cur = f"err:{str(e)[:50]}"
+            seasons = {}
+            for y in (yr, yr - 1, yr - 2):
+                try:
+                    seasons[y] = len(EP._team_athlete_avgs(sport, tid, season=y) or {})
+                except Exception as e:
+                    seasons[y] = f"err:{str(e)[:40]}"
+            try:
+                rost = len(EP.team_roster_names(sport, tid) or {})
+            except Exception as e:
+                rost = f"err:{str(e)[:50]}"
+            out[ab] = {"team_id": tid, "current_season_players": cur,
+                       "players_by_season": seasons, "roster_size": rost}
+        return JSONResponse(out)
 
     print("[nba] edge endpoint registered")
