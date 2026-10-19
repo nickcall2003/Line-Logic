@@ -626,6 +626,35 @@ def register(app):
         return {"game_id": game_id, "home_team": home, "away_team": away,
                 "count": len(cards), "cards": cards}
 
+    _NFL_TEAM_ID = {
+        "ARI": 22, "ATL": 1, "BAL": 33, "BUF": 2, "CAR": 29, "CHI": 3, "CIN": 4,
+        "CLE": 5, "DAL": 6, "DEN": 7, "DET": 8, "GB": 9, "HOU": 34, "IND": 11,
+        "JAX": 30, "KC": 12, "LV": 13, "LAC": 24, "LAR": 14, "MIA": 15, "MIN": 16,
+        "NE": 17, "NO": 18, "NYG": 19, "NYJ": 20, "PHI": 21, "PIT": 23, "SF": 25,
+        "SEA": 26, "TB": 27, "TEN": 10, "WSH": 28, "WAS": 28,
+    }
+
+    @app.get("/api/nfl/roster-diag")
+    def nfl_roster_diag(team: str, player: str = ""):
+        """Dead-simple check: is `player` on `team`'s CURRENT ESPN roster, and what
+        does the frozen profile say? e.g. ?team=HOU&player=harrison"""
+        import espn_provider as _ep
+        from fastapi.responses import JSONResponse as _J
+        tid = _NFL_TEAM_ID.get((team or "").upper())
+        if not tid:
+            return _J({"error": f"unknown team '{team}'", "known": sorted(_NFL_TEAM_ID)})
+        names = _ep.team_roster_names("nfl", tid)
+        q = (player or "").lower()
+        hits = [v for k, v in names.items() if q and q in k]
+        data = load()
+        prof = [{"name": p.get("name"), "profile_team": p.get("team"), "pos": p.get("pos")}
+                for p in (data or {}).get("players", {}).values()
+                if q and q in _norm(p.get("name"))]
+        return _J({"team": team.upper(), "team_id": tid, "roster_count": len(names),
+                   "query": q, "on_current_roster": hits, "profile_says": prof,
+                   "sample_roster": list(names.values())[:8]},
+                  headers={"Cache-Control": "no-store"})
+
     @app.get("/api/nfl/trade-diag")
     def nfl_trade_diag(game_id: str, date: str | None = None,
                        home: str | None = None, away: str | None = None,
