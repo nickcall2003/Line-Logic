@@ -105,6 +105,71 @@ _POS = {
 _POS["FB"] = _POS["RB"]
 
 
+# ---- injury backup boost -----------------------------------------------------
+# When a starter is ruled OUT, his vacated per-game volume flows to the next man
+# up at that position, so the backup's projection climbs and he's flagged. The
+# fractions are how much of the starter's workload the DIRECT backup typically
+# absorbs (the rest bleeds to the committee / pass game).
+_INHERIT = {
+    "RB": {"carries_pg": 0.62, "rush_yards_pg": 0.62, "rush_tds_pg": 0.58,
+           "targets_pg": 0.45, "rec_pg": 0.45, "rec_yards_pg": 0.45, "ppr_pg": 0.52},
+    "WR": {"target_share": 0.33, "wopr": 0.30, "rec_yards_pg": 0.33,
+           "rec_pg": 0.33, "rec_tds_pg": 0.33, "targets_pg": 0.33},
+    "TE": {"target_share": 0.42, "wopr": 0.40, "rec_yards_pg": 0.42,
+           "rec_pg": 0.42, "rec_tds_pg": 0.42, "targets_pg": 0.42},
+    "QB": {"pass_yards_pg": 0.88, "pass_tds_pg": 0.82, "att_pg": 0.95, "cmp_pg": 0.88},
+}
+
+
+def _is_out(status):
+    s = (status or "").lower()
+    return any(k in s for k in ("out", "injured reserve", "season", " ir",
+                                "suspension", "doubtful"))
+
+
+def apply_injuries(by_team):
+    """Mutate {team:[player dicts]} for injuries: drop OUT starters from the prop
+    pool and boost the next player at that position by the vacated volume (tagged
+    boosted_by). No-op when the injury feed is unavailable."""
+    try:
+        import injuries
+        if not injuries.enabled("nfl"):
+            return by_team
+    except Exception:
+        return by_team
+    for team, players in list(by_team.items()):
+        info = injuries.for_team("nfl", abbr=str(team).upper(), name=team)
+        outs = [o for o in info.get("players", []) if _is_out(o.get("status"))]
+        if not outs:
+            continue
+        out_norm = {_norm(o.get("name")) for o in outs}
+        pool = [p for p in players if _norm(p.get("name")) not in out_norm]
+        for o in outs:
+            pos = (o.get("pos") or "").upper()
+            inh = _INHERIT.get(pos)
+            if not inh:
+                continue
+            starter = next((p for p in players
+                            if _norm(p.get("name")) == _norm(o.get("name"))), None)
+            same = [p for p in pool if (p.get("pos") or "").upper() == pos]
+            if not same:
+                continue
+            use = (lambda p: (p.get("targets_pg") or 0) if pos in ("WR", "TE")
+                   else (p.get("carries_pg") or 0) if pos in ("RB", "FB")
+                   else (p.get("att_pg") or 0))
+            backup = max(same, key=use)
+            bk = dict(backup)
+            for st, frac in inh.items():
+                vac = (starter.get(st) if starter else 0) or 0
+                if vac:
+                    bk[st] = round((bk.get(st) or 0) + vac * frac, 3)
+            bk["boosted_by"] = o.get("name")
+            bk["boosted_status"] = (o.get("status") or "OUT")
+            pool = [bk if p is backup else p for p in pool]
+        by_team[team] = pool
+    return by_team
+
+
 def load():
     p = _path()
     if not p:
@@ -475,6 +540,9 @@ def game_cards(home, away, players_by_team, defense):
             if pl.get("pos") in ("WR", "TE", "RB"):
                 c["coverage"] = coverage_matchup(pl, _tnorm(opp), pl.get("games"))
             c["descriptor"] = _descriptor(pl, c, c["tax"])
+            if pl.get("boosted_by"):
+                c["boosted_by"] = pl["boosted_by"]
+                c["boosted_status"] = pl.get("boosted_status") or "OUT"
             cards.append(c)
     cards.sort(key=lambda c: c.get("logic_score") or 0, reverse=True)
     for i, c in enumerate(cards, 1):
@@ -519,7 +587,9 @@ def register(app):
                   (pl.get("att_pg") or 0)
             if (pl.get("games") or 0) >= 2 and use >= MIN.get(pos, 1):
                 by_team[t].append(pl)
-        cards = game_cards(H, A, {H: by_team[H], A: by_team[A]}, data.get("defense", {}))
+        roster = {H: by_team[H], A: by_team[A]}
+        apply_injuries(roster)          # drop OUT starters, boost the next man up
+        cards = game_cards(H, A, roster, data.get("defense", {}))
         return {"game_id": game_id, "home_team": home, "away_team": away,
                 "count": len(cards), "cards": cards}
 

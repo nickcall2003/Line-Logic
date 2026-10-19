@@ -5749,6 +5749,7 @@ function peLogo(c,sport){
 function peTags(c){
   var out=[],seen={};
   function add(t,glow){var k=t.toLowerCase(); if(seen[k])return; seen[k]=1; out.push({t:t,glow:glow});}
+  if(c.boosted_by)add("↑ "+String(c.boosted_by).split(" ").slice(-1)[0]+" out",true);
   if(c.baseline>=85)add("Elite",true);
   if(c.radar){var skip={Matchup:1,Logic:1};
     Object.keys(c.radar).filter(function(k){return !skip[k];})
