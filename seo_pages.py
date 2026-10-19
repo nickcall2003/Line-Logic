@@ -108,6 +108,7 @@ def _nav():
         items.append(f'<a href="/{_PRED_SLUG[s]}">{_NAV_LABEL[s]} Predictions</a>')
     for s in _PROP_SPORTS:
         items.append(f'<a href="/{s}-player-props">{_NAV_LABEL[s]} Props</a>')
+    items.append('<a href="/weekly-recap">This Week</a>')
     items.append('<a href="/model-track-record">Track Record</a>')
     items.append('<a href="/how-it-works">How It Works</a>')
     return '<nav class="xnav">' + "".join(items) + "</nav>"
@@ -195,6 +196,7 @@ ul{{margin:0 0 16px;padding-left:20px;color:#D4D3CC}}li{{margin:6px 0}}
   <div class="links">
     {''.join(f'<a href="/{_PRED_SLUG[s]}">{l} predictions</a>' for s,l in _SPORTS.items())}
     {''.join(f'<a href="/{s}-player-props">{_SPORTS[s]} props</a>' for s in _PROP_SPORTS)}
+    <a href="/weekly-recap">This week</a>
     <a href="/model-track-record">Track record</a>
     <a href="/how-it-works">How it works</a>
     <a href="{DISCORD}" rel="nofollow">Discord</a>
@@ -501,6 +503,103 @@ real, complete number. No cherry-picking, because the whole point is that you ca
                   jsonld=jsonld, data_sport="", data_scope="overall")
 
 
+_RECAP_CSS = """<style>
+.wsum{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 24px}
+.wsum .b{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center}
+.wsum .n{font-family:"Archivo",sans-serif;font-size:30px;font-weight:900;letter-spacing:-.02em}
+.wsum .n.pos{color:var(--win)}.wsum .n.neg{color:var(--loss)}
+.wsum .k{font-family:"Space Mono",monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:6px}
+.day{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 12px}
+.dh{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.dh .dd{font-family:"Archivo",sans-serif;font-weight:800;font-size:15px}
+.dh .dr{font-family:"Space Mono",monospace;font-weight:700;font-size:13px;margin-left:auto}
+.dh .duu{font-family:"Space Mono",monospace;font-weight:700;font-size:13px}
+.dh .pos,.plist li.won .pi,.pu.pos{color:var(--win)}
+.dh .neg,.plist li.lost .pi,.pu.neg{color:var(--loss)}
+.plist{list-style:none;margin:0;padding:0}
+.plist li{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
+.plist li:first-child{border-top:0}
+.plist .pi{font-weight:800;width:15px;text-align:center;flex:none}
+.plist .pk{color:var(--ink)}
+.plist .pm{color:var(--muted);font-size:12px}
+.plist .pu{margin-left:auto;font-family:"Space Mono",monospace;font-weight:700;font-size:12px;flex:none}
+.rempty{color:var(--muted);font-family:"Space Mono",monospace;font-size:13px;padding:18px 0}
+</style>"""
+
+_RECAP_JS = """<script>
+(function(){
+  var box=document.getElementById('recap'); if(!box) return;
+  function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+  function fmtDay(iso){try{var p=iso.split('-');var dt=new Date(+p[0],+p[1]-1,+p[2]);return dt.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});}catch(e){return iso;}}
+  fetch('/api/results/recent?days=7').then(function(r){return r.json();}).then(function(d){
+    var days=(d&&d.days)||[], sum=(d&&d.summary)||{w:0,l:0};
+    var tu=0,hasU=false; days.forEach(function(dy){if(dy.units!=null){tu+=dy.units;hasU=true;}});
+    tu=Math.round(tu*100)/100;
+    var sw=sum.w||0, sl=sum.l||0;
+    var html='<div class="wsum">'+
+      '<div class="b"><div class="n '+(sw>sl?'pos':(sl>sw?'neg':''))+'">'+sw+'\\u2013'+sl+'</div><div class="k">Last 7 days</div></div>'+
+      '<div class="b"><div class="n '+(hasU?(tu>=0?'pos':'neg'):'')+'">'+(hasU?((tu>=0?'+':'')+tu+'u'):'\\u2014')+'</div><div class="k">Units (7d)</div></div>'+
+      '</div>';
+    if(!days.length){box.innerHTML=html+'<p class="rempty">No graded picks in the last week yet \\u2014 fresh results post here as this week\\u2019s games settle.</p>';return;}
+    days.forEach(function(dy){
+      var picks=(dy.picks||[]);
+      var items=picks.map(function(p){
+        var cls=p.won?'won':'lost', ic=p.won?'\\u2713':'\\u2717';
+        var u=(p.units!=null)?(' <span class="pu '+(p.units>=0?'pos':'neg')+'">'+(p.units>=0?'+':'')+p.units+'u</span>'):'';
+        var m=p.match?' <span class="pm">'+esc(p.match)+'</span>':'';
+        return '<li class="'+cls+'"><span class="pi">'+ic+'</span><span class="pk">'+esc(p.pick)+'</span>'+m+u+'</li>';
+      }).join('');
+      var du=(dy.units!=null)?((dy.units>=0?'+':'')+dy.units+'u'):'';
+      html+='<div class="day"><div class="dh"><span class="dd">'+fmtDay(dy.date)+'</span>'+
+        '<span class="dr '+(dy.w>dy.l?'pos':(dy.l>dy.w?'neg':''))+'">'+esc(dy.record)+'</span>'+
+        (du?'<span class="duu '+(dy.units>=0?'pos':'neg')+'">'+du+'</span>':'')+
+        '</div><ul class="plist">'+items+'</ul></div>';
+    });
+    box.innerHTML=html;
+  }).catch(function(){box.innerHTML='<p class="rempty">Couldn\\u2019t load results right now \\u2014 try again shortly.</p>';});
+})();
+</script>"""
+
+
+def _weekly_recap_page():
+    title = "This Week's Model Results — Record & Best Calls | Line Logic"
+    desc = ("Every graded pick from the last 7 days — daily record, units won and the "
+            "best calls, win or lose. Line Logic's honest weekly receipts, updated as "
+            "games settle.")
+    canon = f"{BASE}/weekly-recap"
+    h1 = "This Week in the Model"
+    qas = [
+        ("How did the model do this week?",
+         "This page lists every graded pick from the last seven days with the daily "
+         "record and units, and it updates automatically as games settle."),
+        ("Do you show the losses too?",
+         "Yes — winners and losers are both here. A recap that only showed winners "
+         "would be worthless, and honesty is the whole brand."),
+    ]
+    jsonld = _faq_jsonld(qas)
+    body = (
+        _RECAP_CSS +
+        '<p class="lede">The honest receipts from the last seven days — every graded pick, '
+        'the daily record and units won or lost. No hiding the misses.</p>'
+        '<div class="cta">'
+        '<a class="btn p" href="/">See today\u2019s board \u2192</a>'
+        '<a class="btn s" href="' + DISCORD + '" rel="nofollow">Get picks in Discord</a>'
+        '</div>'
+        '<div id="recap"><p class="rempty">Loading this week\u2019s results\u2026</p></div>'
+        '<section>'
+        '<h2>Want the full picture?</h2>'
+        '<p>This is just the last week. The complete, all-time record \u2014 units and ROI across '
+        'every sport \u2014 lives on the <a href="/model-track-record">track record</a> page, and '
+        'today\u2019s slate is always on the <a href="/">board</a>.</p>'
+        '<h2>Questions</h2><div class="faq">' +
+        ''.join(f'<div class="q">{q}</div><p>{a}</p>' for q, a in qas) +
+        '</div></section>' +
+        _RECAP_JS
+    )
+    return _shell(title=title, desc=desc, canonical=canon, h1=h1, body_html=body,
+                  jsonld=jsonld, data_sport="", data_scope="")
+
+
 # ---- routes -----------------------------------------------------------------
 _CACHE = {"Cache-Control": "public, max-age=300"}
 
@@ -534,12 +633,20 @@ def _how():
     return _html(_how_it_works_page())
 
 
+@router.get("/weekly-recap", include_in_schema=False)
+def _recap():
+    # Shorter cache: this is fresh-every-day content.
+    return HTMLResponse(content=_weekly_recap_page(),
+                        headers={"Cache-Control": "public, max-age=120"})
+
+
 @router.get("/sitemap.xml", include_in_schema=False)
 def _sitemap():
     urls = [BASE + "/"]
     urls += [f"{BASE}/{_PRED_SLUG[s]}" for s in _SPORTS]
     urls += [f"{BASE}/{s}-player-props" for s in _PROP_SPORTS]
-    urls += [BASE + "/model-track-record", BASE + "/how-it-works", BASE + "/portal"]
+    urls += [BASE + "/weekly-recap", BASE + "/model-track-record",
+             BASE + "/how-it-works", BASE + "/portal"]
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
