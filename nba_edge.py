@@ -507,6 +507,49 @@ def register(app):
                 rost = f"err:{str(e)[:50]}"
             out[ab] = {"team_id": tid, "current_season_players": cur,
                        "players_by_season": seasons, "roster_size": rost}
+        # Deep probe on the home team: which params make the athlete-statistics
+        # endpoint actually return athletes, and does the roster carry positions?
+        probe = {}
+        try:
+            tid = g["home"].get("team_id")
+            surl = EP._ATHLETE_STATS.get(sport)
+            variants = {
+                "base": {"region": "us"},
+                "s2025": {"region": "us", "season": "2025"},
+                "s2025_t2": {"region": "us", "season": "2025", "seasontype": "2"},
+                "s2024_t2": {"region": "us", "season": "2024", "seasontype": "2"},
+                "t2": {"region": "us", "seasontype": "2"},
+            }
+            for lab, p in variants.items():
+                try:
+                    data = EP._get(surl.format(team=tid), p) or {}
+                    aths = data.get("athletes") or []
+                    # also note if a sample athlete has 'categories' (what the
+                    # parser reads) so we can tell params-bug from parse-bug
+                    cat = bool(aths and (aths[0].get("categories")))
+                    probe[lab] = {"athletes": len(aths), "has_categories": cat,
+                                  "top_keys": list(data.keys())[:8]}
+                except Exception as e:
+                    probe[lab] = f"err:{str(e)[:50]}"
+            # roster athlete shape
+            rurl = EP._ROSTER_URL.get(sport)
+            rdata = EP._get(rurl.format(team=tid), {}) if rurl else {}
+            ra = rdata.get("athletes") or []
+            samp = None
+            if ra:
+                grp = ra[0]
+                items = (grp.get("items") if isinstance(grp, dict)
+                         and isinstance(grp.get("items"), list) else [grp])
+                if items:
+                    a0 = items[0] or {}
+                    samp = {"keys": list(a0.keys()),
+                            "name": a0.get("displayName"),
+                            "position": (a0.get("position") or {}).get("abbreviation"),
+                            "has_statistics": bool(a0.get("statistics"))}
+            probe["roster_sample"] = samp
+        except Exception as e:
+            probe["error"] = str(e)[:80]
+        out["probe"] = probe
         return JSONResponse(out)
 
     print("[nba] edge endpoint registered")
