@@ -109,6 +109,7 @@ def _nav():
     for s in _PROP_SPORTS:
         items.append(f'<a href="/{s}-player-props">{_NAV_LABEL[s]} Props</a>')
     items.append('<a href="/model-track-record">Track Record</a>')
+    items.append('<a href="/how-it-works">How It Works</a>')
     return '<nav class="xnav">' + "".join(items) + "</nav>"
 
 
@@ -195,6 +196,7 @@ ul{{margin:0 0 16px;padding-left:20px;color:#D4D3CC}}li{{margin:6px 0}}
     {''.join(f'<a href="/{_PRED_SLUG[s]}">{l} predictions</a>' for s,l in _SPORTS.items())}
     {''.join(f'<a href="/{s}-player-props">{_SPORTS[s]} props</a>' for s in _PROP_SPORTS)}
     <a href="/model-track-record">Track record</a>
+    <a href="/how-it-works">How it works</a>
     <a href="{DISCORD}" rel="nofollow">Discord</a>
   </div>
   <div>Line Logic publishes model projections and a public, graded record for
@@ -432,6 +434,73 @@ so we show it. The numbers above are pulled live from the tracker across every s
                   jsonld=jsonld, data_sport="", data_scope="overall")
 
 
+def _how_it_works_page():
+    title = "How Line Logic Works — The Model Explained | Line Logic"
+    desc = ("How Line Logic works: a betting model that prices every game, compares its "
+            "number to the market, factors in injuries and trades, and grades every pick "
+            "in public. No touts, no deleted losers — just the model vs. the market.")
+    canon = f"{BASE}/how-it-works"
+    h1 = "How Line Logic Works"
+    qas = [
+        ("Is Line Logic legit?",
+         "It's a model with a public, graded record — not a tout selling locks. Every "
+         "pick is logged at the line it was taken and graded win or lose, so you can "
+         "judge it by the receipts instead of taking anyone's word for it."),
+        ("Does Line Logic guarantee winners?",
+         "No, and anyone who guarantees winners is lying. No model wins every bet. The "
+         "goal is to find spots where the model's number beats the market's over a large "
+         "sample, and to be honest about the misses."),
+        ("What sports does it cover?",
+         "NFL, NBA, MLB, NHL, college football and soccer, plus tennis and the FBS "
+         "transfer-portal board — each with the same model-vs-market approach and a "
+         "shared, graded record."),
+        ("How much does it cost?",
+         "The board and the track record are open right now. Live alerts run in the "
+         "Discord. A paid monthly tier is on the way — the public record is how you'll "
+         "decide if it's worth it."),
+    ]
+    jsonld = _faq_jsonld(qas)
+    body = f"""<p class="lede">No locks, no screenshots of mystery winners, no deleted losers. Line
+Logic is a model that prices every game, compares its number to the market, and grades every pick
+in public. Here's exactly how it works.</p>
+<div class="cta">
+  <a class="btn p" href="/">See today's board →</a>
+  <a class="btn s" href="{DISCORD}" rel="nofollow">Join the Discord</a>
+</div>
+{_rec_box("All-time")}
+<section>
+<h2>1. The model prices every game</h2>
+<p>Before looking at the odds, the model rates every team and projects each game — a fair spread,
+total and win probability — from team ratings, the matchup, rest and situation. That projection is
+the model's honest opinion of the game, un-anchored to what the book is offering.</p>
+<h2>2. It compares that price to the market</h2>
+<p>Then it lines the projection up against the live sportsbook number. When the model and the market
+disagree, that gap is the edge — and it's shown right on every game card, so you're never guessing
+why a pick is a pick.</p>
+<h2>3. Injuries and trades change the number</h2>
+<p>A ruled-out starter re-runs the matchup and can flip the side or the margin — and boosts the
+backups who inherit the role in the player props. In-season trades move players to their new team
+before lines are set, so the model is never reading a stale roster.</p>
+<h2>4. Confidence becomes a wager</h2>
+<p>Every pick carries a stake by how strongly the model likes it — 1u (low), 2u (medium) or 3u
+(high). That's how you size it, and it's how the units and ROI on the record are calculated.</p>
+<h2>5. Every pick is graded in public</h2>
+<p>This is the part most services skip. Each pick is logged at the line it was taken and graded once
+the game settles — win or lose. The <a href="/model-track-record">track record</a> you see is the
+real, complete number. No cherry-picking, because the whole point is that you can check.</p>
+<h2>Questions</h2>
+<div class="faq">
+  {''.join(f'<div class="q">{q}</div><p>{a}</p>' for q,a in qas)}
+</div>
+<div class="cta" style="margin-top:22px">
+  <a class="btn p" href="/">See today's board →</a>
+  <a class="btn s" href="/model-track-record">See the record</a>
+</div>
+</section>"""
+    return _shell(title=title, desc=desc, canonical=canon, h1=h1, body_html=body,
+                  jsonld=jsonld, data_sport="", data_scope="overall")
+
+
 # ---- routes -----------------------------------------------------------------
 _CACHE = {"Cache-Control": "public, max-age=300"}
 
@@ -460,12 +529,17 @@ def _track():
     return _html(_track_record_page())
 
 
+@router.get("/how-it-works", include_in_schema=False)
+def _how():
+    return _html(_how_it_works_page())
+
+
 @router.get("/sitemap.xml", include_in_schema=False)
 def _sitemap():
     urls = [BASE + "/"]
     urls += [f"{BASE}/{_PRED_SLUG[s]}" for s in _SPORTS]
     urls += [f"{BASE}/{s}-player-props" for s in _PROP_SPORTS]
-    urls += [BASE + "/model-track-record", BASE + "/portal"]
+    urls += [BASE + "/model-track-record", BASE + "/how-it-works", BASE + "/portal"]
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
