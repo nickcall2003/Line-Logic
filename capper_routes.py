@@ -469,21 +469,44 @@ def sweep_closes():
     return updated
 
 
+# ── Confidence-tiered default stake ──────────────────────────────────────────
+# When a pick is tracked WITHOUT an explicit stake, size it by the model's
+# confidence in the play: 1u low / 2u medium / 3u high. Moneylines tier off the
+# user's side win probability (so fading a strong model pick is correctly small);
+# spreads/totals tier off the game's model confidence grade. An explicit
+# stake_units from the bot always overrides this.
+_CONF_UNITS = {"high": 3.0, "medium": 2.0, "low": 1.0}
+
+
+def _tier_units(prob=None, conf=None):
+    if prob is not None:
+        try:
+            p = float(prob)
+            return 3.0 if p >= 0.68 else (2.0 if p >= 0.58 else 1.0)
+        except (TypeError, ValueError):
+            pass
+    return _CONF_UNITS.get(str(conf or "").strip().lower(), 1.0)
+
+
 @router.post("/api/capper/track")
 async def capper_track(payload: dict):
     """Store a tracked pick. Bot posts: {user_id, username, team, sport?, stake_units?}
-    The line is captured from the model board via model_lookup."""
+    The line is captured from the model board via model_lookup. When no stake is
+    sent, the stake defaults to the confidence tier (1u/2u/3u) for that play."""
     from models import CapperPick
     _ensure_capper_table()
     user_id = str(payload.get("user_id") or "").strip()
     username = str(payload.get("username") or "").strip()[:64]
     team = str(payload.get("team") or "").strip()
-    stake = payload.get("stake_units")
-    try:
-        stake = float(stake) if stake is not None else 1.0
-    except (TypeError, ValueError):
-        stake = 1.0
-    stake = max(0.1, min(stake, 100.0))
+    # Explicit stake (if the bot sent one) overrides tiered sizing; otherwise each
+    # pick path sizes the stake from the play's confidence below.
+    _raw_stake = payload.get("stake_units")
+    explicit_stake = None
+    if _raw_stake is not None:
+        try:
+            explicit_stake = max(0.1, min(float(_raw_stake), 100.0))
+        except (TypeError, ValueError):
+            explicit_stake = None
     if not user_id or not team:
         return {"ok": False, "error": "missing user or team"}
 
@@ -519,6 +542,7 @@ async def capper_track(payload: dict):
                                 f"total yet — try again closer to game time.")}
         odds_int = int(round(float(price))) if price is not None else None
         pick_str = f"{ou_side.capitalize()} {line:g}"
+        stake = explicit_stake if explicit_stake is not None else _tier_units(conf=look.get("confidence"))
         row = CapperPick(
             discord_user_id=user_id, discord_username=username,
             sport=look.get("sport"), ref=look.get("ref"),
@@ -585,6 +609,7 @@ async def capper_track(payload: dict):
                                 f"spread yet — try again closer to game time.")}
         odds_int = int(round(float(price))) if price is not None else None
         pick_str = f"{side} {line:+g}"
+        stake = explicit_stake if explicit_stake is not None else _tier_units(conf=look.get("confidence"))
         row = CapperPick(
             discord_user_id=user_id, discord_username=username,
             sport=look.get("sport"), ref=look.get("ref"),
@@ -677,6 +702,10 @@ async def capper_track(payload: dict):
         else:
             odds = None
 
+    # Size the stake by confidence: use the user's side win probability (already
+    # inverted above if they faded the model), falling back to the game's grade.
+    stake = (explicit_stake if explicit_stake is not None
+             else _tier_units(prob=prob, conf=look.get("confidence")))
     row = CapperPick(
         discord_user_id=user_id, discord_username=username,
         sport=look.get("sport"), ref=look.get("ref"),

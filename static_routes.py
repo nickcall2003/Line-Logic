@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v46";   // bumped: restored /portal transfer-portal board
+const CACHE = "ll-shell-v48";   // bumped: wager chips + injuries move win% & margin
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));

@@ -197,22 +197,48 @@ def adjust_prob(prob_home, net_elo):
     return round(1.0 / (1.0 + 10 ** (-((e + net_elo) / 400.0))), 4)
 
 
-def game_adjust(sport, game):
-    """Adjust a built game dict in place: read home/away identifiers, shift
-    prob_home by the net injury Elo, and attach a game['injuries'] panel.
-    Safe no-op when the sport is unsupported or nobody's hurt."""
-    if not enabled(sport) or not isinstance(game, dict):
-        return game
-    h = game.get("home") or {}
-    a = game.get("away") or {}
+# Convert a net injury Elo edge into a point swing on the projected margin, so a
+# ruled-out star moves BOTH the win% and the "favored by X" number (and they stay
+# consistent). Roughly one score per QB-out in football.
+_MARGIN_PER_ELO = {
+    "nfl": 0.045, "ncaaf": 0.045, "nba": 0.035, "ncaab": 0.035,
+    "wncaab": 0.035, "wnba": 0.035, "nhl": 0.013, "mlb": 0.012,
+}
+
+
+def apply_pred(sport, pred, home, away):
+    """Shift pred['prob_home'] AND pred['exp_margin'] by the net injury Elo, and
+    attach pred['injuries'] (with the net point swing). Matches teams by id, then
+    name, then abbreviation. In place. No-op when unsupported or nobody's hurt.
+
+    This is the single source of truth for injury line moves — both the ESPN team
+    builder and game_adjust() below call it."""
+    if not enabled(sport) or not isinstance(pred, dict):
+        return pred
+    h = home or {}
+    a = away or {}
     ih = for_team(sport, h.get("team_id"), h.get("name"), h.get("abbr"))
     ia = for_team(sport, a.get("team_id"), a.get("name"), a.get("abbr"))
-    net = (ia.get("penalty", 0.0) - ih.get("penalty", 0.0))
-    if net and game.get("prob_home") is not None:
-        game["prob_home"] = adjust_prob(game["prob_home"], net)
-        game["injuries"] = {"home": ih.get("players", []), "away": ia.get("players", []),
-                            "home_pts": ih.get("penalty", 0.0), "away_pts": ia.get("penalty", 0.0)}
-    return game
+    net = (ia.get("penalty", 0.0) - ih.get("penalty", 0.0))   # + favors home
+    if net and pred.get("prob_home") is not None:
+        pred["prob_home"] = adjust_prob(pred["prob_home"], net)
+        mpe = _MARGIN_PER_ELO.get(sport)
+        if mpe and pred.get("exp_margin") is not None:
+            pred["exp_margin"] = round(pred["exp_margin"] + net * mpe, 1)
+        pred["injuries"] = {
+            "home": ih.get("players", []), "away": ia.get("players", []),
+            "home_pts": ih.get("penalty", 0.0), "away_pts": ia.get("penalty", 0.0),
+            "net_pts": round(net, 1),
+        }
+    return pred
+
+
+def game_adjust(sport, game):
+    """Adjust a built game dict in place (home/away nested, prob_home/exp_margin at
+    the top). Safe no-op when unsupported or nobody's hurt."""
+    if not isinstance(game, dict):
+        return game
+    return apply_pred(sport, game, game.get("home") or {}, game.get("away") or {})
 
 
 def reload(sport=None):

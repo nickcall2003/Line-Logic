@@ -17,6 +17,50 @@ from mock import MockTennisProvider, demo_schedule
 from weather import get_match_weather
 import datetime as _dt
 
+# Bracket placeholders a feed can post before a draw is set ("TBD", a qualifier
+# slot, a bye, "Winner of ..."). These must NEVER become board matches — they key
+# to nothing, so they render as TBD-vs-TBD cards at 50% with no market. We reject
+# them on the way in AND purge any that were stored before this guard existed.
+_PH_EXACT = {"tbd", "to be determined", "qualifier", "bye", "q", "wc", "ll",
+             "pr", "walkover", "w/o", "n/a", "unknown"}
+_PH_PREFIX = ("winner of", "loser of", "qualifier ", "bye ")
+
+
+def _is_placeholder_player(name) -> bool:
+    s = str(name or "").strip().lower()
+    if not s:
+        return True
+    if s in _PH_EXACT:
+        return True
+    return any(s.startswith(p) for p in _PH_PREFIX)
+
+
+def _purge_placeholder_matches(day_date) -> int:
+    """Delete any stored TBD/qualifier/bye matches (and their child rows) for a
+    day, so a stale pre-draw slot can't keep showing after the draw is known."""
+    from models import LiveState, StatSnapshot
+    start = _dt.datetime.combine(day_date, _dt.time.min)
+    end = _dt.datetime.combine(day_date, _dt.time.max)
+    removed = 0
+    try:
+        with SessionLocal() as db:
+            rows = (db.query(Match)
+                      .filter(Match.scheduled >= start, Match.scheduled <= end).all())
+            bad_ids = [m.id for m in rows
+                       if _is_placeholder_player(m.player_a)
+                       or _is_placeholder_player(m.player_b)]
+            if bad_ids:
+                for mdl in (Prediction, LiveState, StatSnapshot, MatchAnalysis):
+                    db.query(mdl).filter(mdl.match_id.in_(bad_ids)).delete(
+                        synchronize_session=False)
+                db.query(Match).filter(Match.id.in_(bad_ids)).delete(
+                    synchronize_session=False)
+                db.commit()
+                removed = len(bad_ids)
+    except Exception as e:
+        print(f"[build] placeholder purge failed: {e}")
+    return removed
+
 # Optional: plug your LLM here to get natural-language writeups instead of the
 # deterministic template. Leave as None to use the template (no API key needed).
 #
@@ -133,6 +177,10 @@ def build_day(provider, engine: PredictionEngine, day) -> int:
     init_db()
     schedule = provider.get_schedule(day)
     added = 0
+    # Self-heal: remove any TBD/qualifier/bye rows already stored for this day
+    # before (re)building, so the board drops stale placeholder cards.
+    _day_date0 = day.date() if isinstance(day, _dt.datetime) else day
+    _purge_placeholder_matches(_day_date0)
     with SessionLocal() as db:
         # Pre-load which provider ids already exist, in one query, so we don't
         # re-run live scoring/weather for matches we already have.
@@ -147,6 +195,8 @@ def build_day(provider, engine: PredictionEngine, day) -> int:
                 return _dt.datetime.combine(day_date, scheduled.time())
             return scheduled
         for info in schedule:
+            if _is_placeholder_player(info.player_a) or _is_placeholder_player(info.player_b):
+                continue  # never store a TBD / qualifier / bye slot
             if info.provider_match_id in existing:
                 # already stored — but fix a mis-dated row in place (no live calls)
                 try:

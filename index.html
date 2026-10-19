@@ -489,6 +489,14 @@ font-family:var(--body);color:var(--fg)}
 .gai-edge{font-family:var(--mono);font-size:8.5px;margin-top:3px;font-weight:700}
 .gai-edge.pos{color:var(--good)}
 .gai-edge.neg{color:var(--bad)}
+.wchip{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-weight:800;
+  font-size:10.5px;line-height:1;padding:3px 7px;border-radius:999px;letter-spacing:.02em;
+  border:1px solid transparent;white-space:nowrap;vertical-align:middle}
+.wchip:before{content:"\1F4B0";font-size:9px;filter:grayscale(.1)}
+.wchip.w-high{color:#0e1510;background:linear-gradient(180deg,#8fe0a8,#5fc07f);border-color:#4ba169}
+.wchip.w-medium{color:#15120a;background:linear-gradient(180deg,#e7cf8f,#c6a15b);border-color:#a9823f}
+.wchip.w-low{color:#cfcabf;background:#201f22;border-color:#34333a}
+.pick-top .wchip,.card-top .wchip{margin-left:2px}
 .gai-row{margin-top:8px}
 .gai-proj{font-family:var(--mono);font-size:10px;color:var(--muted)}
 .gai-proj b{color:#f3ead4;font-size:12px}
@@ -839,7 +847,7 @@ function matchCardHTML(m){const sc=m.score||{},fin=m.status==="finished",live=m.
   const lc=(p.confidence==="low")?'<span class="lowconf">low-confidence</span>':"";const rnd=m.round?" \u00b7 "+m.round:"";
   function nm(nme,pk,sv,wn){return '<span class="pname'+(sv?' serving':'')+(wn?' winner':'')+'">'+nme+(pk?'<span class="pick">PICK</span>':'')+'</span>';}
   const tb=tierBadge(m.tier,m.tournament);
-  return '<div class="card-top"><span class="tier '+tb.cls+'">'+tb.label+'</span><span class="tourn">'+m.tournament+rnd+'</span>'+(m.weather?'<span class="wx-chip" title="'+m.weather+'">'+wxIcon(m.weather)+'</span>':"")+lc+'<span class="status">'+st+'</span></div>'+
+  return '<div class="card-top"><span class="tier '+tb.cls+'">'+tb.label+'</span><span class="tourn">'+m.tournament+rnd+'</span>'+(m.weather?'<span class="wx-chip" title="'+m.weather+'">'+wxIcon(m.weather)+'</span>':"")+lc+wagerChipC(p.confidence)+'<span class="status">'+st+'</span></div>'+
     '<div class="row">'+nm(m.player_a,pickA,servA,wonA)+'<span class="sets">'+(sc.sets_a||[]).join(" ")+'</span><span class="game">'+(live?sc.game_a:"")+'</span></div>'+
     '<div class="row">'+nm(m.player_b,pickB,servB,wonB)+'<span class="sets">'+(sc.sets_b||[]).join(" ")+'</span><span class="game">'+(live?sc.game_b:"")+'</span></div>'+
     edgeLineHTML({prob_home:pa,odds:m.odds||null},pa)+
@@ -950,7 +958,7 @@ function renderDetail(m){const sc=m.score||{},live=m.status==="live",fin=m.statu
     const paras=(m.analysis||"").split("\n\n").filter(Boolean).map(p=>'<p style="margin:0 0 12px">'+p+'</p>').join("");
     body='<div class="panel"><div id="tdeep-mount" class="tdeep tpv">'+tdeepSkeleton()+'</div>'
        +(paras?('<div class="analysis" style="margin-top:16px">'+paras+'</div>'):'')
-       +'<div class="meta-line" style="margin-top:10px"><b>Model confidence:</b> '+confLabel+'</div></div>';
+       +'<div class="meta-line" style="margin-top:10px"><b>Model confidence:</b> '+confLabel+' &nbsp;'+wagerChipC(conf)+' <span style="color:var(--muted);font-size:12px">recommended stake</span></div></div>';
   }else if(detailTab==="surface"){body='<div class="panel">'+surfaceHTML(m)+'</div>';
   }else{body='<div class="panel">'+statsHTML(m)+'</div>';}
   document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to matches</button>'+hero+(live?'<div id="twp-host" class="twp-host" style="margin:0 0 14px"></div>':"")+tabs+body;
@@ -1026,6 +1034,18 @@ function surfaceHTML(m){
 }
 const TEAM_SPORTS=["mlb","nba","nfl","ncaabb","nhl"];
 const SPORT_LABEL={tennis:"Tennis",mlb:"MLB",nba:"NBA",nfl:"NFL",ncaabb:"NCAA Baseball",nhl:"NHL",soccer:"Soccer",ufc:"UFC",golf:"Golf"};
+// ── Confidence-tiered recommended wager (1u low / 2u medium / 3u high) ──
+const WAGER_UNITS={high:3,medium:2,low:1};
+function wagerTierC(conf,edge){
+  conf=(""+(conf||"")).toLowerCase();
+  if(conf==="high"||conf==="medium"||conf==="low")return conf;
+  if(edge!=null&&edge!==""){edge=+edge;if(!isNaN(edge))return edge>=5?"high":(edge>=2.5?"medium":"low");}
+  return "medium";
+}
+function wagerUnitsC(conf,edge){return WAGER_UNITS[wagerTierC(conf,edge)];}
+function wagerChipC(conf,edge){var t=wagerTierC(conf,edge),u=WAGER_UNITS[t];
+  var uu=(u%1===0)?(""+u):u.toFixed(1);
+  return '<span class="wchip w-'+t+'" title="'+t+'-confidence recommended stake">'+uu+'u</span>';}
 let SPORTS_META=[
   {key:"tennis",emoji:"\u{1f3be}",label:"Tennis",blurb:"ATP \u00b7 WTA \u00b7 Challenger",color:"#4f9d6a",team:false},
   {key:"mlb",emoji:"\u26be",label:"MLB",blurb:"Run lines \u00b7 props",color:"#3f7fc4",team:true},
@@ -1581,8 +1601,8 @@ function teamCardHTML(g){const fin=g.status==="finished",live=g.status==="live";
   else if(g.exp_margin!=null){const fav=g.prob_home>=0.5?g.home.abbr:g.away.abbr;proj='<div class="proj-line">proj margin <span class="pr"><b>'+fav+" -"+Math.abs(g.exp_margin)+'</b></span></div>';}
   // model price always; market + edge + book count when a line exists
   const edgeLine=edgeLineHTML(g,g.prob_home);
-  return '<div class="card-top"><span class="tier" style="background:'+(TIER_COLOR[sport]||"#3f7fc4")+'">'+SPORT_LABEL[sport]+'</span><span class="tourn">'+(g.venue||"")+'</span>'+lc+'<span class="status">'+mark+'</span></div>'+
-    '<div class="mlb-card">'+teamColHTML(g.away,winAway)+mid+teamColHTML(g.home,winHome)+'</div>'+proj+edgeLine+whyChipsHTML(g)+
+  return '<div class="card-top"><span class="tier" style="background:'+(TIER_COLOR[sport]||"#3f7fc4")+'">'+SPORT_LABEL[sport]+'</span><span class="tourn">'+(g.venue||"")+'</span>'+lc+wagerChipC(g.confidence,g.edge_pct)+'<span class="status">'+mark+'</span></div>'+
+    '<div class="mlb-card">'+teamColHTML(g.away,winAway)+mid+teamColHTML(g.home,winHome)+'</div>'+proj+edgeLine+whyChipsHTML(g)+injuryNoteHTML(g)+
     '<div style="margin-top:11px">'+predBarHTML(g.away.abbr,pa,g.home.abbr,ph,g.status)+'</div>'+
     shareRowHTML(gameCardUrl(g,sport),gameShareText(g,sport));}
 function renderTabsTeam(){const liveCount=teamGames.filter(g=>g.status==="live").length;const el=document.getElementById("tabs");el.innerHTML="";
@@ -1779,7 +1799,7 @@ function injuriesHTML(){
   const i=mlbInjuries;
   return '<div class="panel"><div class="stat-sec">Injury report</div>'+
     injSide(i.away_team,i.away)+injSide(i.home_team,i.home)+
-    '<div class="note">Players on an injured list or otherwise inactive, from team roster status. The win model doesn\u2019t auto-adjust for injuries yet \u2014 use this as context alongside the prediction. Not betting advice.</div></div>';}
+    '<div class="note">Players on an injured list or otherwise inactive, from team roster status. The win model now factors these in \u2014 a ruled-out star shifts the projected win% and margin. Not betting advice.</div></div>';}
 function bvpLine(line){if(!line)return '<span class="bvp-none">no history</span>';
   const avg=line.avg||(line.ab?("."+String(Math.round(1000*line.h/line.ab)).padStart(3,"0")):"\u2014");
   return '<span class="bvp-stat"><b>'+line.h+'-for-'+line.ab+'</b> '+avg+' &middot; '+line.hr+' HR &middot; '+line.rbi+' RBI'+
@@ -4896,6 +4916,7 @@ function pickCardHTML(p,isFree){const pct=Math.round(p.prob*100);const slabel=(S
   return '<div class="pick-card'+(p.result?" settled-"+p.result:"")+'" data-sport="'+p.sport+'" data-id="'+p.id+'"'+(p.league?' data-league="'+p.league+'"':"")+'>'+
     '<div class="pick-top"><span class="pick-sport '+p.sport+'">'+slabel+'</span>'+
     '<span class="pick-conf '+p.confidence+'">'+p.confidence+'</span>'+
+    wagerChipC(p.confidence,p.edge_pct)+
     resultBadge+
     '<span class="pick-prob">'+pct+'%</span></div>'+
     '<div class="pick-name">'+p.pick+'</div>'+

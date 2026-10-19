@@ -136,6 +136,17 @@ def _ln(name) -> str:
     return s.split()[-1] if s else ""
 
 
+_PH_EXACT = {"tbd", "to be determined", "qualifier", "bye", "q", "wc", "ll",
+             "pr", "walkover", "w/o", "n/a", "unknown", ""}
+
+
+def _is_ph(name) -> bool:
+    """A bracket placeholder (TBD / qualifier / bye / 'Winner of ...'), not a real
+    player — these must never become board matches."""
+    s = str(name or "").strip().lower()
+    return (s in _PH_EXACT) or s.startswith("winner of") or s.startswith("loser of")
+
+
 def _comp_name(c) -> str:
     """Display name of a scoreboard competitor (singles athlete)."""
     if not isinstance(c, dict):
@@ -222,7 +233,7 @@ class ESPNTennisProvider(TennisProvider):
             if local.date() != d:
                 continue
             a, b = e.get("home"), e.get("away")
-            if not a or not b:
+            if not a or not b or _is_ph(a) or _is_ph(b):
                 continue
             tier = e.get("tour") or "ATP"
             title = e.get("title") or "Tennis"
@@ -249,7 +260,7 @@ class ESPNTennisProvider(TennisProvider):
                     continue
                 na = _name(a.get("athlete") or {})
                 nb = _name(b.get("athlete") or {})
-                if not na or not nb:
+                if not na or not nb or _is_ph(na) or _is_ph(nb):
                     continue
                 cid = str(comp.get("id") or "")
                 if not cid:

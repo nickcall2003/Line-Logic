@@ -830,6 +830,14 @@ def get_tennis_events():
             a, b = g.get("home_team"), g.get("away_team")
             if not a or not b:
                 continue
+            # Skip bracket placeholders ("TBD", qualifier/bye slots) the book posts
+            # before a draw is set — they'd render as TBD-vs-TBD cards.
+            _na, _nb = str(a).strip().lower(), str(b).strip().lower()
+            _ph = {"tbd", "to be determined", "qualifier", "bye", "q", "walkover",
+                   "w/o", "n/a", "unknown"}
+            if (_na in _ph or _nb in _ph or _na.startswith("winner of")
+                    or _nb.startswith("winner of")):
+                continue
             pas, pbs = [], []
             for bk in g.get("bookmakers", []):
                 for mk in bk.get("markets", []):

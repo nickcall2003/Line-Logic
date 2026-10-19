@@ -336,22 +336,13 @@ def get_games(sport: str, date: dt.date, force_live=False):
                     pred = _epa
             except Exception:
                 pass
-        # --- injuries: weight each OUT/limited player by value, sum per team,
-        # and nudge the final probability (applies on top of whichever model won)
+        # --- injuries: weight each OUT/limited player by value, sum per team, and
+        # move BOTH the win% and the projected margin (applies on top of whichever
+        # model won). Centralized in injuries.apply_pred so every sport behaves the
+        # same and matches teams by id/name/abbr.
         try:
             import injuries as _inj
-            if _inj.enabled(sport):
-                ih = _inj.for_team(sport, h.get("team_id"))
-                ia = _inj.for_team(sport, a.get("team_id"))
-                net = (ia.get("penalty", 0.0) - ih.get("penalty", 0.0))  # + favors home
-                if net and pred.get("prob_home") is not None:
-                    import math as _m
-                    p = min(0.999, max(0.001, pred["prob_home"]))
-                    e = -400.0 * _m.log10(1.0 / p - 1.0)
-                    pred["prob_home"] = round(1.0 / (1.0 + 10 ** (-((e + net) / 400.0))), 4)
-                    pred["injuries"] = {"home": ih.get("players", []), "away": ia.get("players", []),
-                                        "home_pts": ih.get("penalty", 0.0),
-                                        "away_pts": ia.get("penalty", 0.0)}
+            _inj.apply_pred(sport, pred, h, a)
         except Exception:
             pass
         # --- rest / schedule spot: nudge toward the more-rested team
