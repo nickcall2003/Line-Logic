@@ -22,6 +22,11 @@ import time
 
 _ENABLED = os.environ.get("HOOPS_ADV", "1").strip().lower() not in ("0", "false", "no")
 _TTL = 6 * 3600
+# Negative cache: when stats.nba.com is blocked/slow (common from datacenter IPs
+# like Railway), remember the FAILURE for a short while so we don't re-eat the
+# timeout on every single request. Without this, each NBA props load re-hit the
+# blocked host twice (~12s) and the Player Edge panel looked like it hung.
+_NEG_TTL = 600
 _cache = {}
 _health = {"ok": None, "checked": 0, "error": None}
 
@@ -134,13 +139,13 @@ def defense_vs_position(sport, team_name, position):
     return row.get(bucket) or row.get(pos)
 
 
-def _get(sport, endpoint, params, timeout=6.0):
+def _get(sport, endpoint, params, timeout=4.0):
     """Fetch a stats.nba.com endpoint -> list[dict], or None on ANY failure."""
     if not _ENABLED or sport not in _HOST:
         return None
     key = (sport, endpoint, tuple(sorted(params.items())))
     c = _cache.get(key)
-    if c and time.time() - c[0] < _TTL:
+    if c and time.time() - c[0] < (_TTL if c[1] is not None else _NEG_TTL):
         return c[1]
     try:
         import httpx
@@ -149,6 +154,7 @@ def _get(sport, endpoint, params, timeout=6.0):
         if r.status_code != 200:
             _health.update({"ok": False, "checked": time.time(),
                             "error": f"HTTP {r.status_code}"})
+            _cache[key] = (time.time(), None)   # negative-cache the block
             return None
         data = r.json()
         rs = (data.get("resultSets") or data.get("resultSet") or [])
@@ -164,6 +170,7 @@ def _get(sport, endpoint, params, timeout=6.0):
         return out
     except Exception as e:
         _health.update({"ok": False, "checked": time.time(), "error": str(e)[:120]})
+        _cache[key] = (time.time(), None)       # negative-cache the timeout/error
         return None
 
 

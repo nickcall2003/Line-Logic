@@ -4853,8 +4853,9 @@ function edgeLineHTML(g,homeWP){
     parts+='<span class="el-lab">Market</span><span class="el-v">'+fmtOdds(mkt)+'</span>'+
       (nb?'<span class="el-books">'+nb+(nb===1?" book":" books")+'</span>':"")+
       '<span class="el-edge '+ec+'">'+(edge>=0?"+":"")+edge+'% edge</span>';
-    const k=kellyUnits(modelProb,mkt);
-    if(k)parts+='<span class="el-kelly" title="Suggested stake at quarter-Kelly (1u = 1% bankroll)">'+k+'u</span>';
+    // Single source of truth for the wager is the confidence chip (1u/2u/3u) in
+    // the card header. The old quarter-Kelly chip here showed a DIFFERENT number
+    // (e.g. 4.0u next to a 3u header), which read as a contradiction — removed.
   }else{
     parts+='<span class="el-none">Awaiting market</span>';
   }
