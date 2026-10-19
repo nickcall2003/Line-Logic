@@ -453,17 +453,29 @@ def register(app):
             return JSONResponse({"error": "wnba edge unavailable", "cards": []})
         return res
 
+    @app.get("/api/nba/props-diag")
     @app.get("/api/nba/props-diag/{game_id}")
-    def nba_props_diag(game_id: str, date: str | None = None, sport: str = "nba"):
+    def nba_props_diag(game_id: str | None = None, date: str | None = None, sport: str = "nba"):
         """What each player-data source yields for a game — so an empty Player
-        Edge can be diagnosed without guessing (season year, roster, etc.)."""
+        Edge can be diagnosed without guessing (season year, roster, etc.).
+        With no game_id, auto-picks today's first NBA game."""
         import espn_provider as EP
         try:
             d = dt.date.fromisoformat(date) if date else dt.date.today()
         except Exception:
             d = dt.date.today()
-        g = EP.get_game(sport, d, game_id)
-        out = {"sport": sport, "game_found": bool(g)}
+        slate = []
+        try:
+            for gm in (EP.get_games(sport, d) or []):
+                slate.append({"id": gm.get("id"),
+                              "matchup": f"{(gm.get('away') or {}).get('abbr','?')}@{(gm.get('home') or {}).get('abbr','?')}"})
+        except Exception as e:
+            slate = [{"error": str(e)[:80]}]
+        if not game_id and slate and slate[0].get("id"):
+            game_id = str(slate[0]["id"])
+        g = EP.get_game(sport, d, game_id) if game_id else None
+        out = {"sport": sport, "date": str(d), "game_id": game_id,
+               "todays_games": slate, "game_found": bool(g)}
         if not g:
             return JSONResponse(out)
         yr = dt.date.today().year
