@@ -529,6 +529,22 @@ def register(app):
         season = data.get("season")
         players, goalies, defense = data.get("players", {}), data.get("goalies", {}), data.get("defense", {})
         ranks = _nhl_ranks(defense, goalies)
+        # trade remap prep: resolve each game team's id + a name index of all
+        # profiled skaters, so a player now on a team's CURRENT roster but tagged
+        # elsewhere in the profile (a trade) shows under his new team. Best-effort.
+        _tid_by, _idx = {}, {}
+        try:
+            import espn_provider as _ep
+            _d = dt.date.fromisoformat(date) if date else None
+            _g = _ep.get_game("nhl", _d, game_id) if _d else None
+            if _g:
+                for _s, _tn in (("home", H), ("away", A)):
+                    _ti = (_g.get(_s) or {}).get("team_id")
+                    if _ti:
+                        _tid_by[_tn] = _ti
+                _idx = {_norm(pl.get("name")): pl for pl in players.values()}
+        except Exception:
+            pass
         cards = []
         for team, opp in ((H, A), (A, H)):
             opp_def = defense.get(opp) or {}
@@ -536,6 +552,22 @@ def register(app):
             roster = [pl for pl in players.values()
                       if _tnorm(pl.get("team")) == team
                       and (pl.get("gp") or 0) >= 3 and (pl.get("shots_pg") or 0) >= 1.0]
+            try:
+                _tid = _tid_by.get(team)
+                if _tid and _idx:
+                    import espn_provider as _ep
+                    _have = {_norm(p.get("name")) for p in roster}
+                    for _nm in _ep._team_roster_ids("nhl", _tid):
+                        _k = _norm(_nm)
+                        _pl = _idx.get(_k)
+                        if _pl and _k not in _have and _tnorm(_pl.get("team")) != team:
+                            _mv = dict(_pl)
+                            _mv["team"] = home if team == H else away
+                            _mv["traded_from"] = _pl.get("team")
+                            roster.append(_mv)
+                            _have.add(_k)
+            except Exception:
+                pass
             roster = apply_injuries(roster, team)   # drop OUT, boost the linemate
             for pl in roster:
                 c = score_skater(pl, opp_def, opp_goalie)
@@ -545,6 +577,8 @@ def register(app):
                 c["tax"] = _nhl_tax(pl, opp, defense, goalies)
                 if pl.get("boosted_by"):
                     c["boosted_by"] = pl["boosted_by"]
+                if pl.get("traded_from"):
+                    c["traded_from"] = pl["traded_from"]
                 cards.append(c)
             # team's starting goalie vs opponent offense
             my_def = defense.get(team) or {}

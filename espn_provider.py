@@ -462,6 +462,7 @@ _ATHLETE_STATS = {
     "nba": "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team}/athletes/statistics",
     "wnba": "https://site.web.api.espn.com/apis/site/v2/sports/basketball/wnba/teams/{team}/athletes/statistics",
     "nfl": "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/teams/{team}/athletes/statistics",
+    "nhl": "https://site.web.api.espn.com/apis/site/v2/sports/hockey/nhl/teams/{team}/athletes/statistics",
 }
 # ESPN's per-athlete statistics group stats by category with display names.
 # We match the season-average stat we want by its ESPN stat "name".
