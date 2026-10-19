@@ -606,9 +606,13 @@ def register(app):
                     _cur = _ep.team_roster_names("nfl", _tid)   # {norm: displayName}
                     if len(_cur) < 20:
                         continue                                # roster read too thin to trust
-                    # REMOVE: a profiled player not on the current roster has left
-                    by_team[_tn] = [p for p in by_team[_tn]
-                                    if _norm(p.get("name")) in _cur]
+                    # REMOVE a profiled player no longer on the roster (traded away) —
+                    # but ONLY when most of the list still matches, so a name-format
+                    # mismatch can never wipe the whole props list.
+                    _orig = by_team[_tn]
+                    _kept = [p for p in _orig if _norm(p.get("name")) in _cur]
+                    if _orig and len(_kept) >= max(3, int(0.6 * len(_orig))):
+                        by_team[_tn] = _kept
                     _have = {_norm(p.get("name")) for p in by_team[_tn]}
                     # ADD: a rostered player profiled under another team was traded in
                     for _k in _cur:
@@ -621,7 +625,10 @@ def register(app):
         except Exception:
             pass
         roster = {H: by_team[H], A: by_team[A]}
-        apply_injuries(roster)          # drop OUT starters, boost the next man up
+        try:
+            apply_injuries(roster)      # drop OUT starters, boost the next man up
+        except Exception:
+            pass
         cards = game_cards(H, A, roster, data.get("defense", {}))
         return {"game_id": game_id, "home_team": home, "away_team": away,
                 "count": len(cards), "cards": cards}

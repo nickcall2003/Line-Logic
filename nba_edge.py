@@ -400,8 +400,11 @@ def game_cards(sport, game_id, date):
                     and (vals.get("assists") or 0) < 1.5:
                 continue
             plist.append((name, dict(vals)))
-        # drop OUT starters, boost the next man up
-        plist = _nba_apply_injuries(sport, tabbr, g[side].get("name") or tabbr, plist)
+        # drop OUT starters, boost the next man up (never let this break props)
+        try:
+            plist = _nba_apply_injuries(sport, tabbr, g[side].get("name") or tabbr, plist)
+        except Exception:
+            pass
         for name, vals in plist:
             bucket = _pos_bucket(vals.get("_pos"))
             urow = usage.get(str(name).lower())

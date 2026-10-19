@@ -568,7 +568,10 @@ def register(app):
                             _have.add(_k)
             except Exception:
                 pass
-            roster = apply_injuries(roster, team)   # drop OUT, boost the linemate
+            try:
+                roster = apply_injuries(roster, team)   # drop OUT, boost the linemate
+            except Exception:
+                pass
             for pl in roster:
                 c = score_skater(pl, opp_def, opp_goalie)
                 c["opp"] = opp
