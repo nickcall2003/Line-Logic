@@ -465,12 +465,21 @@ def register(app):
         except Exception:
             d = dt.date.today()
         slate = []
+        used_date = d
         try:
-            for gm in (EP.get_games(sport, d) or []):
-                slate.append({"id": gm.get("id"),
-                              "matchup": f"{(gm.get('away') or {}).get('abbr','?')}@{(gm.get('home') or {}).get('abbr','?')}"})
+            # today, then scan forward up to 5 days for the next slate with games
+            for off in range(0, 6):
+                dd = d + dt.timedelta(days=off)
+                games = EP.get_games(sport, dd) or []
+                if games:
+                    used_date = dd
+                    for gm in games:
+                        slate.append({"id": gm.get("id"),
+                                      "matchup": f"{(gm.get('away') or {}).get('abbr','?')}@{(gm.get('home') or {}).get('abbr','?')}"})
+                    break
         except Exception as e:
             slate = [{"error": str(e)[:80]}]
+        d = used_date
         if not game_id and slate and slate[0].get("id"):
             game_id = str(slate[0]["id"])
         g = EP.get_game(sport, d, game_id) if game_id else None
