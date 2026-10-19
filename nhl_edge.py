@@ -191,6 +191,57 @@ def find(name):
     return (_CACHE["idx"] or {}).get(_norm(name))
 
 
+# ---- injury backup boost: a ruled-out skater's volume flows to a linemate ----
+_NHL_INHERIT_F = {"shots_pg": 0.30, "points_pg": 0.30, "goals_pg": 0.30,
+                  "assists_pg": 0.30, "toi_pg": 0.15, "pp_points_pg": 0.35}
+_NHL_INHERIT_D = {"shots_pg": 0.25, "points_pg": 0.25, "toi_pg": 0.20,
+                  "pp_points_pg": 0.30}
+_NHL_FWD = {"C", "LW", "RW", "F", "W", "LEFT WING", "RIGHT WING", "CENTER"}
+
+
+def _nhl_is_out(status):
+    s = (status or "").lower()
+    return any(k in s for k in ("out", "injured reserve", "season", " ir", "ltir"))
+
+
+def apply_injuries(roster, team):
+    """Drop OUT skaters from a team's prop list and boost the top remaining
+    skater (same side: forward/defense) by the vacated volume. Tagged boosted_by.
+    No-op when the injury feed is unavailable."""
+    try:
+        import injuries
+        if not injuries.enabled("nhl"):
+            return roster
+    except Exception:
+        return roster
+    info = injuries.for_team("nhl", abbr=str(team).upper(), name=team)
+    outs = [o for o in info.get("players", []) if _nhl_is_out(o.get("status"))]
+    if not outs:
+        return roster
+    out_norm = {_norm(o.get("name")) for o in outs}
+    pool = [p for p in roster if _norm(p.get("name")) not in out_norm]
+
+    def _is_fwd(p):
+        return (p.get("pos") or "").upper() in _NHL_FWD
+    for o in outs:
+        fwd = (o.get("pos") or "").upper() in _NHL_FWD
+        inh = _NHL_INHERIT_F if fwd else _NHL_INHERIT_D
+        same = [p for p in pool if _is_fwd(p) == fwd]
+        if not same:
+            continue
+        starter = next((p for p in roster
+                        if _norm(p.get("name")) == _norm(o.get("name"))), None)
+        backup = max(same, key=lambda p: (p.get("toi_pg") or p.get("shots_pg") or 0))
+        bk = dict(backup)
+        for st, frac in inh.items():
+            vac = (starter.get(st) if starter else 0) or 0
+            if vac:
+                bk[st] = round((bk.get(st) or 0) + vac * frac, 3)
+        bk["boosted_by"] = o.get("name")
+        pool = [bk if p is backup else p for p in pool]
+    return pool
+
+
 def score_skater(p, opp_def, opp_goalie):
     load()
     lg = _CACHE["lg"]
@@ -482,16 +533,19 @@ def register(app):
         for team, opp in ((H, A), (A, H)):
             opp_def = defense.get(opp) or {}
             opp_goalie = goalies.get(str(opp_def.get("starter_id"))) if opp_def.get("starter_id") else None
-            for pl in players.values():
-                if _tnorm(pl.get("team")) != team:
-                    continue
-                if (pl.get("gp") or 0) >= 3 and (pl.get("shots_pg") or 0) >= 1.0:
-                    c = score_skater(pl, opp_def, opp_goalie)
-                    c["opp"] = opp
-                    c["headshot"] = _mug(season, pl.get("team"), pl.get("id"))
-                    c["leaks"] = _skater_leaks(opp, defense, goalies, ranks)
-                    c["tax"] = _nhl_tax(pl, opp, defense, goalies)
-                    cards.append(c)
+            roster = [pl for pl in players.values()
+                      if _tnorm(pl.get("team")) == team
+                      and (pl.get("gp") or 0) >= 3 and (pl.get("shots_pg") or 0) >= 1.0]
+            roster = apply_injuries(roster, team)   # drop OUT, boost the linemate
+            for pl in roster:
+                c = score_skater(pl, opp_def, opp_goalie)
+                c["opp"] = opp
+                c["headshot"] = _mug(season, pl.get("team"), pl.get("id"))
+                c["leaks"] = _skater_leaks(opp, defense, goalies, ranks)
+                c["tax"] = _nhl_tax(pl, opp, defense, goalies)
+                if pl.get("boosted_by"):
+                    c["boosted_by"] = pl["boosted_by"]
+                cards.append(c)
             # team's starting goalie vs opponent offense
             my_def = defense.get(team) or {}
             gid2 = my_def.get("starter_id")

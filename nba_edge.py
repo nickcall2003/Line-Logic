@@ -299,6 +299,50 @@ def _pos_disp(bucket):
     return {"Guard": "G", "Forward": "F", "Center": "C"}.get(bucket, "")
 
 
+# ---- injury backup boost: a ruled-out starter's production flows to teammates --
+_NBA_INHERIT = {"points": 0.28, "rebounds": 0.25, "assists": 0.28,
+                "threes": 0.25, "min": 0.12}
+
+
+def _nba_is_out(status):
+    s = (status or "").lower()
+    return any(k in s for k in ("out", "injured", "season", "suspension"))
+
+
+def _nba_apply_injuries(sport, tabbr, tname, plist):
+    """plist = [(name, vals_dict)]. Drop OUT starters and boost the top remaining
+    same-bucket teammate by the vacated production (tagged boosted_by). No-op when
+    the injury feed is unavailable."""
+    import re as _re
+    try:
+        import injuries
+        if not injuries.enabled(sport):
+            return plist
+    except Exception:
+        return plist
+    info = injuries.for_team(sport, abbr=str(tabbr).upper(), name=tname)
+    outs = [o for o in info.get("players", []) if _nba_is_out(o.get("status"))]
+    if not outs:
+        return plist
+    norm = lambda s: _re.sub(r"[^a-z]", "", (s or "").lower())
+    out_norm = {norm(o.get("name")) for o in outs}
+    pool = [(n, v) for (n, v) in plist if norm(n) not in out_norm]
+    for o in outs:
+        bucket = _pos_bucket(o.get("pos"))
+        same = [(n, v) for (n, v) in pool if _pos_bucket(v.get("_pos")) == bucket] or pool
+        if not same:
+            continue
+        starter = next((v for (n, v) in plist if norm(n) == norm(o.get("name"))), None)
+        sv = starter or {}
+        bn, bv = max(same, key=lambda nv: (nv[1].get("points") or 0))
+        for st, frac in _NBA_INHERIT.items():
+            vac = sv.get(st) or 0
+            if vac:
+                bv[st] = round((bv.get(st) or 0) + vac * frac, 2)
+        bv["boosted_by"] = o.get("name")
+    return pool
+
+
 def game_cards(sport, game_id, date):
     try:
         import espn_provider as EP
@@ -348,17 +392,24 @@ def game_cards(sport, game_id, date):
             roster = EP._team_roster_ids(sport, tid) or {}
         except Exception:
             roster = {}
+        plist = []
         for name, vals in avgs.items():
             if not vals or vals.get("points") is None:
                 continue
             if (vals.get("points") or 0) < 2 and (vals.get("rebounds") or 0) < 2 \
                     and (vals.get("assists") or 0) < 1.5:
                 continue
+            plist.append((name, dict(vals)))
+        # drop OUT starters, boost the next man up
+        plist = _nba_apply_injuries(sport, tabbr, g[side].get("name") or tabbr, plist)
+        for name, vals in plist:
             bucket = _pos_bucket(vals.get("_pos"))
             urow = usage.get(str(name).lower())
             pid = roster.get(str(name).lower())
             c = _score_player(sport, name, vals, bucket, urow, usage_lg, team_lg,
                               own_adv, opp_adv, oname, HA, ranks, tabbr, oabbr, pid)
+            if vals.get("boosted_by"):
+                c["boosted_by"] = vals["boosted_by"]
             cards.append(c)
     cards.sort(key=lambda c: c.get("logic_score") or 0, reverse=True)
     for i, c in enumerate(cards, 1):
