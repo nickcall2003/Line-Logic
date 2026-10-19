@@ -524,6 +524,26 @@ def score_player(p, opp_def):
 _KIND = {"pctp": "pct01", "num1": "num1", "num2": "num2", "num3": "num3", "int": "int", "avg": "avg"}
 
 
+# Manual in-season trade overrides: {normalized player name -> new team abbr}.
+# ESPN's roster feed can lag a trade, so these force a player onto his new team
+# immediately. Editable live via /data/nfl_trades.json, e.g.
+#   {"Marvin Harrison Jr.": "HOU", "Davante Adams": "LAR"}
+# falling back to the seed below.
+_TRADE_SEED = {"Marvin Harrison Jr.": "HOU"}
+
+
+def _trade_overrides():
+    import json
+    try:
+        with open("/data/nfl_trades.json") as f:
+            d = json.load(f)
+        if isinstance(d, dict) and d:
+            return {_norm(k): str(v).upper() for k, v in d.items()}
+    except Exception:
+        pass
+    return {_norm(k): v.upper() for k, v in _TRADE_SEED.items()}
+
+
 def game_cards(home, away, players_by_team, defense):
     """home/away = team abbrevs. players_by_team = {team:[player dicts]}.
     Each player scored vs the OTHER team's defense."""
@@ -589,6 +609,29 @@ def register(app):
                   (pl.get("att_pg") or 0)
             if (pl.get("games") or 0) >= 2 and use >= MIN.get(pos, 1):
                 by_team[t].append(pl)
+        # Manual trade overrides FIRST — reliable and ESPN-independent. A player
+        # whose override names this game's team is moved here (flagged); one whose
+        # override names a different team is dropped from this team.
+        try:
+            _ov = _trade_overrides()
+            if _ov:
+                _idx0 = {_norm(pl.get("name")): pl for pl in players.values()}
+                for _tn, _ab in ((H, home), (A, away)):
+                    _abN = _tnorm(_ab)
+                    by_team[_tn] = [p for p in by_team[_tn]
+                                    if _norm(p.get("name")) not in _ov
+                                    or _tnorm(_ov[_norm(p.get("name"))]) == _abN]
+                    _have0 = {_norm(p.get("name")) for p in by_team[_tn]}
+                    for _k, _team in _ov.items():
+                        if _tnorm(_team) == _abN and _k not in _have0:
+                            _pl = _idx0.get(_k)
+                            if _pl:
+                                _mv = dict(_pl)
+                                _mv["team"], _mv["traded_from"] = _ab, _pl.get("team")
+                                by_team[_tn].append(_mv)
+                                _have0.add(_k)
+        except Exception:
+            pass
         # Trade remap vs each team's CURRENT roster: drop a profiled player who is
         # no longer on the team (traded away), and add one who is now on it but
         # tagged elsewhere (traded in), flagged. Best-effort — a failed/empty
