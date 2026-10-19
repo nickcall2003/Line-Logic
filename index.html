@@ -537,18 +537,18 @@ font-family:var(--body);color:var(--fg)}
           <div class="menu-item" data-view="help">&#10067; How to use</div>
           <div class="menu-sec menu-gear open" id="sports-toggle" onclick="var s=document.getElementById('sports-body');var o=s.style.display==='none';s.style.display=o?'':'none';this.classList.toggle('open',o);">&#127942; Sports</div>
           <div id="sports-body">
-          <div class="menu-item" data-sport="mlb">&#9918; MLB</div>
-          <div class="menu-item" data-sport="tennis">&#127934; Tennis</div>
-          <div class="menu-item" data-sport="nba">&#127936; NBA</div>
-          <div class="menu-item" data-sport="golf">&#9971; Golf</div>
           <div class="menu-item" data-sport="nfl">&#127944; NFL</div>
-          <div class="menu-item" data-sport="ncaabb">&#9918; NCAA Baseball</div>
-          <div class="menu-item" data-sport="nhl">&#127954; NHL</div>
           <div class="menu-item" data-sport="ncaaf">&#127944; NCAA Football</div>
+          <div class="menu-item" data-sport="nba">&#127936; NBA</div>
+          <div class="menu-item" data-sport="nhl">&#127954; NHL</div>
+          <div class="menu-item" data-sport="mlb">&#9918; MLB</div>
           <div class="menu-item" data-sport="ncaab">&#127936; NCAA Basketball</div>
-          <div class="menu-item" data-sport="wncaab">&#127936; Women's CBB</div>
           <div class="menu-item" data-sport="soccer">&#9917; Soccer</div>
+          <div class="menu-item" data-sport="tennis">&#127934; Tennis</div>
+          <div class="menu-item" data-sport="golf">&#9971; Golf</div>
           <div class="menu-item" data-sport="ufc">&#129354; UFC</div>
+          <div class="menu-item" data-sport="ncaabb">&#9918; NCAA Baseball</div>
+          <div class="menu-item" data-sport="wncaab">&#127936; Women's CBB</div>
           </div>
           <div class="menu-sec menu-gear" id="offseason-toggle" style="display:none" onclick="var s=document.getElementById('offseason-body');var o=s.style.display==='none';s.style.display=o?'':'none';this.classList.toggle('open',o);">&#128197; Off-season leagues</div>
           <div id="offseason-body" style="display:none"></div>
@@ -1635,7 +1635,11 @@ function renderTeam(){renderDatebar();renderTabsTeam();
       const h2=document.createElement("div");h2.className="section-h";h2.textContent="All games";list.appendChild(h2);}}
   ordered.forEach(g=>{const el=document.createElement("div");const fin=g.status==="finished";
     let cls="card";if(fin&&g.winner){const pick=g.prob_home>=0.5?"home":"away";cls+=pick===g.winner?" correct":" wrong";}else if(g.status==="live")cls+=" live";
-    el.className=cls;el.innerHTML=teamCardHTML(g);el.onclick=()=>openFn(g.id);list.appendChild(el);});}
+    el.className=cls;el.innerHTML=teamCardHTML(g);el.onclick=()=>openFn(g.id);list.appendChild(el);});
+  // Contextual Discord CTA at the bottom of the board — catches visitors who
+  // land straight on a sport (e.g. from /nfl-predictions -> /#nfl).
+  try{var _dc=discordCtaHTML();if(_dc){var _dcw=document.createElement("div");_dcw.innerHTML=_dc;if(_dcw.firstChild)list.appendChild(_dcw.firstChild);}}catch(e){}
+}
 async function openMLBDetail(id){detailId="mlb"+id;mlbDetailTab="prediction";mlbMatchups=null;mlbInjuries=null;mlbProps=null;mlbBox=null;showView(true);
   document.getElementById("detail").innerHTML='<div class="skel-wrap"><div class="skel-card" style="height:130px"></div><div class="skel-card"></div><div class="skel-card"></div></div>';await refreshMLBDetail(id);
   if(detailTimer)clearInterval(detailTimer);detailTimer=setInterval(()=>{if(detailId==="mlb"+id)refreshMLBDetail(id);},10000);}
@@ -4545,6 +4549,7 @@ async function renderPicks(){
     let html='<div class="picks-head">\u2b50 Free Picks'+head30+'</div><div class="picks-sub">The four best plays of the day \u2014 the model\u2019s highest-confidence picks across every sport. Results shown as games finish.</div>'+recBanner;
     if(!d.picks||!d.picks.length)html+='<div class="empty">No games to grade today \u2014 check back when more games are posted.</div>';
     else html+=d.picks.map(p=>pickCardHTML(p,true)).join("");
+    html+=discordCtaHTML();
     list.innerHTML=html;bindPickCards();celebrateWins(d.picks);
   }else{
     let d;try{d=await getJSON("/api/picks/best?date="+ymd(selected)+(bestFilter.sport?"&sport="+bestFilter.sport:"")+"&min_prob="+bestFilter.min+"&min_edge="+(bestFilter.edge||0));}catch(e){d={picks:[]};}
@@ -4562,6 +4567,7 @@ async function renderPicks(){
       filterBtn("Any edge",bestFilter.edge===0,"edge",0)+'</div>';
     if(!d.picks||!d.picks.length)html+='<div class="empty">No plays match these filters today.</div>';
     else html+=d.picks.map(p=>pickCardHTML(p,false)).join("");
+    html+=discordCtaHTML();
     list.innerHTML=html;bindPickCards();
   }}
 function monthBadgeHTML(rec){
