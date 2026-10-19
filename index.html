@@ -4306,12 +4306,7 @@ function renderHome(){
     '<div id="yesterday"></div>'+
     '<div id="ladder-card"></div>'+
     '<div id="hotpick"></div>'+
-    discordCtaHTML()+
     '<div class="sport-grid">'+tileHTML+'</div>'+
-    '<div class="home-picks">'+
-      '<div class="home-pick-btn free" onclick="openPicks(\'free\')"><div class="nm">\u2b50 Free Picks</div><div class="sub">Today\u2019s highest-confidence plays, across every sport.</div></div>'+
-      '<div class="home-pick-btn best" onclick="openPicks(\'best\')"><div class="nm">\u{1f451} Best Bets</div><div class="sub">The full model board, filterable and in-depth.</div></div>'+
-    '</div>'+
     '<div class="home-picks" style="margin-top:13px">'+
       '<div class="home-pick-btn" style="background:var(--panel-2)" onclick="openNews()"><div class="nm">\u{1F4F0} News &amp; Injuries</div><div class="sub">Headlines and the injury report for today\u2019s games.</div></div>'+
     '</div>'+
@@ -4336,14 +4331,12 @@ function heroProofHTML(ov){
   // Units come from the SAME source the Track Record page uses
   // (/api/edges/wagers -> _wagData): a sport's units only count once it has
   // matured (>=25 graded wagers), so these are real plays, not "bet every fav".
-  var mlbA=(_accData&&_accData.by_sport&&_accData.by_sport.mlb)||null;
   var ws=(_wagData&&_wagData.by_sport)||null;
-  var mlbW=(ws&&ws.mlb)||null;
   var head='<div class="rcpt-brand"><h2>Line Logic<span class="dot">.</span></h2>'+
-    '<div class="rcpt-tag">A public model that grades every pick across every sport. Wins and losses both stay on the board.</div></div>';
-  var mU=(mlbW&&mlbW.mature&&mlbW.units!=null)?mlbW.units:null;
-  var mRoi=(mlbW&&mlbW.mature&&mlbW.roi_pct!=null)?mlbW.roi_pct:null;
-  var mAw=(mlbA&&mlbA.alltime_wins)||0, mAl=(mlbA&&mlbA.alltime_losses)||0;
+    '<div class="rcpt-tag">A model that predicts every game, then grades every pick in public — '+
+    'wins and losses both stay on the board, so you see what actually works before you trust it.</div></div>';
+  // All-sports all-time record = the number everyone understands.
+  var aw=(ov&&ov.alltime_wins)||0, al=(ov&&ov.alltime_losses)||0, n=aw+al;
   // All-sports net units: sum every matured sport's units, exactly like the
   // Track Record hero's total — INCLUDING the tennis normalization (tennis units
   // come from the ITF-excluded tour rollup, not the raw wager number, so the two
@@ -4367,29 +4360,25 @@ function heroProofHTML(ov){
     }
     if(any)oU=Math.round(t*100)/100;
   }
-  // If the wager units haven't loaded yet, show the clean intro rather than a
-  // blank slip.
-  if(mU==null){
-    if(!mlbA||mlbA.accuracy==null){
-      return '<div class="rcpt">'+head+
-        '<div class="rcpt-sub">A public, tracked MLB betting model \u2014 plus NBA, NFL, NHL, tennis, soccer &amp; college. Loading the record\u2026</div></div>';
-    }
+  // Nothing loaded yet -> clean intro, never a blank slip.
+  if(!n){
+    return '<div class="rcpt">'+head+
+      '<div class="rcpt-sub">Model picks across NFL, NBA, MLB, NHL, college football, soccer &amp; more \u2014 loading the record\u2026</div></div>';
   }
-  function leader(k,v,cls){return '<div class="rcpt-line"><span class="rcpt-k">'+k+
-    '</span><span class="rcpt-dots"></span><span class="rcpt-v'+(cls?' '+cls:'')+'">'+v+'</span></div>';}
-  function u2(x){return (x>=0?'+':'')+ (Math.round(x*100)/100) +'u';}
+  var pct=Math.round(aw/n*100);
+  function leader(k,v,cls,note){return '<div class="rcpt-line"><span class="rcpt-k">'+k+
+    '</span><span class="rcpt-dots"></span><span class="rcpt-v'+(cls?' '+cls:'')+'">'+v+'</span></div>'+
+    (note?'<div style="font-size:11px;color:var(--muted);margin:-3px 0 9px;text-align:right">'+note+'</div>':'');}
   var lines="";
-  // BIG headline: MLB all-time net units.
-  if(mU!=null) lines+=leader("MLB NET UNITS \u00b7 ALL-TIME", u2(mU), "big "+(mU>=0?'pos':'neg'));
-  // MLB all-time record.
-  if(mAw+mAl) lines+=leader("MLB RECORD \u00b7 ALL-TIME", mAw+'\u2013'+mAl);
-  // MLB all-time ROI.
-  if(mRoi!=null) lines+=leader("MLB ROI \u00b7 ALL-TIME", (mRoi>=0?'+':'')+mRoi+'%', mRoi>=0?'pos':'neg');
+  // Lead with what anyone understands: the all-time record and win rate.
+  lines+=leader("ALL-TIME RECORD", aw+'\u2013'+al, "big "+(aw>=al?'pos':''));
+  lines+=leader("WIN RATE", pct+'%', aw>=al?'pos':'');
   // All-sports net units — the whole book behind the flagship number.
-  if(oU!=null) lines+=leader("ALL SPORTS \u00b7 NET UNITS", u2(oU), oU>=0?'pos':'neg');
+  if(oU!=null) lines+=leader("NET UNITS", (oU>=0?'+':'')+oU+'u', oU>=0?'pos':'neg',
+    "your profit if you\u2019d risked 1 \u201cunit\u201d on every pick");
   // Absolute fallback: if wager units never loaded, at least show the all-time
   // MLB record so the hero is never empty.
-  if(!lines && (mAw+mAl)) lines=leader("MLB RECORD \u00b7 ALL-TIME", mAw+'\u2013'+mAl, "big");
+  // (record + win rate are always present once the overall data loads)
   return '<div class="rcpt">'+head+
     '<div class="rcpt-body">'+lines+'</div>'+
     '<div class="rcpt-perf"></div>'+
