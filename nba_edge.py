@@ -547,6 +547,16 @@ def register(app):
                             "position": (a0.get("position") or {}).get("abbreviation"),
                             "has_statistics": bool(a0.get("statistics"))}
             probe["roster_sample"] = samp
+            # Dump the NEW statistics structure so the parser can be rewritten
+            # to read 'results'/'teamTotals' instead of the gone 'athletes' key.
+            import json as _j
+            sdata = EP._get(surl.format(team=tid), {"region": "us"}) or {}
+            res = sdata.get("results")
+            probe["results_type"] = type(res).__name__
+            if isinstance(res, dict):
+                probe["results_keys"] = list(res.keys())[:12]
+            probe["results_dump"] = _j.dumps(res)[:2200]
+            probe["teamTotals_dump"] = _j.dumps(sdata.get("teamTotals"))[:700]
         except Exception as e:
             probe["error"] = str(e)[:80]
         out["probe"] = probe
