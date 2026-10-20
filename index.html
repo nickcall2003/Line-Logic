@@ -2956,7 +2956,12 @@ function chartHTML(h){
   const fs=formSplits(h.games);
   const cell=(v)=>'<b>'+(v!=null?v:"\u2014")+'</b>';
   const _ih=(h&&h.isHome!=null)?h.isHome:null;
-  const splits=fs?('<div class="ph-form"><span>Season '+cell(fs.season)+'</span><span>L10 '+cell(fs.L10)+'</span><span>L5 '+cell(fs.L5)+'</span><span class="ph-proj">Proj '+cell(projFromGames(h.games,_ih,ymd(selected)))+'</span></div>'):"";
+  var _trend="";
+  if(fs&&fs.L5!=null&&fs.season!=null&&fs.season>0){
+    if(fs.L5>=fs.season*1.08)_trend=' <span style="color:var(--win);font-weight:700">↑ trending up</span>';
+    else if(fs.L5<=fs.season*0.92)_trend=' <span style="color:var(--loss);font-weight:700">↓ cooling off</span>';
+  }
+  const splits=fs?('<div class="ph-form"><span>Season '+cell(fs.season)+'</span><span>L10 '+cell(fs.L10)+'</span><span>L5 '+cell(fs.L5)+'</span><span class="ph-proj">Proj '+cell(projFromGames(h.games,_ih,ymd(selected)))+'</span>'+_trend+'</div>'):"";
   const _r=_restFactor(h.games,ymd(selected)),_m=_minutesTrend(h.games);
   const ctxBits=[];
   if(_r.days!=null)ctxBits.push(_r.days<=1?'back-to-back':(_r.days+'d rest'));
