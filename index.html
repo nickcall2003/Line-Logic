@@ -5833,6 +5833,22 @@ function peRadar(id,R){
     g.appendChild(mk("text",{x:w/2,y:20.5,fill:"#F0B94E","font-size":"11.5","font-family":"Space Mono, monospace","font-weight":"700","text-anchor":"middle"},val));
     svg.appendChild(g);});
   svg.appendChild(mk("text",{x:mx,y:296,fill:"#6f7468","font-size":"7.5","font-family":"Space Mono, monospace","font-weight":"700","letter-spacing":".7","text-anchor":"middle"},"PERCENTILE RANK VS LEAGUE · 0-100"));}
+// On-demand last-10 hit-rate chart for Player Edge cards that don't ship a
+// baked game log (NBA/WNBA). Reuses chartHTML + the /prop-history endpoint, so
+// we fetch one player's log only when the card is expanded (not 40 per game).
+var PE_HIST_STATS={points:1,rebounds:1,assists:1,threes:1,steals:1,blocks:1,turnovers:1,
+  pass_yards:1,rush_yards:1,rec_yards:1,receptions:1,pass_tds:1,rush_tds:1,rec_tds:1,completions:1};
+function peLoadHist(hEl){
+  try{
+    var host=hEl.parentNode.querySelector('.ph-host'); if(!host||host.dataset.loaded==="1")return;
+    host.dataset.loaded="1";
+    host.innerHTML='<div class="ph-wrap"><div class="bvp-none">Loading last 10…</div></div>';
+    var sp=host.dataset.sport,pl=host.dataset.player,st=host.dataset.stat,ln=host.dataset.line,gid=host.dataset.gid;
+    var url="/api/"+sp+"/prop-history/"+gid+"?player="+encodeURIComponent(pl)+"&stat="+encodeURIComponent(st)+"&line="+ln+"&date="+ymd(selected);
+    getJSON(url).then(function(h){host.innerHTML=(typeof chartHTML==="function")?chartHTML(h):"";})
+      .catch(function(){host.innerHTML='<div class="ph-wrap"><div class="bvp-none">No game log available.</div></div>';});
+  }catch(e){}
+}
 function peCard(gid,c,i,props,sport,activeProp){
   var isNFL=c.type==="nfl";
   var isTeam=isNFL||c.type==="nhl"||c.type==="nba";
@@ -5849,6 +5865,20 @@ function peCard(gid,c,i,props,sport,activeProp){
   }
   var projKeys=PE_PROJ_ORDER.filter(function(k){return c.projections&&c.projections[k]!=null;});
   var projTiles=projKeys.map(function(k){return peProjTile(k,c.projections[k],props,c.player);}).join("");
+  // On-demand last-10 chart for cards without a baked game log (NBA/WNBA). NFL
+  // keeps its existing baked-log Research section (peResearch), so skip there.
+  var histSec="";
+  if(isTeam&&(!c.log||!c.log.length)){
+    var hstat=(activeProp&&PE_HIST_STATS[activeProp])?activeProp:projKeys.filter(function(k){return PE_HIST_STATS[k];})[0];
+    if(hstat){
+      var _hl=(peFindLine(props,c.player,hstat)||{}).line;
+      if(_hl==null&&c.projections)_hl=c.projections[hstat];
+      if(_hl!=null){
+        histSec='<div class="vsec collapsed"><div class="vsec-h" onclick="peLoadHist(this)">Last 10 games · '+(PE_PROJ_LABEL[hstat]||hstat)+'</div>'+
+          '<div class="ph-host" data-sport="'+sport+'" data-player="'+String(c.player||"").replace(/"/g,"&quot;")+'" data-stat="'+hstat+'" data-line="'+_hl+'" data-gid="'+gid+'"></div></div>';
+      }
+    }
+  }
   var chips="";
   if(c.arsenal&&c.arsenal.length){
     chips='<span class="chip full">● Full Mix</span>'+c.arsenal.slice(0,7).map(function(a){
@@ -5888,6 +5918,7 @@ function peCard(gid,c,i,props,sport,activeProp){
       peResearch(c,props,activeProp)+
       ((c.leaks&&c.leaks.length)?('<div class="vsec collapsed"><div class="vsec-h">Matchup leaks'+(c.opp?' · '+c.opp:'')+'</div><div class="pe-leaks">'+c.leaks.map(function(l){return '<div class="pe-leak'+(l.strong?' on':'')+'">'+l.text+'</div>';}).join("")+'</div></div>'):"")+
       (projTiles?'<div class="vsec"><div class="vsec-h">Projections · model vs line</div><div class="proj">'+projTiles+'</div></div>':"")+
+      histSec+
       (grid?'<div class="vsec collapsed"><div class="vsec-h">'+secH+'</div>'+vsLine+
         (chips?'<div class="chips">'+chips+'</div>':"")+
         '<div class="leg"><span class="b"><span class="d"></span>'+legPos+'</span><span class="n"><span class="d"></span>Neutral</span><span class="p"><span class="d"></span>'+legNeg+'</span></div>'+
