@@ -4303,10 +4303,15 @@ function renderHome(){
         '<span class="gw-t">Join the community</span>'+
         '<span class="gw-s">Live alerts in Discord</span></button>'+
     '</div>'+
+    // Sport selection comes FIRST, right under the gateways \u2014 it's the primary
+    // navigation, so a visitor who knows what they want taps it immediately
+    // instead of scrolling past the highlight modules.
+    '<div style="font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:24px 0 10px;font-weight:700">Browse by sport</div>'+
+    '<div class="sport-grid">'+tileHTML+'</div>'+
+    // Highlights / reason-to-return modules now sit BELOW the sport picker.
+    '<div id="hotpick"></div>'+
     '<div id="yesterday"></div>'+
     '<div id="ladder-card"></div>'+
-    '<div id="hotpick"></div>'+
-    '<div class="sport-grid">'+tileHTML+'</div>'+
     '<div class="home-picks" style="margin-top:13px">'+
       '<div class="home-pick-btn" style="background:var(--panel-2)" onclick="openNews()"><div class="nm">\u{1F4F0} News &amp; Injuries</div><div class="sub">Headlines and the injury report for today\u2019s games.</div></div>'+
     '</div>'+
