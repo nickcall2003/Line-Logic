@@ -577,6 +577,19 @@ def register(app):
                     "sample_value": s0.get("displayValue"),
                 })
             probe["result_categories"] = cats
+            # Team-level stats field names (for wiring opponent defense/pace from
+            # ESPN instead of the blocked stats.nba.com).
+            try:
+                tt = (EP._get(surl.format(team=tid), {"region": "us"}) or {}).get("teamTotals") or []
+                tmap = []
+                for grp in (tt if isinstance(tt, list) else []):
+                    stats = (grp or {}).get("stats") or []
+                    tmap.append({"group": (grp or {}).get("name"),
+                                 "stats": [{"n": s.get("name"), "v": s.get("displayValue")}
+                                           for s in stats][:30]})
+                probe["teamTotals_fields"] = tmap
+            except Exception as e:
+                probe["teamTotals_err"] = str(e)[:60]
             # Dump ONE complete leader entry (minus the huge links array) to see
             # whether a player carries a full stat line or just a single value.
             import json as _j2
