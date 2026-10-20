@@ -6114,13 +6114,27 @@ function peRender(gid,d,props){
   if(tabKeys.length){
     tabs='<div class="pe-tabs"><button class="pe-tab'+(!activeProp?' on':'')+'" onclick="peSelProp(\''+gid+'\',\'__all__\')">ALL</button>'+
       tabKeys.map(function(k){return '<button class="pe-tab'+(activeProp===k?' on':'')+'" onclick="peSelProp(\''+gid+'\',\''+k+'\')">'+(PE_PROJ_LABEL[k]||k).toUpperCase()+'</button>';}).join("")+'</div>';}
+  var fbPanel="";
+  if(d.first_basket&&d.first_basket.length){
+    fbPanel='<div style="background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:12px 0 2px">'+
+      '<div style="font-family:var(--disp);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:8px">🏀 First Basket · model probability</div>'+
+      d.first_basket.slice(0,8).map(function(f,idx){
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:'+(idx?"1px solid var(--line)":"0")+'">'+
+          '<span style="font-family:var(--mono);color:var(--muted-2);width:15px;font-size:11px">'+(idx+1)+'</span>'+
+          '<span style="flex:1;font-weight:700;font-size:13.5px">'+f.player+'</span>'+
+          '<span style="font-family:var(--mono);font-size:10px;color:var(--muted)">'+(f.team||"")+(f.pos?" · "+f.pos:"")+'</span>'+
+          '<span style="font-family:var(--mono);font-weight:700;color:var(--gold);width:46px;text-align:right">'+(Math.round(f.prob*1000)/10)+'%</span>'+
+          '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);width:46px;text-align:right">'+(f.fair_odds!=null?((f.fair_odds>0?"+":"")+f.fair_odds):"")+'</span></div>';
+      }).join("")+
+      '<div style="font-size:10.5px;color:var(--muted-2);margin-top:8px;font-style:italic">Model estimate: early-shot volume × make rate, fair odds (no vig). Starters on the floor at tip. Not a graded market.</div></div>';
+  }
   var h='<div class="gh"><div class="gh-top"><div><div class="gh-match">'+(d.away_team||"")+'<span class="vs">@</span>'+(d.home_team||"")+'</div>';
   if(activeProp){
     var fr=cards.filter(function(c){return c.projections&&c.projections[activeProp]!=null;}).map(function(c){return {c:c,i:cards.indexOf(c)};});
     fr.sort(function(a,b){return peSortVal(b.c,activeProp,props)-peSortVal(a.c,activeProp,props);});
     fr.forEach(function(r,k){r.c.rank=k+1;});
     h+='<div class="gh-sub">'+fr.length+' players · '+(PE_PROJ_LABEL[activeProp]||activeProp)+' · model vs line</div></div></div></div>';
-    return h+tabs+fr.map(function(r){return peCard(gid,r.c,r.i,props,sport,activeProp);}).join("");
+    return h+fbPanel+tabs+fr.map(function(r){return peCard(gid,r.c,r.i,props,sport,activeProp);}).join("");
   }
   var rows=cards.map(function(c,i){return {c:c,i:i};});
   var isMLB=cards.some(function(c){return c.type==="pitcher"||c.type==="batter";});
@@ -6135,7 +6149,7 @@ function peRender(gid,d,props){
   }else{
     rows.forEach(function(r,k){r.c.rank=k+1;});
     h+='<div class="gh-sub">'+rows.length+' players · ranked by Logic Score</div></div></div></div>';
-    h+=tabs+rows.map(function(r){return peCard(gid,r.c,r.i,props,sport,null);}).join("");
+    h+=fbPanel+tabs+rows.map(function(r){return peCard(gid,r.c,r.i,props,sport,null);}).join("");
   }
   return h;}
 function _peProps(key){

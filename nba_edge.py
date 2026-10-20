@@ -439,6 +439,47 @@ def _nba_apply_injuries(sport, tabbr, tname, plist):
     return pool
 
 
+_FB_POS_BOOST = {"C": 1.15, "PF": 1.04, "PG": 1.10, "SG": 1.05, "SF": 1.0, "G": 1.08, "F": 1.02}
+
+
+def _first_basket_probs(pool):
+    """Model estimate of who scores the game's FIRST basket.
+
+    pool = [{name, team, pos, fga, fgpct}] for the players expected on the floor
+    at tip (each team's top-minutes starters). Weight = early-shot volume (FGA)
+    * make rate (FG%) * a small position nudge (centers/guards touch it first).
+    Probabilities are normalized across both teams' starters so they sum to ~1.
+
+    Honest about its limits: this is a transparent usage-based estimate, NOT
+    trained on historical first-basket outcomes (which aren't freely available),
+    so it won't capture a player's specific tendency to take the opening shot."""
+    weighted = []
+    for p in pool:
+        try:
+            fga = float(p.get("fga") or 0)
+            fg = float(p.get("fgpct") or 0) / 100.0
+        except (TypeError, ValueError):
+            continue
+        if fga <= 0 or fg <= 0:
+            continue
+        boost = _FB_POS_BOOST.get((p.get("pos") or "").upper(), 1.0)
+        weighted.append((p, fga * fg * boost))
+    tot = sum(w for _, w in weighted)
+    if tot <= 0:
+        return []
+    out = [{"player": p["name"], "team": p.get("team"), "pos": p.get("pos"),
+            "prob": round(w / tot, 4),
+            "fair_odds": _prob_to_american(w / tot)} for p, w in weighted]
+    out.sort(key=lambda x: x["prob"], reverse=True)
+    return out[:12]
+
+
+def _prob_to_american(prob):
+    if not prob or prob <= 0 or prob >= 1:
+        return None
+    return int(round(-100 * prob / (1 - prob))) if prob >= 0.5 else int(round(100 * (1 - prob) / prob))
+
+
 def game_cards(sport, game_id, date):
     try:
         import espn_provider as EP
@@ -481,6 +522,7 @@ def game_cards(sport, game_id, date):
         return espn_rates.get(n)
 
     cards = []
+    fb_pool = []
     for side in ("home", "away"):
         opp = "away" if side == "home" else "home"
         tid = g[side].get("team_id")
@@ -535,6 +577,15 @@ def game_cards(sport, game_id, date):
             plist = _nba_apply_injuries(sport, tabbr, g[side].get("name") or tabbr, plist)
         except Exception:
             pass
+        # First-basket pool: the five most-minutes players likely on the floor at
+        # tip (post-injury), carrying shooting rate for the model.
+        try:
+            for _n, _v in sorted(plist, key=lambda nv: (nv[1].get("minutes") or 0),
+                                 reverse=True)[:5]:
+                fb_pool.append({"name": _n, "team": tabbr, "pos": _v.get("_pos"),
+                                "fga": _v.get("fga"), "fgpct": _v.get("fgpct")})
+        except Exception:
+            pass
         for name, vals in plist:
             bucket = _pos_bucket(vals.get("_pos"))
             urow = usage.get(str(name).lower())
@@ -558,9 +609,10 @@ def game_cards(sport, game_id, date):
             g["away"].get("name") or g["away"].get("abbr")) or []
     except Exception:
         book = []
+    first_basket = _first_basket_probs(fb_pool)
     return {"game_id": game_id, "home_team": g["home"].get("abbr"),
             "away_team": g["away"].get("abbr"), "count": len(cards),
-            "cards": cards, "props": book}
+            "cards": cards, "props": book, "first_basket": first_basket}
 
 
 def register(app):

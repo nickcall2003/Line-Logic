@@ -471,6 +471,7 @@ _AVG_STAT_NAME = {
     "assists": ["avgAssists"],
     "threes": ["avgThreePointFieldGoalsMade", "avg3PointFieldGoalsMade", "avgThreePointersMade"],
     "steals": ["avgSteals"], "blocks": ["avgBlocks"], "turnovers": ["avgTurnovers"],
+    "fga": ["avgFieldGoalsAttempted"], "fgpct": ["fieldGoalPct"],
     "passingYards": ["passingYardsPerGame", "avgPassingYards"],
     "rushingYards": ["rushingYardsPerGame", "avgRushingYards"],
     "receivingYards": ["receivingYardsPerGame", "avgReceivingYards"],
