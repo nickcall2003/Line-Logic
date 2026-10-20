@@ -250,7 +250,10 @@ def _score_player(sport, name, avgs, bucket, usage_row, usage_lg, team_lg,
     pts, reb, ast = avgs.get("points"), avgs.get("rebounds"), avgs.get("assists")
     thr = avgs.get("threes")
     usg = _norm_pct(usage_row.get("usg_pct")) if usage_row else None
-    mins = float(usage_row["min"]) if (usage_row and usage_row.get("min") is not None) else None
+    # minutes: prefer the advanced usage feed, else the per-game minutes we now
+    # parse from ESPN player stats (so the Minutes factor isn't a flat 50).
+    mins = (float(usage_row["min"]) if (usage_row and usage_row.get("min") is not None)
+            else avgs.get("minutes"))
     ts = _norm_pct(usage_row.get("ts_pct")) if usage_row else None
 
     def pz(v, key):
