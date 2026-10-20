@@ -28,26 +28,31 @@ def _norm(s):
 
 
 def _recent_game_ids(sport, team_id, limit=15):
-    """Most-recent completed game ids for a team, newest first."""
+    """Most-recent completed game ids for a team, newest first. Walks back from
+    the current season to last season so early-season (few games played yet)
+    still has real tips to count."""
     import espn_provider as EP
+    import datetime as _dt
     if sport not in EP.SCOREBOARD or not team_id:
         return []
     base = EP.SCOREBOARD[sport].rsplit("/scoreboard", 1)[0]
+    yr = _dt.date.today().year
     ids = []
-    try:
-        data = EP._get(f"{base}/teams/{team_id}/schedule", {}) or {}
-        for ev in reversed(data.get("events") or []):
-            comp = (ev.get("competitions") or [{}])[0]
-            if not (((comp.get("status") or {}).get("type") or {}).get("completed")):
-                continue
-            gid = ev.get("id") or comp.get("id")
-            if gid:
-                ids.append(str(gid))
-            if len(ids) >= limit:
-                break
-    except Exception:
-        pass
-    return ids
+    for params in ({}, {"season": yr}, {"season": yr - 1}):
+        try:
+            data = EP._get(f"{base}/teams/{team_id}/schedule", params) or {}
+            for ev in reversed(data.get("events") or []):
+                comp = (ev.get("competitions") or [{}])[0]
+                if not (((comp.get("status") or {}).get("type") or {}).get("completed")):
+                    continue
+                gid = ev.get("id") or comp.get("id")
+                if gid and str(gid) not in ids:
+                    ids.append(str(gid))
+        except Exception:
+            pass
+        if len(ids) >= max(6, limit // 2):
+            break
+    return ids[:limit]
 
 
 def _winner_from_text(text):
