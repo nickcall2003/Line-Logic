@@ -5837,7 +5837,8 @@ function peRadar(id,R){
 // baked game log (NBA/WNBA). Reuses chartHTML + the /prop-history endpoint, so
 // we fetch one player's log only when the card is expanded (not 40 per game).
 var PE_HIST_STATS={points:1,rebounds:1,assists:1,threes:1,steals:1,blocks:1,turnovers:1,
-  pass_yards:1,rush_yards:1,rec_yards:1,receptions:1,pass_tds:1,rush_tds:1,rec_tds:1,completions:1};
+  pass_yards:1,rush_yards:1,rec_yards:1,receptions:1,pass_tds:1,rush_tds:1,rec_tds:1,completions:1,
+  shots_on_goal:1,goals:1,saves:1,goals_against:1};
 function peLoadHist(hEl){
   try{
     var host=hEl.parentNode.querySelector('.ph-host'); if(!host||host.dataset.loaded==="1")return;

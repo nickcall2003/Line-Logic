@@ -5534,7 +5534,7 @@ def _prop_log(sport, game_id, date, player, stat, line, league=None):
         if sport == "mlb":
             from mlb_provider import get_prop_history
             return get_prop_history(date, int(game_id), player, stat, line)
-        if sport in ("nba", "wnba", "nfl"):
+        if sport in ("nba", "wnba", "nfl", "nhl"):
             from espn_provider import get_prop_history
             return get_prop_history(sport, date, game_id, player, stat, line)
     except Exception:
@@ -5609,7 +5609,7 @@ def _enrich_projections(sport, game_id, date, props, league=None):
     """Best-effort, time-boxed parallel fill of `projection` for props that
     lack one (book lines). Cached per player+stat; whatever doesn't finish in
     the budget is filled lazily on the client instead."""
-    if sport not in ("mlb", "nba", "wnba", "nfl", "soccer"):
+    if sport not in ("mlb", "nba", "wnba", "nfl", "soccer", "nhl"):
         return
     need = [p for p in props if p.get("projection") is None][:30]
     if not need:
@@ -6077,7 +6077,7 @@ def prop_diag(player: str, sport: str = "wnba", stat: str = "points"):
 @app.get("/api/{sport}/prop-history/{game_id}")
 def team_prop_history(sport: str, game_id: str, player: str, stat: str,
                       line: float, date: str | None = None):
-    if sport not in ("nba", "wnba", "nfl"):
+    if sport not in ("nba", "wnba", "nfl", "nhl"):
         return {"history": []}
     target = dt.date.fromisoformat(date) if date else dt.date.today()
     try:

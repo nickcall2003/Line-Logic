@@ -764,6 +764,7 @@ GAMELOG = {
     "nba": "https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{pid}/gamelog",
     "wnba": "https://site.web.api.espn.com/apis/common/v3/sports/basketball/wnba/athletes/{pid}/gamelog",
     "nfl": "https://site.web.api.espn.com/apis/common/v3/sports/football/nfl/athletes/{pid}/gamelog",
+    "nhl": "https://site.web.api.espn.com/apis/common/v3/sports/hockey/nhl/athletes/{pid}/gamelog",
 }
 # Map our stat key -> the label ESPN uses in gamelog stat arrays (varies; we
 # match case-insensitively against the labels list).
@@ -782,6 +783,11 @@ _LOG_LABEL = {
     "passing tds": "td", "rushing tds": "td", "receiving tds": "td",
     "interceptions": "int", "completions": "cmp",
     "receptions": "rec", "rushing attempts": "car", "carries": "car",
+    # NHL abbreviations (skaters + goalies). Full-word fallbacks are handled by
+    # the candidate matching below, so these just add the short labels.
+    "goals": "g", "shots on goal": "sog", "shots_on_goal": "sog",
+    "shotsongoal": "sog", "shots": "sog", "saves": "sv",
+    "goals against": "ga", "goals_against": "ga",
 }
 # For NFL gamelogs, the right column lives in a category matching this word.
 _LOG_NFL_CAT = {
@@ -920,12 +926,21 @@ def get_prop_history(sport, date, game_id, player_name, stat, line):
     labels = [l.lower() for l in (data.get("labels") or [])]
     names = [n.lower() for n in (data.get("names") or [])]
     col = None
-    want = _LOG_LABEL.get((stat or "").lower(), "")
-    if want:
+    # Candidate targets: the mapped abbreviation PLUS the stat's own name/variants,
+    # so this works whether a sport's gamelog uses short labels ("G","SOG") or
+    # full names ("goals","shotsTotal"). Exact match against either array.
+    sl = (stat or "").lower()
+    # NHL uses single-letter columns (A=assists, G=goals). Safe to add: NBA/NFL
+    # columns are multi-letter, so these never false-match there.
+    _alt = {"assists": "a", "goals": "g"}.get(sl, "")
+    cands = {c for c in (_LOG_LABEL.get(sl, ""), sl, sl.replace(" ", ""),
+                         sl.replace(" ", "").replace("_", ""), _alt,
+                         sl.split()[-1] if sl else "") if c}
+    if cands:
         for i in range(max(len(labels), len(names))):
             lab = labels[i] if i < len(labels) else ""
             nm = names[i] if i < len(names) else ""
-            if lab == want or nm == want:
+            if lab in cands or nm in cands:
                 col = i
                 break
     games = []
