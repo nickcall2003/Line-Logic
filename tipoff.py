@@ -68,45 +68,49 @@ def _winner_from_text(text):
     return None
 
 
-def _opening_tip_winner(sport, game_id):
-    """The player who won the opening tip of one game, or None."""
+def _opening_tip(sport, game_id):
+    """(winning_team_id, possession_player) for the opening tip, or (None, None).
+    ESPN's jump-ball play is attributed to the team that GAINED possession, so
+    the play's team is the tip winner (the possession player is often a teammate
+    the ball was tipped to, not the jumper)."""
     import espn_provider as EP
     key = (sport, str(game_id))
     c = _tip_cache.get(key)
     if c and time.time() - c[0] < _TIP_TTL:
         return c[1]
-    winner = None
+    res = (None, None)
     try:
         data = EP._get(EP.SUMMARY[sport], {"event": str(game_id)}) or {}
         plays = data.get("plays") or (data.get("gamepackageJSON") or {}).get("plays") or []
         for pl in plays:
-            typ = ((pl.get("type") or {}).get("text") or "")
-            txt = pl.get("text") or ""
-            if "jump ball" in (typ + " " + txt).lower():
-                winner = _winner_from_text(txt)
+            blob = (((pl.get("type") or {}).get("text") or "") + " "
+                    + (pl.get("text") or "")).lower()
+            if "jump ball" in blob or "jumpball" in blob:
+                tid = ((pl.get("team") or {}) or {}).get("id")
+                res = (str(tid) if tid is not None else None,
+                       _winner_from_text(pl.get("text") or ""))
                 break
     except Exception:
         pass
-    _tip_cache[key] = (time.time(), winner)
-    return winner
+    _tip_cache[key] = (time.time(), res)
+    return res
 
 
-def winrate(sport, team_id, player_name, limit=15):
-    """{wins, total, rate} — real opening-tip win rate for a player over their
-    team's recent games. rate is None when no tips were logged."""
-    key = (sport, str(team_id), _norm(player_name))
+def winrate(sport, team_id, player_name=None, limit=15):
+    """{wins, total, rate} — real opening-tip win rate for a TEAM over its recent
+    games (the same starting center jumps, so team tip-win ≈ that center's).
+    rate is None when no tips were logged."""
+    key = (sport, str(team_id))
     c = _rate_cache.get(key)
     if c and time.time() - c[0] < _RATE_TTL:
         return c[1]
-    pn = _norm(player_name)
     wins = total = 0
     for gid in _recent_game_ids(sport, team_id, limit):
-        w = _opening_tip_winner(sport, gid)
-        if not w:
+        wtid, _name = _opening_tip(sport, gid)
+        if not wtid:
             continue
         total += 1
-        wn = _norm(w)
-        if wn == pn or (pn and (pn in wn or wn in pn)):
+        if str(wtid) == str(team_id):
             wins += 1
     res = {"wins": wins, "total": total,
            "rate": (round(wins / total, 3) if total else None)}

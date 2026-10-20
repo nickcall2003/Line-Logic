@@ -901,10 +901,14 @@ def register(app):
                 for pl in plays[:25]:
                     typ = ((pl.get("type") or {}).get("text") or "")
                     txt = pl.get("text") or ""
-                    if "jump ball" in (typ + " " + txt).lower():
-                        jb = {"type": typ, "text": txt, "parsed_winner": TO._winner_from_text(txt)}
+                    if "jump ball" in (typ + " " + txt).lower() or "jumpball" in (typ + txt).lower():
+                        jb = {"type": typ, "text": txt,
+                              "team_id": ((pl.get("team") or {}) or {}).get("id"),
+                              "home_team_id": htid}
                         break
                 out["first_jumpball"] = jb
+                # what the real pipeline computes for this (home) team
+                out["home_tip_winrate"] = TO.winrate(sport, htid)
         except Exception as e:
             out["error"] = str(e)[:150]
         return JSONResponse(out)
