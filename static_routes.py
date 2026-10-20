@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v62";   // bumped: real sportsbook prop lines in Player Edge
+const CACHE = "ll-shell-v63";   // bumped: homepage order + newcomer framing
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));
