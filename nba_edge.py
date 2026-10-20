@@ -565,6 +565,30 @@ def register(app):
                     "sample_value": s0.get("displayValue"),
                 })
             probe["result_categories"] = cats
+            # Dump ONE complete leader entry (minus the huge links array) to see
+            # whether a player carries a full stat line or just a single value.
+            import json as _j2
+            try:
+                lead0 = ((res[0] or {}).get("leaders") or [])[0] if res else None
+                if isinstance(lead0, dict):
+                    slim = dict(lead0)
+                    ath = dict(slim.get("athlete") or {})
+                    ath.pop("links", None)
+                    ath.pop("headshot", None)
+                    slim["athlete"] = ath
+                    probe["leader0_full"] = _j2.dumps(slim)[:2200]
+            except Exception as e:
+                probe["leader0_err"] = str(e)[:60]
+            # Also: does a season+seasontype call expose MORE stat categories?
+            try:
+                sdata2 = EP._get(surl.format(team=tid),
+                                 {"region": "us", "season": "2025", "seasontype": "2"}) or {}
+                r2 = sdata2.get("results") or []
+                probe["s2025t2_categories"] = [
+                    {"name": (c or {}).get("name"), "n": len((c or {}).get("leaders") or [])}
+                    for c in (r2 if isinstance(r2, list) else [])]
+            except Exception as e:
+                probe["s2025t2_err"] = str(e)[:60]
         except Exception as e:
             probe["error"] = str(e)[:80]
         out["probe"] = probe
