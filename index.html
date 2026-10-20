@@ -6121,9 +6121,10 @@ function peRender(gid,d,props){
     if(d.tipoff&&d.tipoff.home_center&&d.tipoff.away_center){
       var _t=d.tipoff,_ht=function(n){return n?(Math.floor(n/12)+"'"+Math.round(n%12)+'"'):"";};
       var _hw=_t.home_tip_pct>=_t.away_tip_pct,_win=_hw?_t.home_abbr:_t.away_abbr,_wp=Math.max(_t.home_tip_pct,_t.away_tip_pct);
+      var _basis=(_t.basis==="real")?'<span style="color:var(--win)">win (real tipoff data'+((_t.home_rate&&_t.home_rate.total)?", "+_t.home_rate.wins+"/"+_t.home_rate.total+" & "+(_t.away_rate?_t.away_rate.wins+"/"+_t.away_rate.total:""):"")+')</span>':'<span style="opacity:.7">win (height model)</span>';
       tipLine='<div style="font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:0 0 9px">'+
         '🤚 Tip: '+_t.away_center+' '+_ht(_t.away_h)+' vs '+_t.home_center+' '+_ht(_t.home_h)+
-        ' — <b style="color:var(--gold)">'+_win+' '+_wp+'%</b> <span style="opacity:.7">win (height model)</span></div>';
+        ' — <b style="color:var(--gold)">'+_win+' '+_wp+'%</b> '+_basis+'</div>';
     }
     fbPanel='<div style="background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:12px 0 2px">'+
       '<div style="font-family:var(--disp);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:8px">🏀 First Basket · model probability</div>'+
@@ -6168,8 +6169,32 @@ function _peProps(key){
   if(g&&g!=="loading"&&g.props&&g.props.length)return g.props;
   // Fall back to book lines bundled in the Player Edge (venom) response itself.
   return (d&&d.props&&d.props.length)?d.props:[];}
+// Refine the First Basket tip with REAL logged jump-ball rates (async, so the
+// panel renders immediately on the height model, then upgrades if real data is
+// available). Re-targets the home/away first-basket mass to the real P(win tip).
+function peApplyTip(d,pHome,rates){
+  var fb=d.first_basket,t=d.tipoff; if(!fb||!t||!t.home_abbr)return false;
+  var home=t.home_abbr;
+  var rawHome=fb.filter(function(f){return f.team===home;}).reduce(function(a,f){return a+f.prob;},0);
+  if(rawHome<=0||rawHome>=1)return false;
+  var target=0.5+0.35*(pHome-0.5),sh=target/rawHome,sa=(1-target)/(1-rawHome);
+  fb.forEach(function(f){f.prob=f.prob*(f.team===home?sh:sa);});
+  var tot=fb.reduce(function(a,f){return a+f.prob;},0);
+  fb.forEach(function(f){f.prob=f.prob/tot;var am=(typeof probToAmerican==="function")?probToAmerican(f.prob):null;if(am!=null)f.fair_odds=am;});
+  fb.sort(function(a,b){return b.prob-a.prob;});
+  t.basis="real";t.home_tip_pct=Math.round(pHome*100);t.away_tip_pct=Math.round((1-pHome)*100);
+  if(rates){t.home_rate=rates.home;t.away_rate=rates.away;}
+  return true;}
+function peRefreshTipoff(key){
+  var d=_peData[key]; if(!d||d._sport!=="nba"||!d.tipoff||!d.first_basket||d._tipDone)return;
+  d._tipDone=1; var t=d.tipoff;
+  var url="/api/nba/tipoff/"+d.game_id+"?date="+ymd(selected)+"&home_player="+encodeURIComponent(t.home_center||"")+"&away_player="+encodeURIComponent(t.away_center||"");
+  getJSON(url).then(function(r){
+    if(r&&r.basis==="real"&&r.p_home!=null&&peApplyTip(d,r.p_home,{home:r.home,away:r.away}))_pePaint(key);
+  }).catch(function(){});
+}
 function _pePaint(key){var mount=document.getElementById("pe-mount"),d=_peData[key];
-  if(!mount||!d)return; mount.innerHTML=peRender(key,d,_peProps(key)); if(!d._prop)peToggle(key,0);}
+  if(!mount||!d)return; mount.innerHTML=peRender(key,d,_peProps(key)); if(!d._prop)peToggle(key,0); peRefreshTipoff(key);}
 /* ===== Game Analysis: impact-player strip (top Player Edge movers in the game view) ===== */
 function gaImpactCard(c){
   var u=peHeadshot(c);

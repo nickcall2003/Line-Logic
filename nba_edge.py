@@ -853,4 +853,60 @@ def register(app):
         out["probe"] = probe
         return JSONResponse(out)
 
+    @app.get("/api/nba/tipoff/{game_id}")
+    def nba_tipoff(game_id: str, date: str | None = None, sport: str = "nba",
+                   home_player: str | None = None, away_player: str | None = None):
+        """REAL opening-tip win rates for the two named centers (from PBP), and
+        the refined P(home wins tip) via log5. basis='real' only when both have
+        a usable sample; otherwise the caller keeps the height estimate."""
+        import espn_provider as EP
+        import tipoff as TO
+        try:
+            d = dt.date.fromisoformat(date) if date else dt.date.today()
+        except Exception:
+            d = dt.date.today()
+        g = EP.get_game(sport, d, game_id)
+        if not g:
+            return JSONResponse({"error": "game not found"})
+        hr = TO.winrate(sport, g["home"].get("team_id"), home_player) if home_player else {"total": 0, "rate": None}
+        ar = TO.winrate(sport, g["away"].get("team_id"), away_player) if away_player else {"total": 0, "rate": None}
+        p_home, basis = None, "insufficient"
+        if (hr.get("total") or 0) >= 5 and (ar.get("total") or 0) >= 5 \
+                and hr.get("rate") is not None and ar.get("rate") is not None:
+            p_home, basis = TO.log5(hr["rate"], ar["rate"]), "real"
+        return JSONResponse({"home_player": home_player, "away_player": away_player,
+                             "home": hr, "away": ar, "p_home": p_home, "basis": basis})
+
+    @app.get("/api/nba/tipoff-diag/{game_id}")
+    def nba_tipoff_diag(game_id: str, sport: str = "nba"):
+        """Verify the PBP tipoff parsing on real data: recent game ids, the
+        summary shape, and the first jump-ball play + what it parsed to."""
+        import espn_provider as EP
+        import tipoff as TO
+        g = EP.get_game(sport, dt.date.today(), game_id)
+        out = {}
+        try:
+            htid = g["home"].get("team_id") if g else None
+            ids = TO._recent_game_ids(sport, htid, 5)
+            out["home_team_id"] = htid
+            out["recent_game_ids"] = ids
+            if ids:
+                data = EP._get(EP.SUMMARY[sport], {"event": ids[0]}) or {}
+                plays = data.get("plays") or (data.get("gamepackageJSON") or {}).get("plays") or []
+                out["summary_top_keys"] = list(data.keys())[:12]
+                out["plays_count"] = len(plays)
+                out["first_play"] = ({"type": ((plays[0].get("type") or {}).get("text")),
+                                      "text": plays[0].get("text")} if plays else None)
+                jb = None
+                for pl in plays[:25]:
+                    typ = ((pl.get("type") or {}).get("text") or "")
+                    txt = pl.get("text") or ""
+                    if "jump ball" in (typ + " " + txt).lower():
+                        jb = {"type": typ, "text": txt, "parsed_winner": TO._winner_from_text(txt)}
+                        break
+                out["first_jumpball"] = jb
+        except Exception as e:
+            out["error"] = str(e)[:150]
+        return JSONResponse(out)
+
     print("[nba] edge endpoint registered")

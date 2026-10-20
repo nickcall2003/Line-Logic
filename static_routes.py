@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v70";   // bumped: first-basket tipoff (real heights)
+const CACHE = "ll-shell-v71";   // bumped: real logged tipoff rates (PBP)
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));
