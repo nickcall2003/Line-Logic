@@ -638,6 +638,26 @@ def get_props(sport: str, date: dt.date, game_id: str):
                 avgs = _team_athlete_avgs(sport, team_id, season=_last) or {}
             except Exception:
                 pass
+        # RECENT FORM: blend each rotation player's last-N games into the season
+        # average so projections react to current form. Capped to the rotation
+        # (top ~12 by minutes) and cached per player, so a full board stays cheap.
+        _sk = [s for s, _ in _PROP_STATS.get(sport, [])]
+        recent_by_name = {}
+        if _sk and avgs:
+            rec_ids = _team_roster_ids(sport, team_id)
+            ranked = sorted(avgs.items(),
+                            key=lambda kv: (kv[1].get("minutes") or 0,
+                                            kv[1].get("points") or 0), reverse=True)
+            for _pn, _pv in ranked[:12]:
+                _pid = rec_ids.get(_pn.lower())
+                if not _pid:
+                    continue
+                try:
+                    r = player_recent_avgs(sport, _pid, _sk, n=7)
+                except Exception:
+                    r = {}
+                if r:
+                    recent_by_name[_pn] = r
         # League-average production allowed to each position bucket (the neutral
         # baseline the DvP numbers are compared against).
         opp_name = g[opp].get("name") or opp_abbr
@@ -670,12 +690,26 @@ def get_props(sport: str, date: dt.date, game_id: str):
 
         for pname, vals in avgs.items():
             ppos = vals.get("_pos") or ""
+            _rec = recent_by_name.get(pname) or {}
+            _rgp = _rec.get("_gp") or 0
             for stat_key, label in _PROP_STATS[sport]:
                 rate = vals.get(stat_key)
                 if not rate or rate <= 0:
                     continue
+                # RECENT-FORM BLEND: lean the baseline toward the last-N games.
+                # Weight scales with sample size so a 3-game blip moves it less
+                # than a settled 5+ game trend. season_avg below stays the TRUE
+                # season number; this only shifts the projection baseline.
+                base_rate = rate
+                _rr = _rec.get(stat_key)
+                form_pct = 0.0
+                if _rr is not None and _rgp >= 3:
+                    _w = 0.40 if _rgp >= 5 else 0.25
+                    base_rate = rate * (1 - _w) + _rr * _w
+                    if rate:
+                        form_pct = round((base_rate / rate - 1) * 100, 1)
                 # skip implausible/no-volume lines (e.g. a center with 0.3 assists)
-                line = default_line(stat_key, rate)
+                line = default_line(stat_key, base_rate)
                 if line is None or line <= 0:
                     continue
                 scoring = stat_key in ("points", "threes")
@@ -687,7 +721,7 @@ def get_props(sport: str, date: dt.date, game_id: str):
                     matchup_f = dvp_f
                 else:
                     matchup_f = def_factor if scoring else 1.0
-                adj_rate = rate * pace_factor * matchup_f
+                adj_rate = base_rate * pace_factor * matchup_f
                 proj = project_prop(stat_key, adj_rate, line)
                 if not proj:
                     continue
@@ -695,6 +729,10 @@ def get_props(sport: str, date: dt.date, game_id: str):
                 proj["team"] = tabbr
                 proj["label"] = label
                 proj["season_avg"] = round(rate, 1)
+                if _rr is not None and _rgp >= 3:
+                    proj["recent_avg"] = round(_rr, 1)
+                    proj["recent_gp"] = _rgp
+                    proj["form_adj_pct"] = form_pct
                 proj["position"] = ppos
                 proj["factors"] = {
                     "opponent": opp_abbr,
@@ -714,6 +752,13 @@ def get_props(sport: str, date: dt.date, game_id: str):
                 _da = proj["factors"]["def_adj_pct"]
                 _pa = proj["factors"]["pace_adj_pct"]
                 bits = [f"season avg {round(rate,1)}"]
+                if _rr is not None and _rgp >= 3:
+                    proj["factors"]["recent_avg"] = round(_rr, 1)
+                    proj["factors"]["recent_gp"] = _rgp
+                    proj["factors"]["form_adj_pct"] = form_pct
+                    _arrow = "↑" if form_pct > 1 else ("↓" if form_pct < -1 else "→")
+                    bits.append(f"L{_rgp} {round(_rr,1)} {_arrow}"
+                                + (f" ({'%+.0f' % form_pct}%)" if abs(form_pct) >= 1 else ""))
                 if dvp_info:
                     # the real "opponent allows X to this position" line
                     proj["factors"]["dvp_allowed"] = dvp_info["allowed"]
@@ -954,6 +999,83 @@ def _game_roster_ids(sport, date, game_id):
     except Exception:
         pass
     return ids
+
+
+# ---- recent-form averages (last-N games) --------------------------------
+# One gamelog fetch per player returns EVERY stat column, so a player's last-N
+# average for all tracked props costs a single (cached) request. Blended into
+# the season average in get_props so projections react to current form — a
+# usage spike, a cold streak, a minutes/shot-volume change — instead of lagging
+# behind a slow season-to-date number.
+_recent_cache = {}        # (sport, pid) -> (ts, {stat_key: avg, "_gp": n})
+_RECENT_TTL = 6 * 3600
+
+
+def player_recent_avgs(sport, pid, stat_keys, n=7):
+    """Average of a player's last-`n` games for each requested stat_key, from one
+    cached gamelog fetch. Returns {stat_key: recent_avg, "_gp": games_used}; empty
+    when there's no log. NBA/WNBA read short-label columns across all games; NFL
+    scopes each stat to its passing/rushing/receiving category (shared 'yds')."""
+    if sport not in GAMELOG or not pid:
+        return {}
+    import time as _t
+    key = (sport, str(pid))
+    c = _recent_cache.get(key)
+    if c and _t.time() - c[0] < _RECENT_TTL:
+        return c[1]
+    out = {}
+    try:
+        data = _get(GAMELOG[sport].format(pid=pid)) or {}
+    except Exception:
+        _recent_cache[key] = (_t.time(), out)
+        return out
+    labels = [l.lower() for l in (data.get("labels") or [])]
+    names = [nm.lower() for nm in (data.get("names") or [])]
+    seasontypes = data.get("seasonTypes") or []
+    gp_seen = 0
+    for stat_key in stat_keys:
+        sl = str(stat_key).lower()
+        nfl_cat = _LOG_NFL_CAT.get(sl)
+        # which rows: NFL yards live in a specific category; everything else
+        # reads every game row (newest last).
+        rows = []
+        for stp in seasontypes:
+            for cat in stp.get("categories", []):
+                if nfl_cat and nfl_cat not in (cat.get("name", "") or "").lower():
+                    continue
+                rows.extend(cat.get("events", []))
+        rows = rows[-n:]
+        if not rows:
+            continue
+        gp_seen = max(gp_seen, len(rows))
+        # locate the stat's column (same candidate matching as the history chart)
+        _alt = {"assists": "a", "goals": "g"}.get(sl, "")
+        cands = {c for c in (_LOG_LABEL.get(sl, ""), sl, sl.replace(" ", ""),
+                             sl.replace(" ", "").replace("_", ""), _alt,
+                             sl.split()[-1] if sl else "") if c}
+        col = None
+        for i in range(max(len(labels), len(names))):
+            lab = labels[i] if i < len(labels) else ""
+            nm = names[i] if i < len(names) else ""
+            if lab in cands or nm in cands:
+                col = i
+                break
+        if col is None:
+            continue
+        vals = []
+        for ev in rows:
+            stats = ev.get("stats", [])
+            if col < len(stats):
+                try:
+                    vals.append(float(str(stats[col]).replace(",", "")))
+                except (ValueError, TypeError):
+                    pass
+        if vals:
+            out[stat_key] = sum(vals) / len(vals)
+    if out:
+        out["_gp"] = gp_seen
+    _recent_cache[key] = (_t.time(), out)
+    return out
 
 
 def get_prop_history(sport, date, game_id, player_name, stat, line):
