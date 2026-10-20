@@ -489,24 +489,44 @@ def _team_athlete_avgs(sport, team_id, season=None):
         params = {"region": "us"}
         if season:
             params["season"] = str(season)
-        data = _get(_ATHLETE_STATS[sport].format(team=team_id), params)
+        data = _get(_ATHLETE_STATS[sport].format(team=team_id), params) or {}
     except Exception:
         return out
-    # structure: athletes[] -> {athlete:{displayName}, categories[]:{name, stats[]:{name,value}}}
-    athletes = data.get("athletes") or []
+    # ESPN changed this endpoint. Players now live under
+    #   results[<category>].leaders[] -> {athlete:{displayName,position}, statistics[]:{stats[]}}
+    # The old shape was athletes[] -> {athlete, categories[]}. Support both: the
+    # 'game' category's leaders list every rostered player with a full stat line.
+    entries = []
+    results = data.get("results")
+    if isinstance(results, list):
+        for cat in results:
+            leaders = (cat or {}).get("leaders") if isinstance(cat, dict) else None
+            if leaders:
+                entries = leaders
+                break
+    if not entries:
+        entries = data.get("athletes") or []   # legacy structure
     wanted = {name: key for key, names in _AVG_STAT_NAME.items() for name in names}
-    for entry in athletes:
+    # extra context so callers can keep to the rotation (starters + key bench)
+    extra = {"avgMinutes": "minutes", "gamesStarted": "gs", "gamesPlayed": "gp"}
+    for entry in entries:
         ath = entry.get("athlete", {}) or {}
         nm = ath.get("displayName")
         if not nm:
             continue
         vals = {}
-        for cat in entry.get("categories", []) or []:
-            for st in cat.get("stats", []) or []:
+        # NEW: entry['statistics'];  LEGACY: entry['categories']
+        for grp in (entry.get("statistics") or entry.get("categories") or []):
+            for st in (grp.get("stats", []) or []):
                 sname = st.get("name", "")
                 if sname in wanted:
                     try:
                         vals[wanted[sname]] = float(st.get("value"))
+                    except (ValueError, TypeError):
+                        pass
+                elif sname in extra:
+                    try:
+                        vals[extra[sname]] = float(st.get("value"))
                     except (ValueError, TypeError):
                         pass
         if vals:
