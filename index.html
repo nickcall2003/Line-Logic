@@ -5713,11 +5713,11 @@ function drawDeepRadar(R){
 /* ===== Player Edge — Statcast/nflverse-powered ranked player cards (MLB + NFL) ===== */
 var _peData={};
 var PE_PROJ_ORDER=["pass_yards","pass_tds","completions","rush_yards","rush_tds","rec_yards","receptions","rec_tds",
-  "shots_on_goal","points","rebounds","goals","assists","threes","saves","goals_against",
+  "shots_on_goal","points","rebounds","goals","assists","threes","steals","blocks","turnovers","pra","pr","pa","ra","saves","goals_against",
   "home_runs","hits","total_bases","rbis","runs","strikeouts","outs"];
 var PE_PROJ_LABEL={pass_yards:"Pass Yds",pass_tds:"Pass TD",completions:"Comp",rush_yards:"Rush Yds",rush_tds:"Rush TD",
   rec_yards:"Rec Yds",receptions:"Rec",rec_tds:"Rec TD",
-  shots_on_goal:"SOG",points:"Pts",rebounds:"Reb",goals:"Goals",assists:"Ast",threes:"3PM",saves:"Saves",goals_against:"GA",
+  shots_on_goal:"SOG",points:"Pts",rebounds:"Reb",goals:"Goals",assists:"Ast",threes:"3PM",steals:"Stl",blocks:"Blk",turnovers:"TO",pra:"P+R+A",pr:"P+R",pa:"P+A",ra:"R+A",saves:"Saves",goals_against:"GA",
   home_runs:"HR",hits:"Hits",total_bases:"Tot Bases",rbis:"RBIs",runs:"Runs",strikeouts:"Ks",outs:"Outs"};
 var PE_STAT_MATCH={
   pass_yards:["passing yards","pass yds"],pass_tds:["passing touchdown","passing td","pass td"],completions:["completions"],
@@ -5725,6 +5725,9 @@ var PE_STAT_MATCH={
   rec_yards:["receiving yards","rec yds","receiving yds"],receptions:["receptions"],rec_tds:["receiving touchdown","rec td"],
   shots_on_goal:["shots on goal","shots on net","sog"],points:["points"],goals:["goals"],assists:["assists"],
   rebounds:["rebound"],threes:["three","3-point","3pt","3 pt","3pm","made three"],
+  steals:["steal"],blocks:["block"],turnovers:["turnover"],
+  pra:["points + rebounds + assists","pts + reb + ast","points rebounds assists"],
+  pr:["points + rebounds","pts + reb"],pa:["points + assists","pts + ast"],ra:["rebounds + assists","reb + ast"],
   saves:["saves"],goals_against:["goals against"],
   home_runs:["home run"],hits:["hits"],total_bases:["total base"],rbis:["rbi","runs batted"],runs:["runs scored"],
   strikeouts:["strikeout"],outs:["outs"]};

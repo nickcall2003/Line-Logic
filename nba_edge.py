@@ -323,6 +323,23 @@ def _score_player(sport, name, avgs, bucket, usage_row, usage_lg, team_lg,
         proj["assists"] = round(ast * pace_factor * _dvp_factor(sport, opp_name, bucket, "assists", HA), 2)
     if thr is not None:
         proj["threes"] = round(thr * pace_factor * _dvp_factor(sport, opp_name, bucket, "threes", HA), 2)
+    # extra single-stat markets (pace-adjusted; DvP not meaningful for these)
+    stl, blk, tov = avgs.get("steals"), avgs.get("blocks"), avgs.get("turnovers")
+    if stl is not None:
+        proj["steals"] = round(stl * pace_factor, 2)
+    if blk is not None:
+        proj["blocks"] = round(blk * pace_factor, 2)
+    if tov is not None:
+        proj["turnovers"] = round(tov * pace_factor, 2)
+    # combo markets — arithmetic on the already-adjusted projections
+    if "points" in proj and "rebounds" in proj and "assists" in proj:
+        proj["pra"] = round(proj["points"] + proj["rebounds"] + proj["assists"], 2)
+    if "points" in proj and "rebounds" in proj:
+        proj["pr"] = round(proj["points"] + proj["rebounds"], 2)
+    if "points" in proj and "assists" in proj:
+        proj["pa"] = round(proj["points"] + proj["assists"], 2)
+    if "rebounds" in proj and "assists" in proj:
+        proj["ra"] = round(proj["rebounds"] + proj["assists"], 2)
 
     radar = {"Usage": p_usg, "Scoring": p_pts, "Minutes": p_min,
              "Efficiency": p_ts, "Playmaking": play,
