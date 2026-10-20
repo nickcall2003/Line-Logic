@@ -498,6 +498,21 @@ def game_cards(sport, game_id, date):
                     and (vals.get("assists") or 0) < 1.5:
                 continue
             plist.append((name, dict(vals)))
+        # Keep only players on the team's CURRENT roster. The stats feed is tied
+        # to last season's team, so an off-season trade (e.g. a star who left in
+        # the summer) would otherwise show on his OLD team. The dedicated /roster
+        # endpoint reflects trades. Gated: never wipe the list on a bad/empty
+        # roster fetch or a name-normalization mismatch.
+        try:
+            import re as _re2
+            cur_roster = EP.team_roster_names(sport, tid) or {}
+            if len(cur_roster) >= 8:
+                _n = lambda s: _re2.sub(r"[^a-z0-9]", "", (s or "").lower())
+                _kept = [(n, v) for (n, v) in plist if _n(n) in cur_roster]
+                if len(_kept) >= max(3, int(0.5 * len(plist))):
+                    plist = _kept
+        except Exception:
+            pass
         # drop OUT starters, boost the next man up (never let this break props)
         try:
             plist = _nba_apply_injuries(sport, tabbr, g[side].get("name") or tabbr, plist)
