@@ -169,6 +169,51 @@ def _leaks(sport, opp_name, bucket, HA, ranks):
     return out[:3]
 
 
+def _espn_team_rates(sport, team_id):
+    """Opponent pace + a defensive proxy from ESPN's team statistics, used when
+    the advanced source (stats.nba.com) is blocked from the server.
+
+    PACE is real: possessions = FGA + 0.44*FTA - OReb + TOV.
+    DEF_RTG is a PROXY: ESPN's free team feed has no points-allowed, so we scale
+    the league-average rating by the team's defensive activity (steals, blocks,
+    defensive boards). It's a nudge, tightly clamped downstream, not a true
+    points-allowed figure. Returns {def_rtg, pace, off_rtg} or None."""
+    if sport not in ("nba", "wnba") or not team_id:
+        return None
+    try:
+        import espn_provider as EP
+        data = EP._get(EP._ATHLETE_STATS[sport].format(team=team_id), {"region": "us"}) or {}
+    except Exception:
+        return None
+    off, dfn = {}, {}
+    for grp in (data.get("teamTotals") or []):
+        gname = (grp or {}).get("name")
+        for s in ((grp or {}).get("stats") or []):
+            (off if gname in ("offensive", "general") else dfn if gname == "defensive" else {})[s.get("name")] = s.get("value")
+
+    def gv(d, k):
+        try:
+            return float(d.get(k))
+        except (TypeError, ValueError):
+            return None
+    fga = gv(off, "avgFieldGoalsAttempted")
+    pts = gv(off, "avgPoints")
+    if fga is None or pts is None:
+        return None
+    pace = fga + 0.44 * (gv(off, "avgFreeThrowsAttempted") or 0) \
+        - (gv(off, "avgOffensiveRebounds") or 0) + (gv(off, "avgTurnovers") or 0)
+    if not pace:
+        return None
+    off_rtg = 100.0 * pts / pace
+    # defensive-activity index -> modest def_rtg proxy around the league mean
+    activity = (gv(dfn, "avgSteals") or 0) + (gv(dfn, "avgBlocks") or 0) \
+        + 0.25 * (gv(dfn, "avgDefensiveRebounds") or 0)
+    z = (activity - 21.0) / 3.0            # rough NBA baseline for this index
+    def_rtg = 113.0 - _clamp(z, -2.2, 2.2) * 2.3   # more activity -> tougher D
+    return {"def_rtg": round(def_rtg, 1), "pace": round(pace, 1),
+            "off_rtg": round(off_rtg, 1)}
+
+
 def _factors(sport, own_adv, opp_adv):
     """pace + defensive-rating multipliers (replicates get_props)."""
     ref = _REF[sport]
@@ -357,20 +402,32 @@ def game_cards(sport, game_id, date):
     if not g:
         return {"error": "game not found", "cards": []}
     team_adv = HA.team_advanced(sport) or {}
+    # stats.nba.com blocked -> source pace + a defensive proxy from ESPN for the
+    # two teams in THIS game, so projections factor the opponent (not a flat 50).
+    espn_rates = {}
+    if not team_adv:
+        for _s in ("home", "away"):
+            _nm = (g[_s].get("name") or "").upper()
+            _r = _espn_team_rates(sport, g[_s].get("team_id"))
+            if _r and _nm:
+                espn_rates[_nm] = _r
     usage = HA.player_usage(sport) or {}
     usage_lg = _league_usage_stats(usage)
-    team_lg = _league_team_stats(team_adv)
+    # With no real league table, fall back to league-constant mean/sd so the
+    # opportunity z-scores stay sane (2-team stats would be degenerate).
+    team_lg = _league_team_stats(team_adv) or {"def_rtg": _REF[sport]["def_rtg"],
+                                               "pace": _REF[sport]["pace"]}
     team_names = list(team_adv.keys())
     ranks = _dvp_ranks(HA, sport, team_names)
 
     def _adv_for(name):
-        if not team_adv or not name:
+        if not name:
             return None
         n = str(name).upper()
         for k, v in team_adv.items():
             if k == n or n in k or k in n:
                 return v
-        return None
+        return espn_rates.get(n)
 
     cards = []
     for side in ("home", "away"):
