@@ -169,15 +169,40 @@ def _leaks(sport, opp_name, bucket, HA, ranks):
     return out[:3]
 
 
+def _espn_points_against(sport, team_id):
+    """True points allowed/scored per game from ESPN standings (works from the
+    server, cached). Returns (pts_against, pts_for) per game, or (None, None)
+    — empty before the season has games played."""
+    try:
+        import espn_depth
+        table = espn_depth._standings(sport) or {}
+    except Exception:
+        return None, None
+
+    def _f(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+    for v in table.values():
+        if str(v.get("id")) != str(team_id):
+            continue
+        st = v.get("stats") or {}
+        pa = _f(st.get("avgPointsAgainst"))
+        pf = _f(st.get("avgPointsFor"))
+        # ignore a 0.0 that just means "no games yet"
+        return (pa if pa else None), (pf if pf else None)
+    return None, None
+
+
 def _espn_team_rates(sport, team_id):
-    """Opponent pace + a defensive proxy from ESPN's team statistics, used when
-    the advanced source (stats.nba.com) is blocked from the server.
+    """Opponent pace + defensive rating from ESPN, used when the advanced source
+    (stats.nba.com) is blocked from the server.
 
     PACE is real: possessions = FGA + 0.44*FTA - OReb + TOV.
-    DEF_RTG is a PROXY: ESPN's free team feed has no points-allowed, so we scale
-    the league-average rating by the team's defensive activity (steals, blocks,
-    defensive boards). It's a nudge, tightly clamped downstream, not a true
-    points-allowed figure. Returns {def_rtg, pace, off_rtg} or None."""
+    DEF_RTG uses TRUE points allowed/game from ESPN standings when the season has
+    games; before that it falls back to a clamped defensive-activity proxy
+    (steals/blocks/boards). Returns {def_rtg, pace, off_rtg, def_src} or None."""
     if sport not in ("nba", "wnba") or not team_id:
         return None
     try:
@@ -205,13 +230,19 @@ def _espn_team_rates(sport, team_id):
     if not pace:
         return None
     off_rtg = 100.0 * pts / pace
-    # defensive-activity index -> modest def_rtg proxy around the league mean
-    activity = (gv(dfn, "avgSteals") or 0) + (gv(dfn, "avgBlocks") or 0) \
-        + 0.25 * (gv(dfn, "avgDefensiveRebounds") or 0)
-    z = (activity - 21.0) / 3.0            # rough NBA baseline for this index
-    def_rtg = 113.0 - _clamp(z, -2.2, 2.2) * 2.3   # more activity -> tougher D
-    return {"def_rtg": round(def_rtg, 1), "pace": round(pace, 1),
-            "off_rtg": round(off_rtg, 1)}
+    # TRUE defense first: points allowed/game from standings. At ~100 pace that
+    # is already ~points per 100 poss, which is what the model's def_rtg expects.
+    pa, _pf = _espn_points_against(sport, team_id)
+    if pa is not None:
+        def_rtg, def_src = round(pa, 1), "standings_pa"
+    else:
+        # pre-season / no games yet -> clamped defensive-activity proxy
+        activity = (gv(dfn, "avgSteals") or 0) + (gv(dfn, "avgBlocks") or 0) \
+            + 0.25 * (gv(dfn, "avgDefensiveRebounds") or 0)
+        z = (activity - 21.0) / 3.0
+        def_rtg, def_src = round(113.0 - _clamp(z, -2.2, 2.2) * 2.3, 1), "activity_proxy"
+    return {"def_rtg": def_rtg, "pace": round(pace, 1),
+            "off_rtg": round(off_rtg, 1), "def_src": def_src}
 
 
 def _factors(sport, own_adv, opp_adv):
