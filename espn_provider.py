@@ -895,6 +895,55 @@ def team_roster_names(sport, team_id):
     return out
 
 
+_roster_meta_cache = {}
+
+
+def _parse_height_inches(height, disp):
+    """Real height in inches from the roster feed. ESPN gives numeric inches
+    and/or a display string like 7' 4\"."""
+    try:
+        if height is not None:
+            hv = float(height)
+            if 50 <= hv <= 100:          # already inches
+                return hv
+    except (TypeError, ValueError):
+        pass
+    import re as _re
+    m = _re.search(r"(\d+)'\s*(\d+)", str(disp or ""))
+    if m:
+        return int(m.group(1)) * 12 + int(m.group(2))
+    return None
+
+
+def team_roster_meta(sport, team_id):
+    """{norm_name: {"h": height_inches, "pos": abbr}} from the dedicated roster
+    endpoint — real heights + positions for the tipoff model, etc."""
+    import re
+    key = (sport, str(team_id))
+    if key in _roster_meta_cache:
+        return _roster_meta_cache[key]
+    out = {}
+    try:
+        url = _ROSTER_URL.get(sport)
+        if url and team_id:
+            data = _get(url.format(team=team_id), {})
+            for grp in (data.get("athletes") or []):
+                items = (grp.get("items")
+                         if isinstance(grp, dict) and isinstance(grp.get("items"), list)
+                         else [grp])
+                for a in (items or []):
+                    nm = (a or {}).get("displayName") or (a or {}).get("fullName")
+                    if not nm:
+                        continue
+                    out[re.sub(r"[^a-z0-9]", "", nm.lower())] = {
+                        "h": _parse_height_inches(a.get("height"), a.get("displayHeight")),
+                        "pos": ((a.get("position") or {}) or {}).get("abbreviation") or ""}
+    except Exception:
+        pass
+    _roster_meta_cache[key] = out
+    return out
+
+
 def _game_roster_ids(sport, date, game_id):
     ids = {}
     try:

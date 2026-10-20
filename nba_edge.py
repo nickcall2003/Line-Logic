@@ -442,17 +442,19 @@ def _nba_apply_injuries(sport, tabbr, tname, plist):
 _FB_POS_BOOST = {"C": 1.15, "PF": 1.04, "PG": 1.10, "SG": 1.05, "SF": 1.0, "G": 1.08, "F": 1.02}
 
 
-def _first_basket_probs(pool):
+def _first_basket_probs(pool, tip_home_prob=None, home_abbr=None):
     """Model estimate of who scores the game's FIRST basket.
 
     pool = [{name, team, pos, fga, fgpct}] for the players expected on the floor
-    at tip (each team's top-minutes starters). Weight = early-shot volume (FGA)
-    * make rate (FG%) * a small position nudge (centers/guards touch it first).
-    Probabilities are normalized across both teams' starters so they sum to ~1.
+    at tip (each team's top-minutes starters). Within a team, weight = early-shot
+    volume (FGA) * make rate (FG%) * a small position nudge. The TEAM split is
+    then set by the opening tip: the team that wins the tip gets first possession
+    and scores first a bit more often, so `tip_home_prob` (from real heights)
+    nudges the home/away mass. Probabilities sum to ~1.
 
-    Honest about its limits: this is a transparent usage-based estimate, NOT
-    trained on historical first-basket outcomes (which aren't freely available),
-    so it won't capture a player's specific tendency to take the opening shot."""
+    Honest limits: the within-team shot share is a transparent usage estimate,
+    not trained on historical first-basket outcomes; the tip edge is modeled from
+    real player heights, not logged jump-ball win rates (see the PBP upgrade)."""
     weighted = []
     for p in pool:
         try:
@@ -467,11 +469,47 @@ def _first_basket_probs(pool):
     tot = sum(w for _, w in weighted)
     if tot <= 0:
         return []
+    # Tip adjustment: retarget the HOME team's share of first-basket mass toward
+    # the tip winner (first possession scores first a bit more). Centered at 50%.
+    if tip_home_prob is not None and home_abbr:
+        raw_home = sum(w for p, w in weighted if p.get("team") == home_abbr)
+        if 0 < raw_home < tot:
+            TIP_INFLUENCE = 0.35
+            target_home = 0.5 + TIP_INFLUENCE * (tip_home_prob - 0.5)
+            sh = target_home / (raw_home / tot)
+            sa = (1 - target_home) / (1 - raw_home / tot)
+            weighted = [(p, w * (sh if p.get("team") == home_abbr else sa))
+                        for p, w in weighted]
+            tot = sum(w for _, w in weighted)
     out = [{"player": p["name"], "team": p.get("team"), "pos": p.get("pos"),
             "prob": round(w / tot, 4),
             "fair_odds": _prob_to_american(w / tot)} for p, w in weighted]
     out.sort(key=lambda x: x["prob"], reverse=True)
     return out[:12]
+
+
+def _tip_matchup(fb_pool, team_abbr, meta):
+    """The player who takes the tip for a team = the tallest of its likely
+    starters (real height from the roster). Returns (name, height_in, pos)."""
+    import re
+    best = None
+    for p in fb_pool:
+        if p.get("team") != team_abbr:
+            continue
+        m = meta.get(re.sub(r"[^a-z0-9]", "", (p.get("name") or "").lower())) or {}
+        h = m.get("h")
+        if h and (best is None or h > best[1]):
+            best = (p.get("name"), h, m.get("pos") or p.get("pos"))
+    return best
+
+
+def _tip_home_prob(h_home, h_away):
+    """P(home wins the opening tip) from the height differential of the two
+    jumpers. Height/reach is the dominant jump-ball factor; ~0.25/inch logit
+    puts a 3-inch edge near 68%."""
+    if not h_home or not h_away:
+        return None
+    return 1.0 / (1.0 + math.exp(-0.25 * (h_home - h_away)))
 
 
 def _prob_to_american(prob):
@@ -609,10 +647,31 @@ def game_cards(sport, game_id, date):
             g["away"].get("name") or g["away"].get("abbr")) or []
     except Exception:
         book = []
-    first_basket = _first_basket_probs(fb_pool)
+    # Tipoff edge from the two tallest starters' REAL heights (ESPN roster).
+    tipoff = None
+    _p_home = None
+    try:
+        _ha, _aa = g["home"].get("abbr"), g["away"].get("abbr")
+        _mh = EP.team_roster_meta(sport, g["home"].get("team_id"))
+        _ma = EP.team_roster_meta(sport, g["away"].get("team_id"))
+        _tc_h = _tip_matchup(fb_pool, _ha, _mh)
+        _tc_a = _tip_matchup(fb_pool, _aa, _ma)
+        if _tc_h and _tc_a:
+            _p_home = _tip_home_prob(_tc_h[1], _tc_a[1])
+            if _p_home is not None:
+                tipoff = {"home_abbr": _ha, "away_abbr": _aa,
+                          "home_center": _tc_h[0], "home_h": _tc_h[1],
+                          "away_center": _tc_a[0], "away_h": _tc_a[1],
+                          "home_tip_pct": round(_p_home * 100),
+                          "away_tip_pct": round((1 - _p_home) * 100),
+                          "basis": "height"}
+    except Exception:
+        tipoff, _p_home = None, None
+    first_basket = _first_basket_probs(fb_pool, _p_home, g["home"].get("abbr"))
     return {"game_id": game_id, "home_team": g["home"].get("abbr"),
             "away_team": g["away"].get("abbr"), "count": len(cards),
-            "cards": cards, "props": book, "first_basket": first_basket}
+            "cards": cards, "props": book, "first_basket": first_basket,
+            "tipoff": tipoff}
 
 
 def register(app):

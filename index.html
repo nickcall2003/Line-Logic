@@ -6117,8 +6117,17 @@ function peRender(gid,d,props){
       tabKeys.map(function(k){return '<button class="pe-tab'+(activeProp===k?' on':'')+'" onclick="peSelProp(\''+gid+'\',\''+k+'\')">'+(PE_PROJ_LABEL[k]||k).toUpperCase()+'</button>';}).join("")+'</div>';}
   var fbPanel="";
   if(d.first_basket&&d.first_basket.length){
+    var tipLine="";
+    if(d.tipoff&&d.tipoff.home_center&&d.tipoff.away_center){
+      var _t=d.tipoff,_ht=function(n){return n?(Math.floor(n/12)+"'"+Math.round(n%12)+'"'):"";};
+      var _hw=_t.home_tip_pct>=_t.away_tip_pct,_win=_hw?_t.home_abbr:_t.away_abbr,_wp=Math.max(_t.home_tip_pct,_t.away_tip_pct);
+      tipLine='<div style="font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:0 0 9px">'+
+        '🤚 Tip: '+_t.away_center+' '+_ht(_t.away_h)+' vs '+_t.home_center+' '+_ht(_t.home_h)+
+        ' — <b style="color:var(--gold)">'+_win+' '+_wp+'%</b> <span style="opacity:.7">win (height model)</span></div>';
+    }
     fbPanel='<div style="background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:12px 0 2px">'+
       '<div style="font-family:var(--disp);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:8px">🏀 First Basket · model probability</div>'+
+      tipLine+
       d.first_basket.slice(0,8).map(function(f,idx){
         return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:'+(idx?"1px solid var(--line)":"0")+'">'+
           '<span style="font-family:var(--mono);color:var(--muted-2);width:15px;font-size:11px">'+(idx+1)+'</span>'+
