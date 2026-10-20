@@ -6098,7 +6098,9 @@ function peRender(gid,d,props){
 function _peProps(key){
   var d=_peData[key],sp=d&&d._sport;
   var g=(sp==="mlb")?(typeof mlbProps!=="undefined"?mlbProps:null):(typeof teamProps!=="undefined"?teamProps:null);
-  return (g&&g!=="loading"&&g.props)?g.props:[];}
+  if(g&&g!=="loading"&&g.props&&g.props.length)return g.props;
+  // Fall back to book lines bundled in the Player Edge (venom) response itself.
+  return (d&&d.props&&d.props.length)?d.props:[];}
 function _pePaint(key){var mount=document.getElementById("pe-mount"),d=_peData[key];
   if(!mount||!d)return; mount.innerHTML=peRender(key,d,_peProps(key)); if(!d._prop)peToggle(key,0);}
 /* ===== Game Analysis: impact-player strip (top Player Edge movers in the game view) ===== */

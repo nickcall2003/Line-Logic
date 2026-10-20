@@ -424,8 +424,20 @@ def game_cards(sport, game_id, date):
     cards.sort(key=lambda c: c.get("logic_score") or 0, reverse=True)
     for i, c in enumerate(cards, 1):
         c["rank"] = i
+    # Real sportsbook player-prop lines (points/reb/ast/threes), matched to the
+    # cards client-side by player+stat. Degrades to [] with no key / no prop
+    # add-on on the plan, so the projections still render on their own.
+    book = []
+    try:
+        import odds_api
+        book = odds_api.get_player_props(
+            sport, g["home"].get("name") or g["home"].get("abbr"),
+            g["away"].get("name") or g["away"].get("abbr")) or []
+    except Exception:
+        book = []
     return {"game_id": game_id, "home_team": g["home"].get("abbr"),
-            "away_team": g["away"].get("abbr"), "count": len(cards), "cards": cards}
+            "away_team": g["away"].get("abbr"), "count": len(cards),
+            "cards": cards, "props": book}
 
 
 def register(app):
