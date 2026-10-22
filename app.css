@@ -1577,6 +1577,14 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .clv-big{font-family:"Archivo",sans-serif;font-weight:900;font-size:42px;line-height:1;margin:4px 0 6px}
 .clv-big.pos{color:var(--win)} .clv-big.neg{color:var(--loss)}
 .clv-sub{font-size:12.5px;color:var(--muted)}
+.pm-err{font-size:12px;color:var(--muted);margin:8px 0 2px}
+.pm-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
+.pm-stat{flex:1 1 90px;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.pm-stat-lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.pm-stat-pct{font-family:"Archivo",sans-serif;font-weight:800;font-size:18px;color:var(--text)}
+.pm-stat-pct.pos{color:var(--win)}
+.pm-stat-n{font-size:10.5px;color:var(--muted-2)}
 
 /* ===== "How yesterday went" — the return-visit hook ===== */
 .yd{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;

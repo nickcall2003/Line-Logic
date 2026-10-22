@@ -1102,6 +1102,46 @@ def _batter_rates(batter_id):
         return None
 
 
+_batter_recent_cache = {}   # batter_id -> (ts, {stat: avg, "_gp": n})
+
+
+def _batter_recent_rates(batter_id, n=10):
+    """Per-game hits/HR/RBI over a batter's last `n` games, from one cached
+    hitting gameLog fetch. {stat: recent_avg, "_gp": games}; empty when no log.
+    Lets batter projections lean on current form, not just the season line."""
+    if not batter_id:
+        return {}
+    c = _batter_recent_cache.get(batter_id)
+    if c and time.time() - c[0] < _DAY_TTL:
+        return c[1]
+    out = {}
+    try:
+        data = _get(f"{BASE}/people/{batter_id}/stats",
+                    {"stats": "gameLog", "group": "hitting", "season": SEASON})
+        splits = (data["stats"][0]["splits"] or [])[-n:]
+    except Exception:
+        splits = []
+    if splits:
+        acc = {"hits": [], "home_runs": [], "rbis": []}
+        field = {"hits": "hits", "home_runs": "homeRuns", "rbis": "rbi"}
+        for s in splits:
+            st = s.get("stat", {}) or {}
+            for k, f in field.items():
+                v = st.get(f)
+                if v is not None:
+                    try:
+                        acc[k].append(float(v))
+                    except (ValueError, TypeError):
+                        pass
+        for k, vals in acc.items():
+            if vals:
+                out[k] = sum(vals) / len(vals)
+        if out:
+            out["_gp"] = len(splits)
+    _batter_recent_cache[batter_id] = (time.time(), out)
+    return out
+
+
 def get_batter_props(date: dt.date, game_id: int, max_batters=9):
     """Hits/HR/RBI props for each team's lineup (or projected batters)."""
     from props import project_prop, default_line
@@ -1150,6 +1190,11 @@ def get_batter_props(date: dt.date, game_id: int, max_batters=9):
             rates = _batter_rates(b["id"])
             if not rates:
                 continue
+            # RECENT FORM: blend the batter's last-10 games into the season rate
+            # so a hot/cold streak moves the projection. Season rate stays shown
+            # as season_avg; weight scales with sample (one cached fetch/batter).
+            _brec = _batter_recent_rates(b["id"])
+            _brgp = _brec.get("_gp") or 0
             # this hitter vs that specific pitch (real sample required)
             bvp, bvp_f = None, 1.0
             if _prim:
@@ -1164,6 +1209,15 @@ def get_batter_props(date: dt.date, game_id: int, max_batters=9):
                 rate = rates[stat]
                 if rate <= 0:
                     continue
+                # recent-form blend: lean the baseline toward the last-10 games.
+                base_rate = rate
+                _rr = _brec.get(stat)
+                form_pct = 0.0
+                if _rr is not None and _brgp >= 4:
+                    _w = 0.35 if _brgp >= 7 else 0.22
+                    base_rate = rate * (1 - _w) + _rr * _w
+                    if rate:
+                        form_pct = round((base_rate / rate - 1) * 100, 1)
                 # contact factor applies to hits/RBIs; HR is power-driven, so use a
                 # softened version rather than pretending AVG predicts homers.
                 f = hit_f if stat in ("hits", "rbis") else (1 + (hit_f - 1) * 0.5)
@@ -1171,7 +1225,7 @@ def get_batter_props(date: dt.date, game_id: int, max_batters=9):
                 # power props get half weight (batting average predicts contact,
                 # not power)
                 bf = bvp_f if stat in ("hits", "rbis") else (1 + (bvp_f - 1) * 0.5)
-                adj = rate * f * bf
+                adj = base_rate * f * bf
                 line = default_line(stat, adj)
                 proj = project_prop(stat, adj, line)
                 if not proj:
@@ -1180,7 +1234,15 @@ def get_batter_props(date: dt.date, game_id: int, max_batters=9):
                 proj["team"] = g[side_key]["name"]
                 proj["label"] = labels[stat]
                 proj["season_avg"] = round(rate, 2)
+                if _rr is not None and _brgp >= 4:
+                    proj["recent_avg"] = round(_rr, 2)
+                    proj["recent_gp"] = _brgp
+                    proj["form_adj_pct"] = form_pct
                 bits = [c for c in (ctx,) if c]
+                if _rr is not None and _brgp >= 4:
+                    _arrow = "↑" if form_pct > 1 else ("↓" if form_pct < -1 else "→")
+                    bits.append(f"L{_brgp} {round(_rr,2)} {_arrow}"
+                                + (f" ({'%+.0f' % form_pct}%)" if abs(form_pct) >= 1 else ""))
                 if bvp and bvp.get("league_ba"):
                     _d = round((bvp_f - 1) * 100)
                     bits.append(f"vs {_prim}: hits {bvp['ba']:.3f} "
