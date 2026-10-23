@@ -30,6 +30,61 @@ _DAILY_MAX = int(os.environ.get("ODDS_DAILY_MAX", "30"))   # requests/day, all s
 _MIN_REMAINING = 20    # stop calling if the API says this few are left this month
 _spend = {"day": None, "count": 0}
 
+# --- attributed credit accounting ----------------------------------------
+# The Odds API bills CREDITS = markets x regions per request, so a props call
+# (4 markets) costs 4, a game-odds call (h2h+spreads+totals) costs 3, a tennis
+# h2h call costs 1. We attribute every paid call to a category and persist the
+# running monthly total, so "where did the 20k credits go?" is answerable
+# instead of guessed. Best-effort file; survives restarts, resets each month.
+import json as _json
+_USAGE_FILE = os.environ.get("ODDS_USAGE_FILE", "odds_usage.json")
+_usage = {}
+
+
+def _usage_load():
+    global _usage
+    try:
+        with open(_USAGE_FILE) as f:
+            _usage = _json.load(f) or {}
+    except Exception:
+        _usage = {}
+
+
+def _usage_save():
+    try:
+        with open(_USAGE_FILE, "w") as f:
+            _json.dump(_usage, f)
+    except Exception:
+        pass
+
+
+_usage_load()
+
+
+def _charge(category, credits=1):
+    """Count one API request against the daily cap AND attribute its credit cost
+    (markets x regions) to a category for the month, so usage is observable."""
+    _spend["count"] = _spend.get("count", 0) + 1
+    try:
+        mkey = dt.date.today().strftime("%Y-%m")
+        u = _usage.setdefault(mkey, {})
+        u[category] = u.get(category, 0) + int(credits)
+        u["_total"] = u.get("_total", 0) + int(credits)
+        u["_requests"] = u.get("_requests", 0) + 1
+        _usage_save()
+    except Exception:
+        pass
+
+
+def usage(month=None):
+    """Per-category credit spend for a month (default current). The Odds API's
+    own x-requests-used is the source of truth for the monthly total; this is the
+    breakdown of where our calls went."""
+    mkey = month or dt.date.today().strftime("%Y-%m")
+    return {"month": mkey, "by_category": _usage.get(mkey, {}),
+            "months_tracked": sorted(_usage.keys()),
+            "api_used": _quota.get("used"), "api_remaining": _quota.get("remaining")}
+
 
 def _quota_ok():
     today = dt.date.today().isoformat()
@@ -86,7 +141,10 @@ _TENNIS_ODDS_TTL = 6 * 3600      # odds per tournament refreshed every 6h
 _tennis_odds_cache = {}          # sport_key -> (ts, {match_key: odds})
 
 _cache = {}        # sport -> (ts, {match_key: {...odds...}})
-_TTL = 900         # 15 min; protects the monthly quota
+_TTL = int(os.environ.get("ODDS_TTL_SECONDS", "2700"))   # 45 min; protects the monthly quota
+# Game lines barely move over 45 min, but game-odds is pulled from many routes
+# (board warmer, capper, promo). At 3 credits/call x many sports, a short TTL was
+# a top credit drain. ODDS_TTL_SECONDS tunes it; raise to spend less.
 _quota = {"remaining": None, "used": None}
 
 # In-season ("active") sport keys, from the free /sports list. Used to avoid
@@ -165,7 +223,7 @@ def get_odds(sport: str):
     try:
         import httpx
         r = httpx.get(url, params=params, timeout=6)
-        _spend_one()
+        _charge("game_odds", 3)   # h2h + spreads + totals x 1 region
         _quota["remaining"] = r.headers.get("x-requests-remaining")
         _quota["used"] = r.headers.get("x-requests-used")
         r.raise_for_status()
@@ -349,7 +407,7 @@ def get_golf_outrights():
                               "oddsFormat": "american", "apiKey": API_KEY}, timeout=6)
         r.raise_for_status()
         data = r.json()
-        _spend_one()
+        _charge("golf", 1)   # outrights x 1 region
     except Exception as e:
         print(f"[odds] golf outrights failed: {e}")
         return _golf_out_cache["data"] or empty
@@ -405,6 +463,7 @@ def diag():
         "active_sport_keys": active,
         "cached": {k: len(v[1]) for k, v in _cache.items()},
         "cached_soccer": {k: len(v[1]) for k, v in _soccer_cache.items()},
+        "usage_this_month": _usage.get(dt.date.today().strftime("%Y-%m"), {}),
     }
 
 
@@ -432,7 +491,7 @@ def get_soccer_odds(slug):
     try:
         import httpx
         r = httpx.get(url, params=params, timeout=6)
-        _spend_one()
+        _charge("soccer", 3)   # h2h x 3 regions (us,uk,eu)
         _quota["remaining"] = r.headers.get("x-requests-remaining")
         _quota["used"] = r.headers.get("x-requests-used")
         r.raise_for_status()
@@ -549,7 +608,7 @@ def get_tennis_odds():
                           params={"regions": "us", "markets": _ten_mkts,
                                   "oddsFormat": "american", "apiKey": API_KEY},
                           timeout=6)
-            _spend_one()
+            _charge("tennis", _ten_mkts.count(",") + 1)   # markets x 1 region
             _quota["remaining"] = r.headers.get("x-requests-remaining")
             _quota["used"] = r.headers.get("x-requests-used")
             r.raise_for_status()
@@ -643,6 +702,7 @@ PROP_MARKETS = {
 
 _events_cache = {}   # sport -> (ts, {match_key: event_id})
 _props_cache = {}    # (sport, event_id) -> (ts, [props])
+_PROPS_TTL = int(os.environ.get("ODDS_PROPS_TTL", "2700"))   # 45 min; props are 4 credits/call
 
 
 def _event_id(sport, home, away):
@@ -704,7 +764,7 @@ def get_player_props(sport, home, away):
         return []
     ck = (sport, eid)
     c = _props_cache.get(ck)
-    if c and time.time() - c[0] < 900:
+    if c and time.time() - c[0] < _PROPS_TTL:
         return c[1]
     if not _quota_ok():
         return c[1] if c else []
@@ -720,6 +780,11 @@ def get_player_props(sport, home, away):
             _props_cache[ck] = (time.time(), [])
             return []
         r.raise_for_status()
+        # CREDIT COST: this per-event endpoint bills one credit PER MARKET
+        # (x regions=1). NBA = 4 markets = 4 credits per game. This was never
+        # counted before, so player props — the single most expensive call —
+        # bypassed the daily cap entirely. Now attributed and capped.
+        _charge("player_props_" + sport, len(labels))
         _quota["remaining"] = r.headers.get("x-requests-remaining")
         _quota["used"] = r.headers.get("x-requests-used")
         data = r.json() or {}
@@ -817,7 +882,7 @@ def get_tennis_events():
             r = httpx.get(f"{BASE}/sports/{key}/odds",
                           params={"regions": "us", "markets": "h2h",
                                   "oddsFormat": "american", "apiKey": API_KEY}, timeout=6)
-            _spend_one()
+            _charge("tennis_schedule", 1)   # h2h x 1 region (used for schedule)
             _quota["remaining"] = r.headers.get("x-requests-remaining")
             _quota["used"] = r.headers.get("x-requests-used")
             r.raise_for_status()

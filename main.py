@@ -6429,6 +6429,18 @@ def _odds_diag():
     return JSONResponse(out, headers={"Cache-Control": "no-store"})
 
 
+@app.get("/api/odds/usage")
+def _odds_usage(month: str | None = None):
+    """Where the Odds-API credits went this month, by category (player props by
+    sport, game odds, tennis, soccer, golf). The API's own x-requests-used is the
+    authoritative monthly total; this is the attributed breakdown."""
+    try:
+        import odds_api
+        return JSONResponse(odds_api.usage(month), headers={"Cache-Control": "no-store"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:200]}, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/surface/diag")
 def _surface_diag(name: str = "A. Zverev", name2: str = "V. Kopriva"):
     """Diagnose surface-record lookups. ?name=...&name2=... to test specific
