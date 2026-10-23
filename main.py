@@ -5285,10 +5285,15 @@ def team_game(sport: str, game_id: str, date: str | None = None):
     return g
 
 
-def _book_props(sport, g):
+def _book_props(sport, g, allow_paid=True):
     """Resolve real sportsbook player props: SportsGameOdds (free tier includes
     props) first, then The Odds API. Returns a props list or None. Soccer
-    passes its per-match league (one of 15) to SportsGameOdds."""
+    passes its per-match league (one of 15) to SportsGameOdds.
+
+    allow_paid=False skips the paid Odds-API fallback entirely — used by the
+    background auto-logger so slate-wide prop logging never spends credits
+    (it falls back to the model projection instead). Only a real user opening a
+    game spends a paid prop credit."""
     home, away = g["home"]["name"], g["away"]["name"]
     sgo_league = None
     if sport == "soccer":
@@ -5312,6 +5317,8 @@ def _book_props(sport, g):
         print(f"[{sport}] sgo props failed: {e}")
     if sport == "soccer":
         return None                       # no Odds-API soccer player props
+    if not allow_paid:
+        return None                       # background sweep: never spend credits
     try:
         import odds_api
         b = odds_api.get_player_props(sport, home, away)
@@ -5747,7 +5754,8 @@ def mlb_props(game_id: int, date: str | None = None):
 
 
 @app.get("/api/{sport}/props/{game_id}")
-def team_props(sport: str, game_id: str, date: str | None = None):
+def team_props(sport: str, game_id: str, date: str | None = None,
+               allow_paid: bool = True):
     if sport not in ("nba", "wnba", "nfl"):
         return {"props": []}
     target = dt.date.fromisoformat(date) if date else dt.date.today()
@@ -5770,7 +5778,7 @@ def team_props(sport: str, game_id: str, date: str | None = None):
                 g = None
         if g:
             status = g.get("status")
-            b = _book_props(sport, g)
+            b = _book_props(sport, g, allow_paid=allow_paid)
             if b:
                 return _enrich_props(sport, game_id, target,
                                      {"game_id": game_id, "props": b,
@@ -5867,8 +5875,12 @@ def _autolog_props(day=None, sports=("nba", "wnba", "nfl", "mlb")):
                     continue
                 try:
                     # going through team_props means props get logged + graded by the
-                    # same path the UI uses (no duplicate logic to drift)
-                    res = team_props(sport, str(gid), date=day.isoformat())
+                    # same path the UI uses (no duplicate logic to drift). allow_paid
+                    # =False so this background slate sweep NEVER spends paid credits
+                    # — it logs SGO (free) or the model projection; paid prop credits
+                    # are reserved for a real user opening a game.
+                    res = team_props(sport, str(gid), date=day.isoformat(),
+                                     allow_paid=False)
                     n += len((res or {}).get("props") or [])
                 except Exception as e:
                     out["errors"] += 1

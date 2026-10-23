@@ -86,6 +86,32 @@ def usage(month=None):
             "api_used": _quota.get("used"), "api_remaining": _quota.get("remaining")}
 
 
+# Monthly pace governor: spread the plan evenly across the month so a busy
+# early stretch can't drain the whole quota in two weeks. If the API says we've
+# already used more than today's pro-rated share (plus slack), hold paid calls
+# until the pace catches up. ODDS_MONTHLY_PLAN = your plan's monthly credits.
+_MONTHLY_PLAN = int(os.environ.get("ODDS_MONTHLY_PLAN", "20000"))
+_PACE_SLACK = float(os.environ.get("ODDS_PACE_SLACK", "1.20"))  # allow 20% ahead
+
+
+def _over_pace():
+    """True when month-to-date spend is running ahead of an even daily pace."""
+    if _MONTHLY_PLAN <= 0:
+        return False
+    try:
+        used = int(_quota.get("used") or 0)
+    except (ValueError, TypeError):
+        return False
+    if used <= 0:
+        return False
+    import calendar
+    today = dt.date.today()
+    dim = calendar.monthrange(today.year, today.month)[1]
+    # allowance through END of today, with slack
+    target = _MONTHLY_PLAN * (today.day / dim) * _PACE_SLACK
+    return used > target
+
+
 def _quota_ok():
     today = dt.date.today().isoformat()
     if _spend["day"] != today:
@@ -99,6 +125,8 @@ def _quota_ok():
             return False
     except (ValueError, TypeError):
         pass
+    if _over_pace():
+        return False
     return True
 
 
@@ -460,6 +488,8 @@ def diag():
         "daily_max": _DAILY_MAX,
         "min_remaining_floor": _MIN_REMAINING,
         "quota_ok": _quota_ok(),
+        "over_pace": _over_pace(),
+        "monthly_plan": _MONTHLY_PLAN,
         "active_sport_keys": active,
         "cached": {k: len(v[1]) for k, v in _cache.items()},
         "cached_soccer": {k: len(v[1]) for k, v in _soccer_cache.items()},
