@@ -446,6 +446,8 @@ def get_games(date: dt.date, force_live=False):
         games.append({
             "id": gid, "sport": "mlb", "status": status,
             "event_time": _ct_time(g.get("gameDate", "")),
+            "start_ts": g.get("gameDate", "") or "",   # raw ISO UTC — sorts chronologically
+
             "home": _side(home, home_t, hp), "away": _side(away, away_t, ap),
             "prob_home": pred["prob_home"], "confidence": pred["confidence"],
             "series": series_note,

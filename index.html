@@ -891,8 +891,22 @@ function _byEdge(a,b){
   if(na&&nb)return favPct(b)-favPct(a); // both edgeless -> fall back to model %
   return eb-ea;                         // biggest edge first
 }
+// Chronological order: live games first, then upcoming by start time, then
+// finished. start_ts is the raw ISO UTC kickoff/tip, so it sorts correctly
+// regardless of sport or time zone; falls back to scheduled/kickoff_iso.
+function _startKey(g){return g.start_ts||g.scheduled||g.kickoff_iso||"";}
+function _statusGroup(g){return g.status==="live"?0:(g.status==="finished"?2:1);}
+function _byTime(a,b){
+  var ga=_statusGroup(a),gb=_statusGroup(b);
+  if(ga!==gb)return ga-gb;
+  var sa=_startKey(a),sb=_startKey(b);
+  if(sa&&sb&&sa!==sb)return sa<sb?-1:1;
+  if(sa&&!sb)return -1;
+  if(sb&&!sa)return 1;
+  return 0;
+}
 function appendSortToggle(el){var wrap=document.createElement("span");wrap.className="sortwrap";
-  [["featured","\u2605 Top"],["confidence","Model %"],["edge","Edge %"]].forEach(function(pr){
+  [["featured","\u2605 Top"],["time","\ud83d\udd52 Time"],["confidence","Model %"],["edge","Edge %"]].forEach(function(pr){
     var b=document.createElement("button");b.className="tab sortbtn"+(sortMode===pr[0]?" active":"");
     b.innerHTML=pr[1];b.onclick=function(){sortMode=pr[0];prefSet("sort",sortMode);renderCurrent();};wrap.appendChild(b);});
   el.appendChild(wrap);}
@@ -906,9 +920,10 @@ function render(){renderTabs();renderBubbles();loadTournaments();
       : '<div class="empty">No matches here for this day.</div>';
     return;}
   list.innerHTML="";
-  let ordered=shown;
+  let ordered=shown.slice().sort(_byTime);   // default: chronological
   if(sortMode==="confidence")ordered=shown.slice().sort(_byConfidence);
   if(sortMode==="edge")ordered=shown.slice().sort(_byEdge);
+  if(sortMode==="time")ordered=shown.slice().sort(_byTime);
   if(sortMode==="featured"&&tabMode==="all"&&tFilter===null){
     const big=shown.filter(m=>m.status!=="finished").slice().sort((a,b)=>b.prominence-a.prominence).slice(0,3);
     if(big.length){const h=document.createElement("div");h.className="section-h";h.textContent="\u2605 Biggest matches today";list.appendChild(h);
@@ -1632,9 +1647,10 @@ function renderTeam(){renderDatebar();renderTabsTeam();
     return;}
   list.innerHTML="";
   const openFn=(sport==="mlb")?openMLBDetail:openTeamDetail;
-  let ordered=shown;
+  let ordered=shown.slice().sort(_byTime);   // default: chronological
   if(sortMode==="confidence")ordered=shown.slice().sort(_byConfidence);
   if(sortMode==="edge")ordered=shown.slice().sort(_byEdge);
+  if(sortMode==="time")ordered=shown.slice().sort(_byTime);
   if(sortMode==="featured"&&tabMode==="all"){const big=shown.filter(g=>g.status!=="finished").slice().sort((a,b)=>b.prominence-a.prominence).slice(0,3);
     if(big.length){const h=document.createElement("div");h.className="section-h";h.textContent="\u2605 Biggest games today";list.appendChild(h);
       big.forEach(g=>{const el=document.createElement("div");el.className="card big"+(g.status==="live"?" live":"");el.innerHTML=teamCardHTML(g);el.onclick=()=>openFn(g.id);list.appendChild(el);});

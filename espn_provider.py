@@ -385,6 +385,8 @@ def get_games(sport: str, date: dt.date, force_live=False):
         games.append({
             "id": ev.get("id"), "sport": sport, "status": status,
             "event_time": _ct_time(ev.get("date", "")),
+            "start_ts": ev.get("date", "") or "",   # raw ISO UTC — sorts chronologically
+
             "home": h, "away": a,
             "h2h": _season_h2h(sport, h.get("team_id"), a.get("team_id")),
             "prob_home": pred["prob_home"], "exp_margin": pred["exp_margin"],

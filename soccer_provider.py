@@ -487,6 +487,7 @@ def _build(ev, league, ext=None):
         "league_label": _LABEL.get(league, league),
         "status": status, "event_time": E._ct_time(ev.get("date", "")),
         "kickoff_iso": ev.get("date", ""),
+        "start_ts": ev.get("date", "") or "",   # raw ISO UTC — sorts chronologically
         "home": h, "away": a,
         "home_id": home_id, "away_id": away_id,
         "h2h": _season_h2h(league, home_id, away_id),
@@ -521,7 +522,10 @@ def get_today(date: dt.date, force_live=False):
         except Exception as ex:
             print(f"[soccer] {k} today failed: {ex}")
     order = {"live": 0, "scheduled": 1, "finished": 2}
-    allg.sort(key=lambda g: (order.get(g["status"], 3), -g["prominence"]))
+    # live first, then by kickoff time (chronological), then finished — the
+    # board reads in time order instead of jumping around by prominence.
+    allg.sort(key=lambda g: (order.get(g["status"], 3),
+                             g.get("start_ts") or g.get("kickoff_iso") or ""))
     _cache[key] = (time.time(), allg)
     return allg
 
