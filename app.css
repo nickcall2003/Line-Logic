@@ -1586,6 +1586,40 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .pm-stat-pct.pos{color:var(--win)}
 .pm-stat-n{font-size:10.5px;color:var(--muted-2)}
 
+/* ===== Defense vs Position (matchup grid) ===== */
+.dvp-wrap{padding:2px 2px 20px}
+.dvp-head{margin:2px 0 10px}
+.dvp-title{font-family:"Archivo",sans-serif;font-weight:800;font-size:19px;color:var(--text)}
+.dvp-meta{font-size:11.5px;color:var(--muted)}
+.dvp-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.dvp-tab{flex:1 1 auto;min-width:64px;padding:8px 6px;border:1px solid var(--line);
+  background:var(--panel-2);color:var(--muted);border-radius:10px;font-weight:700;
+  font-size:13px;cursor:pointer;transition:all .12s}
+.dvp-tab.active{background:var(--accent);color:#141414;border-color:var(--accent)}
+.dvp-ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.dvp-seg-group{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.dvp-seg{padding:6px 11px;background:var(--panel-2);color:var(--muted);border:0;
+  font-size:12px;font-weight:600;cursor:pointer;border-right:1px solid var(--line)}
+.dvp-seg.sm{padding:6px 9px;font-size:11px}
+.dvp-seg:last-child{border-right:0}
+.dvp-seg.active{background:var(--accent);color:#141414}
+.dvp-exp{margin-left:auto;padding:7px 13px;border:1px solid var(--accent);
+  background:transparent;color:var(--accent);border-radius:9px;font-weight:700;
+  font-size:12px;cursor:pointer}
+.dvp-exp:hover{background:var(--accent);color:#141414}
+.dvp-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
+.dvp-table{border-collapse:collapse;width:100%;font-size:12.5px;white-space:nowrap}
+.dvp-table th{position:sticky;top:0;background:var(--panel);color:var(--muted);
+  font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.03em;
+  padding:9px 8px;cursor:pointer;user-select:none;border-bottom:1px solid var(--line)}
+.dvp-table th.sorted{color:var(--accent)}
+.dvp-table td{padding:8px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,.04)}
+.dvp-table .dvp-team{text-align:left;position:sticky;left:0;background:var(--panel-2);
+  font-weight:700;color:var(--text);z-index:1;min-width:148px}
+.dvp-table th.dvp-team{z-index:2}
+.dvp-num{text-align:center;font-variant-numeric:tabular-nums}
+.dvp-foot{font-size:11px;color:var(--muted-2);line-height:1.5;margin-top:10px}
+
 /* ===== "How yesterday went" — the return-visit hook ===== */
 .yd{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;
   padding:14px 16px;margin:0 0 14px;cursor:pointer;transition:border-color .14s,transform .1s}
