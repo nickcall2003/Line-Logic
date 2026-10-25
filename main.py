@@ -771,6 +771,26 @@ async def lifespan(app: FastAPI):
         _thr_pa.Thread(target=_props_sweeper, daemon=True).start()
         print("[props] auto-logger started")
 
+    # ---- Defense vs Position warmer --------------------------------------
+    # Building the DvP tables walks ~100 box scores, so warm the cache in the
+    # background and refresh it periodically — every page request then hits a
+    # ready table instead of triggering the heavy build inline.
+    if run_bg and os.environ.get("DVP_WARM", "1").strip().lower() not in ("0", "false", "no"):
+        def _dvp_warmer():
+            import time as _t
+            _t.sleep(150)      # let startup settle first
+            while True:
+                try:
+                    import dvp
+                    d = dvp.nfl_dvp()
+                    print(f"[dvp] nfl warmed: {d.get('games_counted')} games")
+                except Exception as e:
+                    print(f"[dvp] warm failed: {e}")
+                _t.sleep(int(os.environ.get("DVP_WARM_INTERVAL", "21600")))  # 6h
+        import threading as _thr_dvp
+        _thr_dvp.Thread(target=_dvp_warmer, daemon=True).start()
+        print("[dvp] warmer started")
+
     if USE_REAL and run_bg and startup_build:
         def _startup_bg():
             import time as _t
@@ -6439,6 +6459,19 @@ def _odds_diag():
     except Exception as e:
         out["sgo_game_odds_sample"] = {"error": str(e)}
     return JSONResponse(out, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/dvp/nfl")
+def _dvp_nfl(scoring: str = "ppr"):
+    """Defense vs Position tables for the NFL (QB/RB/WR/TE), auto-built from box
+    scores. scoring = ppr | half | standard changes only the Pts column."""
+    try:
+        import dvp
+        return JSONResponse(dvp.nfl_dvp(scoring),
+                            headers={"Cache-Control": "public, max-age=1800"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300], "tables": {}},
+                            headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/dvp/nfl-probe")
