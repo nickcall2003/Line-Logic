@@ -6441,6 +6441,17 @@ def _odds_diag():
     return JSONResponse(out, headers={"Cache-Control": "no-store"})
 
 
+@app.get("/api/dvp/nfl-probe")
+def _dvp_nfl_probe(game_id: str | None = None):
+    """TEMP: dump one NFL game's box-score groups so we can confirm ESPN's exact
+    column labels + whether position is present, before building the DvP tables."""
+    try:
+        import dvp
+        return JSONResponse(dvp.nfl_probe(game_id), headers={"Cache-Control": "no-store"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300]}, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/odds/usage")
 def _odds_usage(month: str | None = None):
     """Where the Odds-API credits went this month, by category (player props by
