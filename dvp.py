@@ -386,8 +386,41 @@ def _rank_map(values):
 # bucket by position resolved from the team roster.
 
 _nba_dvp_cache = {"ts": 0.0, "data": None}
-_NBA_POS_CANON = {"pg": "PG", "sg": "SG", "sf": "SF", "pf": "PF", "c": "C",
-                  "g": "SG", "f": "SF", "gf": "SF", "fg": "SF", "fc": "PF", "cf": "C"}
+# ESPN's NBA roster reports the GENERIC position (G / F / C), not PG/SG/SF/PF,
+# so those three are the honest granularity we can bucket by. (Mapping guards to
+# SG and forwards to SF left PG/PF permanently empty — the bug reported.)
+_NBA_POS_CANON = {"pg": "G", "sg": "G", "g": "G", "gf": "G", "fg": "F",
+                  "sf": "F", "pf": "F", "f": "F", "fc": "F", "cf": "C", "c": "C"}
+
+
+_valid_ids_cache = {}
+
+
+def _valid_team_ids(sport, group=None):
+    """Set of real team ids for a league (e.g. the 30 NBA franchises, or FBS-only
+    for CFB) from the teams endpoint, so exhibitions vs international clubs and
+    FCS opponents can be filtered out. Cached."""
+    key = (sport, group)
+    if key in _valid_ids_cache:
+        return _valid_ids_cache[key]
+    ids = set()
+    base = EP.SCOREBOARD.get(sport)
+    if base:
+        url = base.rsplit("/scoreboard", 1)[0] + "/teams"
+        params = {"limit": "900"}
+        if group:
+            params["groups"] = group
+        try:
+            data = EP._get(url, params) or {}
+            for lg in ((data.get("sports") or [{}])[0].get("leagues") or []):
+                for t in (lg.get("teams") or []):
+                    tid = ((t.get("team") or {}) or {}).get("id")
+                    if tid:
+                        ids.add(str(tid))
+        except Exception:
+            pass
+    _valid_ids_cache[key] = ids
+    return ids
 
 
 def _pos_generic(sport, team_id, name, canon):
@@ -436,7 +469,7 @@ def _nba_blank():
             "stl": 0.0, "blk": 0.0, "to": 0.0}
 
 
-def _nba_accumulate(gid, acc, team_names):
+def _nba_accumulate(gid, acc, team_names, valid=None):
     try:
         data = EP._get(EP.SUMMARY["nba"], {"event": str(gid)}) or {}
     except Exception:
@@ -445,6 +478,9 @@ def _nba_accumulate(gid, acc, team_names):
     if len(teams) != 2:
         return
     tids = [str(((t.get("team") or {}).get("id")) or "") for t in teams]
+    # skip exhibitions vs non-NBA clubs (e.g. preseason vs international teams)
+    if valid and (tids[0] not in valid or tids[1] not in valid):
+        return
     tnm = [((t.get("team") or {}).get("displayName")
             or (t.get("team") or {}).get("abbreviation") or "") for t in teams]
     for i, t in enumerate(teams):
@@ -452,7 +488,7 @@ def _nba_accumulate(gid, acc, team_names):
         if not def_id:
             continue
         team_names[def_id] = tnm[1 - i]
-        dbuckets = acc.setdefault(def_id, {p: _nba_blank() for p in ("PG", "SG", "SF", "PF", "C")})
+        dbuckets = acc.setdefault(def_id, {p: _nba_blank() for p in _NBA_POSITIONS})
         for p in dbuckets.values():
             p["gms"].add(gid)
         for grp in (t.get("statistics") or []):
@@ -482,21 +518,23 @@ def _nba_accumulate(gid, acc, team_names):
 
 _NBA_COLS = [("pts", "Pts"), ("reb", "Reb"), ("ast", "Ast"), ("fg3", "3PM"),
              ("stl", "Stl"), ("blk", "Blk"), ("to", "TO")]
-_NBA_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
+_NBA_POSITIONS = ["G", "F", "C"]
 
 
 def nba_dvp(scoring=None):
-    """NBA Defense vs Position: per team, what each position (PG/SG/SF/PF/C)
-    produces against them — points, rebounds, assists, 3s, steals, blocks,
-    turnovers — season totals + per-game. Cached."""
+    """NBA Defense vs Position: per team, what each position (G/F/C) produces
+    against them — points, rebounds, assists, 3s, steals, blocks, turnovers —
+    season totals + per-game. Filtered to the 30 NBA franchises so preseason
+    exhibitions vs international clubs don't leak in. Cached."""
     import time as _t
     c = _nba_dvp_cache
     if c["data"] and _t.time() - c["ts"] < _DVP_TTL:
         return _recolor_generic(c["data"])
     acc, team_names = {}, {}
+    valid = _valid_team_ids("nba")
     gids = _nba_season_game_ids()
     for gid in gids:
-        _nba_accumulate(gid, acc, team_names)
+        _nba_accumulate(gid, acc, team_names, valid=valid)
     tables = {}
     for pos in _NBA_POSITIONS:
         rows = []
@@ -608,6 +646,10 @@ def _college_games(sport):
     yr = today.year if today.month >= 8 else today.year - 1
     # FBS football / D1 basketball groups so we sweep the full slate, not top-25.
     group = {"ncaaf": "80", "ncaab": "50", "wncaab": "50"}.get(sport)
+    # Only rate games between members of this set — FBS-only for CFB (FCS
+    # opponents excluded), D1-only for CBB. A game vs a non-member is dropped,
+    # which also keeps records clean (SRS counts member-vs-member only).
+    valid = _valid_team_ids(sport, group)
     out = []
     seen = set()
 
@@ -640,16 +682,22 @@ def _college_games(sport):
             except (TypeError, ValueError):
                 continue
             ht, at = h.get("team") or {}, a.get("team") or {}
+            hid, aid = str(ht.get("id")), str(at.get("id"))
+            # drop FCS/non-D1 opponents entirely
+            if valid and (hid not in valid or aid not in valid):
+                continue
             seen.add(gid)
-            out.append((str(ht.get("id")), ht.get("displayName") or ht.get("shortDisplayName"),
-                        hp, str(at.get("id")), at.get("displayName") or at.get("shortDisplayName"), ap))
+            out.append((hid, ht.get("displayName") or ht.get("shortDisplayName"),
+                        hp, aid, at.get("displayName") or at.get("shortDisplayName"), ap))
 
     if sport == "ncaaf":
         for wk in range(1, 17):
             _pull({"dates": str(yr), "seasontype": 2, "week": wk})
     else:
-        season_open = dt.date(yr, 11, 1)
-        start = max(season_open, today - dt.timedelta(days=75))
+        # basketball: scan the season to date (opens early Nov); the member-set
+        # filter removes any exhibition vs a non-D1 school.
+        season_open = dt.date(yr, 10, 15)
+        start = max(season_open, today - dt.timedelta(days=120))
         d = today
         while d >= start:
             _pull({"dates": d.strftime("%Y%m%d")})
