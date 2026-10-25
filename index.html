@@ -559,7 +559,7 @@ font-family:var(--body);color:var(--fg)}
 
           <div class="menu-sec menu-gear open" onclick="var s=document.getElementById('performance-body');var o=s.style.display==='none';s.style.display=o?'':'none';this.classList.toggle('open',o);">&#128202; Performance</div>
           <div id="performance-body">
-          <div class="menu-item" data-view="dvp">&#127944; Defense vs Position</div>
+          <div class="menu-item" data-view="statsheets">&#128203; Stat Sheets</div>
           <div class="menu-item" data-view="record">&#128202; Track Record</div>
           <div class="menu-item" data-view="results">&#128203; Recent Results</div>
           <div class="menu-item menu-adv" data-view="calibration">&#128208; Model Accuracy</div>
@@ -1135,7 +1135,7 @@ function sportLoader(sp,msg){
   const icons={tennis:"\u{1F3BE}",mlb:"\u26BE",ncaabb:"\u26BE",nba:"\u{1F3C0}",ncaab:"\u{1F3C0}",wncaab:"\u{1F3C0}",nfl:"\u{1F3C8}",ncaaf:"\u{1F3C8}",nhl:"\u{1F3D2}",soccer:"\u26BD",golf:"\u26F3",ufc:"\u{1F94A}"};
   const ic=icons[sp]||"\u{1F3BE}";
   return '<div class="sload"><div class="sload-track"><span class="sload-ball s-'+(sp||"tennis")+'">'+ic+'</span></div><div class="sload-msg">'+(msg||"Loading")+'</div></div>';}
-async function reload(){if(detailId)return;if(view==="free"||view==="best"||view==="parlays"||view==="news"||view==="home"||view==="help"||view==="record"||view==="dvp"||view==="bets"||view==="auth"||view==="calibration"||view==="transparency"||view==="simulator"||view==="value"||view==="ladder")return;const tok=++loadToken;const mySport=sport;
+async function reload(){if(detailId)return;if(view==="free"||view==="best"||view==="parlays"||view==="news"||view==="home"||view==="help"||view==="record"||view==="statsheets"||view==="bets"||view==="auth"||view==="calibration"||view==="transparency"||view==="simulator"||view==="value"||view==="ladder")return;const tok=++loadToken;const mySport=sport;
   renderDatebar();document.getElementById("list").innerHTML=sportLoader(mySport,'Loading &middot; first load after idle can take ~30s');
   if(mySport==="soccer"){await loadSoccer();if(tok!==loadToken||sport!=="soccer"||view!=="sport")return;renderSoccer();}
   else if(mySport==="ufc"){await loadUFC();if(tok!==loadToken||sport!=="ufc"||view!=="sport")return;renderUFC();}
@@ -1193,7 +1193,7 @@ function selectMenu(el){
   else if(el.dataset.view==="home"){openHome();}
   else if(el.dataset.view==="news"){openNews();}
   else if(el.dataset.view==="record"){openRecord();}
-  else if(el.dataset.view==="dvp"){openDvp();}
+  else if(el.dataset.view==="statsheets"){openStatSheets();}
   else if(el.dataset.view==="results"){openResults();}
   else if(el.dataset.view==="ladder"){openLadder();}
   else if(el.dataset.view==="stocks"){if(typeof openStocks==="function")openStocks();}
@@ -3167,20 +3167,51 @@ function propModelHTML(pr){
     '<div class="chart-foot">Every projection is graded against what the player actually did — winners and losers. 52.4% is break-even at standard −110 juice. <b>This is model quality only; it never counts toward the site’s units or ROI.</b></div>'+
     '</div>';
 }
-// ===== Defense vs Position (matchup grid) =====
+// ===== Stat Sheets hub (Defense vs Position + future sheets) =====
 var dvpPos="TE",dvpScoring="ppr",dvpMode="avgs",dvpData=null,dvpSort={key:null,dir:1},dvpLoading=false;
-function openDvp(){view="dvp";if(detailId)closeDetail();
+var statSport=null;   // null = show the sport list; otherwise the chosen sport
+// Which sheets exist per sport. active=false renders as "coming soon".
+var STAT_SPORTS=[
+  {key:"nfl",emoji:"🏈",label:"NFL",sheet:"Defense vs Position",sub:"QB · RB · WR · TE — what each defense allows",active:true},
+  {key:"nba",emoji:"🏀",label:"NBA",sheet:"Defense vs Position",sub:"Points, rebounds, assists, 3s allowed by position",active:false},
+  {key:"ncaab",emoji:"🏀",label:"College Basketball",sheet:"Team Efficiency",sub:"KenPom-style adjusted ratings & tempo",active:false},
+  {key:"ncaaf",emoji:"🏈",label:"College Football",sheet:"Team Ratings",sub:"Offensive & defensive efficiency",active:false}
+];
+function openStatSheets(){view="statsheets";statSport=null;if(detailId)closeDetail();
   document.getElementById("home").classList.remove("show");
   document.getElementById("main").style.display="";toTop();
   document.getElementById("detail").style.display="none";
-  document.getElementById("sport-tag").textContent="Defense vs Position";
-  document.querySelectorAll(".menu-item").forEach(it=>it.classList.toggle("active",it.dataset.view==="dvp"));
+  document.getElementById("sport-tag").textContent="Stat Sheets";
+  document.querySelectorAll(".menu-item").forEach(it=>it.classList.toggle("active",it.dataset.view==="statsheets"));
   var _ab=document.getElementById("acc-badge");if(_ab)_ab.style.display="none";var _tb=document.getElementById("today-badge");if(_tb)_tb.style.display="none";
   document.getElementById("side").style.display="none";
   document.querySelector(".shell").style.gridTemplateColumns="1fr";
   document.getElementById("tabs").innerHTML="";document.getElementById("bubbles").innerHTML="";
   document.getElementById("datebar")&&(document.getElementById("datebar").innerHTML="");
-  loadDvp();}
+  renderStatSheets();}
+function renderStatSheets(){
+  const list=document.getElementById("list");
+  if(statSport){                       // a sport is chosen -> show its sheet
+    if(statSport==="nfl"){loadDvp();return;}
+    return;
+  }
+  // sport picker
+  document.getElementById("sport-tag").textContent="Stat Sheets";
+  const cards=STAT_SPORTS.map(function(s){
+    const cls="stat-sport"+(s.active?"":" soon");
+    const click=s.active?(' onclick="statSport=\''+s.key+'\';renderStatSheets()"'):"";
+    const badge=s.active?"":'<span class="stat-soon">Coming soon</span>';
+    return '<div class="'+cls+'"'+click+'><span class="stat-emoji">'+s.emoji+'</span>'+
+      '<div class="stat-info"><div class="stat-nm">'+s.label+badge+'</div>'+
+      '<div class="stat-sheet">'+s.sheet+'</div>'+
+      '<div class="stat-sub">'+s.sub+'</div></div>'+
+      (s.active?'<span class="stat-go">›</span>':'')+'</div>';
+  }).join("");
+  list.innerHTML='<div class="dvp-wrap">'+
+    '<div class="dvp-head"><div class="dvp-title">Stat Sheets</div>'+
+      '<div class="dvp-meta">Pick a sport — matchup grids and team ratings, auto-updating, exportable to Excel.</div></div>'+
+    '<div class="stat-sports">'+cards+'</div></div>';
+}
 async function loadDvp(){
   const list=document.getElementById("list");
   if(!dvpData){list.innerHTML=sportLoader("nfl","Building the matchup grid from box scores");dvpLoading=true;}
@@ -3211,7 +3242,8 @@ function renderDvp(){
   const upd=dvpData.updated?('Updated '+new Date(dvpData.updated).toLocaleDateString()):"";
   list.innerHTML=
     '<div class="dvp-wrap">'+
-    '<div class="dvp-head"><div class="dvp-title">NFL Defense vs Position</div>'+
+    '<button class="dvp-back" onclick="statSport=null;renderStatSheets()">‹ All stat sheets</button>'+
+    '<div class="dvp-head"><div class="dvp-title">🏈 NFL Defense vs Position</div>'+
       '<div class="dvp-meta">'+(dvpData.games_counted||0)+' games · '+upd+'</div></div>'+
     '<div class="dvp-tabs">'+posTabs+'</div>'+
     '<div class="dvp-ctrls"><span class="dvp-seg-group">'+modeTabs+'</span>'+
@@ -4445,6 +4477,7 @@ function renderHome(){
     '<div id="yesterday"></div>'+
     '<div id="ladder-card"></div>'+
     '<div class="home-picks" style="margin-top:13px">'+
+      '<div class="home-pick-btn" style="background:var(--panel-2)" onclick="openStatSheets()"><div class="nm">\u{1F4CB} Stat Sheets</div><div class="sub">Defense vs position matchup grids \u2014 who\u2019s soft against each spot. Export to Excel.</div></div>'+
       '<div class="home-pick-btn" style="background:var(--panel-2)" onclick="openNews()"><div class="nm">\u{1F4F0} News &amp; Injuries</div><div class="sub">Headlines and the injury report for today\u2019s games.</div></div>'+
     '</div>'+
     '<div class="home-picks" style="margin-top:13px"><div class="home-pick-btn" style="grid-column:1/-1;background:var(--panel-2)" onclick="openHelp()"><div class="nm">\u2753 New here? How Line Logic works</div><div class="sub">A quick tour \u2014 what the model does, and what the numbers mean.</div></div></div>'+
