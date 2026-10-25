@@ -3174,8 +3174,8 @@ var statSport=null;   // null = show the sport list; otherwise the chosen sport
 var STAT_SPORTS=[
   {key:"nfl",emoji:"🏈",label:"NFL",sheet:"Defense vs Position",sub:"QB · RB · WR · TE — what each defense allows",active:true},
   {key:"nba",emoji:"🏀",label:"NBA",sheet:"Defense vs Position",sub:"Points, rebounds, assists, 3s, stl/blk/TO by position",active:true},
-  {key:"ncaab",emoji:"🏀",label:"College Basketball",sheet:"Team Efficiency",sub:"KenPom-style adjusted ratings & tempo",active:false},
-  {key:"ncaaf",emoji:"🏈",label:"College Football",sheet:"Team Ratings",sub:"Offensive & defensive efficiency",active:false}
+  {key:"ncaab",emoji:"🏀",label:"College Basketball",sheet:"Team Ratings",sub:"Opponent-adjusted power ratings (SRS) & SOS",active:true},
+  {key:"ncaaf",emoji:"🏈",label:"College Football",sheet:"Team Ratings",sub:"Opponent-adjusted power ratings (SRS) & SOS",active:true}
 ];
 function openStatSheets(){view="statsheets";statSport=null;if(detailId)closeDetail();
   document.getElementById("home").classList.remove("show");
@@ -3193,6 +3193,7 @@ function renderStatSheets(){
   const list=document.getElementById("list");
   if(statSport){                       // a sport is chosen -> show its sheet
     if(statSport==="nfl"||statSport==="nba"){loadDvp();return;}
+    if(statSport==="ncaab"||statSport==="ncaaf"){loadRatings();return;}
     return;
   }
   // sport picker
@@ -3276,6 +3277,49 @@ function dvpExport(){
   const blob=new Blob([csv],{type:"text/csv"});const a=document.createElement("a");
   const sp=(dvpData.sport||"nfl").toUpperCase();
   a.href=URL.createObjectURL(blob);a.download=sp+"_defense_vs_"+dvpPos+(dvpData.sport==="nfl"?("_"+dvpScoring):"")+".csv";
+  document.body.appendChild(a);a.click();document.body.removeChild(a);}
+
+// ===== College team ratings (SRS) =====
+var ratingsData=null,ratingsSort={key:"srs",dir:-1},RAT_LABEL={ncaab:"🏀 College Basketball — Team Ratings",ncaaf:"🏈 College Football — Team Ratings"};
+async function loadRatings(){
+  const list=document.getElementById("list");const sp=statSport;
+  if(!ratingsData||ratingsData.sport!==sp){list.innerHTML=sportLoader(sp==="ncaaf"?"ncaaf":"ncaab","Crunching opponent-adjusted ratings");ratingsData=null;ratingsSort={key:"srs",dir:-1};}
+  try{const d=await getJSON("/api/ratings/"+sp);d.sport=d.sport||sp;ratingsData=d;}catch(e){ratingsData={error:"load failed",rows:[],sport:sp};}
+  renderRatings();}
+function renderRatings(){
+  const list=document.getElementById("list");
+  if(!ratingsData||ratingsData.error){list.innerHTML='<div class="dvp-wrap"><button class="dvp-back" onclick="statSport=null;renderStatSheets()">‹ All stat sheets</button><div class="empty">Ratings aren’t ready yet — they build from the season’s games and refresh shortly after launch.</div></div>';return;}
+  const sp=ratingsData.sport;
+  let rows=(ratingsData.rows||[]).slice();
+  if(!rows.length){list.innerHTML='<div class="dvp-wrap"><button class="dvp-back" onclick="statSport=null;renderStatSheets()">‹ All stat sheets</button><div class="dvp-head"><div class="dvp-title">'+(RAT_LABEL[sp]||"Team Ratings")+'</div></div><div class="empty">No completed games yet this season — the table fills in as games are played.</div></div>';return;}
+  if(ratingsSort.key){rows.sort((a,b)=>{if(ratingsSort.key==="team")return a.team<b.team?-1*ratingsSort.dir:a.team>b.team?1*ratingsSort.dir:0;return ((a.vals[ratingsSort.key]||0)-(b.vals[ratingsSort.key]||0))*ratingsSort.dir;});}
+  const cols=ratingsData.columns||[];
+  let head='<th onclick="ratingsSortBy(\'rank\')">#</th><th class="dvp-team" onclick="ratingsSortBy(\'team\')">Team</th>';
+  cols.forEach(c=>{const act=ratingsSort.key===c[0]?' sorted':'';head+='<th class="dvp-num'+act+'" onclick="ratingsSortBy(\''+c[0]+'\')">'+c[1]+'</th>';});
+  let body="";
+  rows.forEach(r=>{
+    let tds='<td class="dvp-num" style="color:var(--muted)">'+r.rank+'</td><td class="dvp-team">'+r.team+'</td>';
+    cols.forEach(c=>{const v=r.vals[c[0]];const h=(r.heat||{})[c[0]];
+      tds+='<td class="dvp-num" style="'+dvpHeat(h)+'">'+(v==null?"—":v)+'</td>';});
+    body+='<tr>'+tds+'</tr>';});
+  const upd=ratingsData.updated?('Updated '+new Date(ratingsData.updated).toLocaleDateString()):"";
+  list.innerHTML='<div class="dvp-wrap">'+
+    '<button class="dvp-back" onclick="statSport=null;renderStatSheets()">‹ All stat sheets</button>'+
+    '<div class="dvp-head"><div class="dvp-title">'+(RAT_LABEL[sp]||"Team Ratings")+'</div>'+
+      '<div class="dvp-meta">'+(ratingsData.teams_counted||0)+' teams · '+(ratingsData.games_counted||0)+' games · '+upd+'</div></div>'+
+    '<div class="dvp-ctrls"><button class="dvp-exp" onclick="ratingsExport()">⬇ Export CSV</button></div>'+
+    '<div class="dvp-scroll"><table class="dvp-table"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'+
+    '<div class="dvp-foot"><b>SRS</b> = opponent-adjusted scoring margin (points better than an average team; 0 is average). <b>SOS</b> = strength of schedule. <b>Marg</b> = raw avg scoring margin. Green = stronger. Auto-updates as games finish. Note: this is an SRS power rating from scores — not possession-level efficiency.</div>'+
+    '</div>';
+}
+function ratingsSortBy(k){if(ratingsSort.key===k){ratingsSort.dir*=-1;}else{ratingsSort={key:k,dir:(k==="team"||k==="rank"||k==="pa")?1:-1};}renderRatings();}
+function ratingsExport(){
+  if(!ratingsData||!ratingsData.rows)return;
+  const cols=ratingsData.columns||[];
+  let csv="Rank,Team";cols.forEach(c=>csv+=","+c[1]);csv+="\n";
+  ratingsData.rows.forEach(r=>{csv+=r.rank+',"'+r.team+'"';cols.forEach(c=>csv+=","+(r.vals[c[0]]!=null?r.vals[c[0]]:""));csv+="\n";});
+  const blob=new Blob([csv],{type:"text/csv"});const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=(ratingsData.sport||"college").toUpperCase()+"_team_ratings.csv";
   document.body.appendChild(a);a.click();document.body.removeChild(a);}
 function openRecord(){view="record";if(detailId)closeDetail();
   document.getElementById("home").classList.remove("show");

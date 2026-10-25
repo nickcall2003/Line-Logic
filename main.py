@@ -792,6 +792,13 @@ async def lifespan(app: FastAPI):
                     print(f"[dvp] nba warmed: {d.get('games_counted')} games")
                 except Exception as e:
                     print(f"[dvp] nba warm failed: {e}")
+                for _cs in ("ncaaf", "ncaab"):
+                    try:
+                        import dvp
+                        d = dvp.college_ratings(_cs)
+                        print(f"[dvp] {_cs} ratings warmed: {d.get('teams_counted')} teams")
+                    except Exception as e:
+                        print(f"[dvp] {_cs} ratings warm failed: {e}")
                 _t.sleep(int(os.environ.get("DVP_WARM_INTERVAL", "21600")))  # 6h
         import threading as _thr_dvp
         _thr_dvp.Thread(target=_dvp_warmer, daemon=True).start()
@@ -6490,6 +6497,21 @@ def _dvp_nba():
                             headers={"Cache-Control": "public, max-age=1800"})
     except Exception as e:
         return JSONResponse({"error": str(e)[:300], "tables": {}},
+                            headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/ratings/{sport}")
+def _college_ratings(sport: str):
+    """Opponent-adjusted team ratings (SRS) for a college sport (ncaaf/ncaab)."""
+    if sport not in ("ncaaf", "ncaab", "wncaab"):
+        return JSONResponse({"error": "unsupported", "rows": []},
+                            headers={"Cache-Control": "no-store"})
+    try:
+        import dvp
+        return JSONResponse(dvp.college_ratings(sport),
+                            headers={"Cache-Control": "public, max-age=1800"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300], "rows": []},
                             headers={"Cache-Control": "no-store"})
 
 

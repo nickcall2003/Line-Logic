@@ -583,3 +583,174 @@ def nba_probe(game_id=None):
                          "sample": sample})
         out["teams"].append({"team": tinfo.get("displayName"), "team_id": tid, "groups": grps})
     return out
+
+
+# ---- College team ratings (SRS: opponent-adjusted margin) ----------------
+# A full KenPom clone needs possession-level box scores for all of D1 — too
+# heavy, and CBB barely opens before November. Instead we compute the Simple
+# Rating System from final scores: each team's rating = its average scoring
+# margin plus the average rating of its opponents (solved iteratively). It's a
+# real, respected, opponent-adjusted power rating (Sports-Reference uses it),
+# computable from scores alone, so it auto-updates with zero box-score cost.
+
+_ratings_cache = {}        # sport -> (ts, data)
+_RATINGS_TTL = 6 * 3600
+_MARGIN_CAP = 24           # cap blowouts so one 50-pt win can't distort a rating
+
+
+def _college_games(sport):
+    """[(home_id,home_name,home_pts,away_id,away_name,away_pts)] for completed
+    games this season, from the weekly/daily scoreboards (free, no box scores)."""
+    base = EP.SCOREBOARD.get(sport)
+    if not base:
+        return []
+    today = dt.date.today()
+    yr = today.year if today.month >= 8 else today.year - 1
+    # FBS football / D1 basketball groups so we sweep the full slate, not top-25.
+    group = {"ncaaf": "80", "ncaab": "50", "wncaab": "50"}.get(sport)
+    out = []
+    seen = set()
+
+    def _pull(params):
+        p = dict(params)
+        p["limit"] = "900"
+        if group:
+            p["groups"] = group
+        try:
+            data = EP._get(base, p) or {}
+        except Exception:
+            return
+        for ev in data.get("events") or []:
+            comp = (ev.get("competitions") or [{}])[0]
+            if not (((comp.get("status") or {}).get("type") or {}).get("completed")):
+                continue
+            gid = str(ev.get("id") or "")
+            if not gid or gid in seen:
+                continue
+            cs = comp.get("competitors") or []
+            if len(cs) != 2:
+                continue
+            try:
+                h = next(c for c in cs if c.get("homeAway") == "home")
+                a = next(c for c in cs if c.get("homeAway") == "away")
+            except StopIteration:
+                continue
+            try:
+                hp, ap = int(h.get("score")), int(a.get("score"))
+            except (TypeError, ValueError):
+                continue
+            ht, at = h.get("team") or {}, a.get("team") or {}
+            seen.add(gid)
+            out.append((str(ht.get("id")), ht.get("displayName") or ht.get("shortDisplayName"),
+                        hp, str(at.get("id")), at.get("displayName") or at.get("shortDisplayName"), ap))
+
+    if sport == "ncaaf":
+        for wk in range(1, 17):
+            _pull({"dates": str(yr), "seasontype": 2, "week": wk})
+    else:
+        season_open = dt.date(yr, 11, 1)
+        start = max(season_open, today - dt.timedelta(days=75))
+        d = today
+        while d >= start:
+            _pull({"dates": d.strftime("%Y%m%d")})
+            d -= dt.timedelta(days=1)
+    return out
+
+
+def _srs(games):
+    """Solve the Simple Rating System. Returns per-team dict with record, points
+    for/against per game, margin, SRS (opponent-adjusted) and SOS."""
+    rec = {}   # id -> {name, g, pf, pa, mov_sum, opps:[ids]}
+    for hid, hnm, hp, aid, anm, ap in games:
+        for tid, nm, pf, pa, opp in ((hid, hnm, hp, ap, aid), (aid, anm, ap, hp, hid)):
+            r = rec.setdefault(tid, {"name": nm, "g": 0, "pf": 0, "pa": 0,
+                                     "mov": 0.0, "opps": []})
+            r["name"] = nm or r["name"]
+            r["g"] += 1
+            r["pf"] += pf
+            r["pa"] += pa
+            m = pf - pa
+            m = max(-_MARGIN_CAP, min(_MARGIN_CAP, m))
+            r["mov"] += m
+            r["opps"].append(opp)
+    if not rec:
+        return {}
+    # iterate: rating = avg margin + avg opponent rating
+    rating = {t: (r["mov"] / r["g"]) for t, r in rec.items()}
+    for _ in range(30):
+        new = {}
+        for t, r in rec.items():
+            opp_sum = sum(rating.get(o, 0.0) for o in r["opps"])
+            new[t] = (r["mov"] / r["g"]) + (opp_sum / r["g"])
+        mean = sum(new.values()) / len(new)
+        rating = {t: v - mean for t, v in new.items()}   # re-center each pass
+    out = {}
+    for t, r in rec.items():
+        g = r["g"] or 1
+        avg_margin = r["mov"] / g
+        out[t] = {"name": r["name"], "g": r["g"],
+                  "w": sum(1 for o_i, o in enumerate(r["opps"]) if False),  # filled below
+                  "pf": round(r["pf"] / g, 1), "pa": round(r["pa"] / g, 1),
+                  "marg": round((r["pf"] - r["pa"]) / g, 1),
+                  "srs": round(rating[t], 2),
+                  "sos": round(rating[t] - avg_margin, 2)}
+    # wins/losses
+    wl = {}
+    for hid, hnm, hp, aid, anm, ap in games:
+        wl.setdefault(hid, [0, 0]); wl.setdefault(aid, [0, 0])
+        if hp > ap:
+            wl[hid][0] += 1; wl[aid][1] += 1
+        elif ap > hp:
+            wl[aid][0] += 1; wl[hid][1] += 1
+    for t in out:
+        out[t]["w"], out[t]["l"] = wl.get(t, [0, 0])
+    return out
+
+
+_RATINGS_COLS = [("w", "W"), ("l", "L"), ("pf", "PF/g"), ("pa", "PA/g"),
+                 ("marg", "Marg"), ("srs", "SRS"), ("sos", "SOS")]
+_RATINGS_INVERT = {"pa"}   # fewer points allowed is better (green)
+
+
+def college_ratings(sport):
+    """Opponent-adjusted team ratings (SRS) for a college sport. One ranked
+    table, sorted by SRS. Cached."""
+    import time as _t
+    c = _ratings_cache.get(sport)
+    if c and _t.time() - c[0] < _RATINGS_TTL:
+        return _color_ratings(c[1])
+    games = _college_games(sport)
+    srs = _srs(games)
+    rows = []
+    for tid, r in srs.items():
+        rows.append({"team": r["name"] or tid, "team_id": tid, "gms": r["g"],
+                     "vals": {"w": r["w"], "l": r["l"], "pf": r["pf"], "pa": r["pa"],
+                              "marg": r["marg"], "srs": r["srs"], "sos": r["sos"]}})
+    rows.sort(key=lambda x: -x["vals"]["srs"])
+    for i, row in enumerate(rows):
+        row["rank"] = i + 1
+    data = {"sport": sport, "kind": "ratings",
+            "updated": dt.datetime.utcnow().isoformat() + "Z",
+            "games_counted": len(games), "teams_counted": len(rows),
+            "columns": _RATINGS_COLS, "rows": rows}
+    _ratings_cache[sport] = (_t.time(), data)
+    return _color_ratings(data)
+
+
+def _color_ratings(data):
+    out = dict(data)
+    rows = data["rows"]
+    cols = [k for k, _ in _RATINGS_COLS]
+    ranks = {k: _rank_map([r["vals"].get(k, 0) for r in rows]) for k in cols}
+    nr = []
+    for i, r in enumerate(rows):
+        rr = dict(r)
+        rr["heat"] = {}
+        for k in cols:
+            if k in ("w", "l"):
+                continue
+            h = ranks[k][i]
+            rr["heat"][k] = (1 - h) if k in _RATINGS_INVERT else h
+        nr.append(rr)
+    out["rows"] = nr
+    return out
