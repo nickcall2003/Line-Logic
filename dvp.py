@@ -377,3 +377,209 @@ def _rank_map(values):
     for rank, i in enumerate(order):
         out[i] = rank / (n - 1)
     return out
+
+
+# ---- NBA Defense vs Position --------------------------------------------
+# NBA box scores are simpler than NFL: one stat group per team listing every
+# player with a full line (MIN, FG, 3PT, FT, OREB, DREB, REB, AST, STL, BLK,
+# TO, PF, PTS). We attribute each player's line to the defense they faced and
+# bucket by position resolved from the team roster.
+
+_nba_dvp_cache = {"ts": 0.0, "data": None}
+_NBA_POS_CANON = {"pg": "PG", "sg": "SG", "sf": "SF", "pf": "PF", "c": "C",
+                  "g": "SG", "f": "SF", "gf": "SF", "fg": "SF", "fc": "PF", "cf": "C"}
+
+
+def _pos_generic(sport, team_id, name, canon):
+    key = (sport, team_id)
+    rm = _rosterpos_cache.get(key)
+    if rm is None:
+        try:
+            meta = EP.team_roster_meta(sport, team_id) or {}
+        except Exception:
+            meta = {}
+        rm = {nm: (v.get("pos") or "").lower() for nm, v in meta.items()}
+        _rosterpos_cache[key] = rm
+    return canon.get(rm.get(_norm(name), ""))
+
+
+def _nba_season_game_ids(lookback_days=80):
+    """Completed NBA game ids over the recent window (season-to-date, capped).
+    Early season that's every game; deep in the season it's a rolling window,
+    which is what a DvP table actually wants."""
+    base = EP.SCOREBOARD["nba"]
+    today = dt.date.today()
+    # NBA seasons open late Oct; don't scan before the opener.
+    season_open = dt.date(today.year if today.month >= 10 else today.year - 1, 10, 1)
+    start = max(season_open, today - dt.timedelta(days=lookback_days))
+    ids = []
+    seen = set()
+    d = today
+    while d >= start:
+        try:
+            data = EP._get(base, {"dates": d.strftime("%Y%m%d")}) or {}
+            for ev in data.get("events") or []:
+                comp = (ev.get("competitions") or [{}])[0]
+                if (((comp.get("status") or {}).get("type") or {}).get("completed")):
+                    gid = str(ev.get("id") or "")
+                    if gid and gid not in seen:
+                        seen.add(gid)
+                        ids.append(gid)
+        except Exception:
+            pass
+        d -= dt.timedelta(days=1)
+    return ids
+
+
+def _nba_blank():
+    return {"gms": set(), "pts": 0.0, "reb": 0.0, "ast": 0.0, "fg3": 0.0,
+            "stl": 0.0, "blk": 0.0, "to": 0.0}
+
+
+def _nba_accumulate(gid, acc, team_names):
+    try:
+        data = EP._get(EP.SUMMARY["nba"], {"event": str(gid)}) or {}
+    except Exception:
+        return
+    teams = (data.get("boxscore") or {}).get("players") or []
+    if len(teams) != 2:
+        return
+    tids = [str(((t.get("team") or {}).get("id")) or "") for t in teams]
+    tnm = [((t.get("team") or {}).get("displayName")
+            or (t.get("team") or {}).get("abbreviation") or "") for t in teams]
+    for i, t in enumerate(teams):
+        off_id, def_id = tids[i], tids[1 - i]
+        if not def_id:
+            continue
+        team_names[def_id] = tnm[1 - i]
+        dbuckets = acc.setdefault(def_id, {p: _nba_blank() for p in ("PG", "SG", "SF", "PF", "C")})
+        for p in dbuckets.values():
+            p["gms"].add(gid)
+        for grp in (t.get("statistics") or []):
+            labels = grp.get("labels") or []
+            ci = {"pts": _col_index(labels, "pts"), "reb": _col_index(labels, "reb"),
+                  "ast": _col_index(labels, "ast"), "fg3": _col_index(labels, "3pt"),
+                  "stl": _col_index(labels, "stl"), "blk": _col_index(labels, "blk"),
+                  "to": _col_index(labels, "to", "tov")}
+            for ath in (grp.get("athletes") or []):
+                nm = ((ath.get("athlete") or {}).get("displayName") or "")
+                pos = _pos_generic("nba", off_id, nm, _NBA_POS_CANON)
+                if pos not in dbuckets:
+                    continue
+                s = ath.get("stats") or []
+                if not s:
+                    continue
+                b = dbuckets[pos]
+                for key, idx in ci.items():
+                    if idx is None or idx >= len(s):
+                        continue
+                    raw = str(s[idx])
+                    # "3PT" is made-attempted (e.g. "4-9") -> take made
+                    if key == "fg3" and "-" in raw:
+                        raw = raw.split("-")[0]
+                    b[key] += _f(raw)
+
+
+_NBA_COLS = [("pts", "Pts"), ("reb", "Reb"), ("ast", "Ast"), ("fg3", "3PM"),
+             ("stl", "Stl"), ("blk", "Blk"), ("to", "TO")]
+_NBA_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
+
+
+def nba_dvp(scoring=None):
+    """NBA Defense vs Position: per team, what each position (PG/SG/SF/PF/C)
+    produces against them — points, rebounds, assists, 3s, steals, blocks,
+    turnovers — season totals + per-game. Cached."""
+    import time as _t
+    c = _nba_dvp_cache
+    if c["data"] and _t.time() - c["ts"] < _DVP_TTL:
+        return _recolor_generic(c["data"])
+    acc, team_names = {}, {}
+    gids = _nba_season_game_ids()
+    for gid in gids:
+        _nba_accumulate(gid, acc, team_names)
+    tables = {}
+    for pos in _NBA_POSITIONS:
+        rows = []
+        for def_id, buckets in acc.items():
+            b = buckets[pos]
+            g = len(b["gms"]) or 1
+            tot = {k: round(v, 1) for k, v in b.items() if k != "gms"}
+            avg = {k: round(v / g, 1) for k, v in tot.items()}
+            rows.append({"team": team_names.get(def_id, def_id), "team_id": def_id,
+                         "gms": len(b["gms"]), "totals": tot, "avgs": avg})
+        rows.sort(key=lambda r: r["avgs"].get("pts", 0))
+        tables[pos] = rows
+    data = {"sport": "nba",
+            "updated": dt.datetime.utcnow().isoformat() + "Z",
+            "games_counted": len(gids),
+            "positions": _NBA_POSITIONS,
+            "columns": {p: _NBA_COLS for p in _NBA_POSITIONS},
+            "tables": tables}
+    _nba_dvp_cache["data"] = data
+    _nba_dvp_cache["ts"] = _t.time()
+    return _recolor_generic(data)
+
+
+def _recolor_generic(data):
+    """Attach a 0-1 heatmap rank per cell (higher value -> greener), for sheets
+    where every stat is 'more allowed = softer matchup'. Nothing inverted."""
+    out = dict(data)
+    tables = {}
+    for pos, rows in data["tables"].items():
+        cols = [k for k, _ in data["columns"][pos]]
+        rt = {k: _rank_map([r["totals"].get(k, 0) for r in rows]) for k in cols}
+        ra = {k: _rank_map([r["avgs"].get(k, 0) for r in rows]) for k in cols}
+        nr = []
+        for i, r in enumerate(rows):
+            rr = dict(r)
+            rr["heat_tot"] = {k: rt[k][i] for k in cols}
+            rr["heat_avg"] = {k: ra[k][i] for k in cols}
+            nr.append(rr)
+        tables[pos] = nr
+    out["tables"] = tables
+    return out
+
+
+def nba_probe(game_id=None):
+    """Confirm NBA box-score labels + roster positions before trusting the grid."""
+    gid = game_id
+    if not gid:
+        base = EP.SCOREBOARD["nba"]
+        d = dt.date.today()
+        for _ in range(10):
+            try:
+                data = EP._get(base, {"dates": d.strftime("%Y%m%d")}) or {}
+                for ev in data.get("events") or []:
+                    comp = (ev.get("competitions") or [{}])[0]
+                    if (((comp.get("status") or {}).get("type") or {}).get("completed")):
+                        gid = str(ev.get("id"))
+                        break
+            except Exception:
+                pass
+            if gid:
+                break
+            d -= dt.timedelta(days=1)
+    if not gid:
+        return {"error": "no completed NBA game found to probe"}
+    try:
+        data = EP._get(EP.SUMMARY["nba"], {"event": str(gid)}) or {}
+    except Exception as e:
+        return {"error": str(e)[:150], "game_id": gid}
+    out = {"game_id": gid, "teams": []}
+    for t in ((data.get("boxscore") or {}).get("players") or []):
+        tinfo = t.get("team") or {}
+        tid = tinfo.get("id")
+        grps = []
+        for grp in (t.get("statistics") or []):
+            aths = grp.get("athletes") or []
+            sample = []
+            for ath in aths[:4]:
+                a = ath.get("athlete") or {}
+                nm = a.get("displayName")
+                sample.append({"name": nm,
+                               "roster_pos": _pos_generic("nba", str(tid), nm, _NBA_POS_CANON),
+                               "stats": ath.get("stats")})
+            grps.append({"name": grp.get("name"), "labels": grp.get("labels"),
+                         "sample": sample})
+        out["teams"].append({"team": tinfo.get("displayName"), "team_id": tid, "groups": grps})
+    return out

@@ -785,7 +785,13 @@ async def lifespan(app: FastAPI):
                     d = dvp.nfl_dvp()
                     print(f"[dvp] nfl warmed: {d.get('games_counted')} games")
                 except Exception as e:
-                    print(f"[dvp] warm failed: {e}")
+                    print(f"[dvp] nfl warm failed: {e}")
+                try:
+                    import dvp
+                    d = dvp.nba_dvp()
+                    print(f"[dvp] nba warmed: {d.get('games_counted')} games")
+                except Exception as e:
+                    print(f"[dvp] nba warm failed: {e}")
                 _t.sleep(int(os.environ.get("DVP_WARM_INTERVAL", "21600")))  # 6h
         import threading as _thr_dvp
         _thr_dvp.Thread(target=_dvp_warmer, daemon=True).start()
@@ -6474,6 +6480,19 @@ def _dvp_nfl(scoring: str = "ppr"):
                             headers={"Cache-Control": "no-store"})
 
 
+@app.get("/api/dvp/nba")
+def _dvp_nba():
+    """Defense vs Position tables for the NBA (PG/SG/SF/PF/C), auto-built from box
+    scores — points, rebounds, assists, 3s, steals, blocks, turnovers allowed."""
+    try:
+        import dvp
+        return JSONResponse(dvp.nba_dvp(),
+                            headers={"Cache-Control": "public, max-age=1800"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300], "tables": {}},
+                            headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/dvp/nfl-probe")
 def _dvp_nfl_probe(game_id: str | None = None):
     """TEMP: dump one NFL game's box-score groups so we can confirm ESPN's exact
@@ -6481,6 +6500,16 @@ def _dvp_nfl_probe(game_id: str | None = None):
     try:
         import dvp
         return JSONResponse(dvp.nfl_probe(game_id), headers={"Cache-Control": "no-store"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300]}, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/dvp/nba-probe")
+def _dvp_nba_probe(game_id: str | None = None):
+    """TEMP: confirm NBA box-score labels + resolved roster positions."""
+    try:
+        import dvp
+        return JSONResponse(dvp.nba_probe(game_id), headers={"Cache-Control": "no-store"})
     except Exception as e:
         return JSONResponse({"error": str(e)[:300]}, headers={"Cache-Control": "no-store"})
 

@@ -3173,7 +3173,7 @@ var statSport=null;   // null = show the sport list; otherwise the chosen sport
 // Which sheets exist per sport. active=false renders as "coming soon".
 var STAT_SPORTS=[
   {key:"nfl",emoji:"🏈",label:"NFL",sheet:"Defense vs Position",sub:"QB · RB · WR · TE — what each defense allows",active:true},
-  {key:"nba",emoji:"🏀",label:"NBA",sheet:"Defense vs Position",sub:"Points, rebounds, assists, 3s allowed by position",active:false},
+  {key:"nba",emoji:"🏀",label:"NBA",sheet:"Defense vs Position",sub:"Points, rebounds, assists, 3s, stl/blk/TO by position",active:true},
   {key:"ncaab",emoji:"🏀",label:"College Basketball",sheet:"Team Efficiency",sub:"KenPom-style adjusted ratings & tempo",active:false},
   {key:"ncaaf",emoji:"🏈",label:"College Football",sheet:"Team Ratings",sub:"Offensive & defensive efficiency",active:false}
 ];
@@ -3192,7 +3192,7 @@ function openStatSheets(){view="statsheets";statSport=null;if(detailId)closeDeta
 function renderStatSheets(){
   const list=document.getElementById("list");
   if(statSport){                       // a sport is chosen -> show its sheet
-    if(statSport==="nfl"){loadDvp();return;}
+    if(statSport==="nfl"||statSport==="nba"){loadDvp();return;}
     return;
   }
   // sport picker
@@ -3212,10 +3212,14 @@ function renderStatSheets(){
       '<div class="dvp-meta">Pick a sport — matchup grids and team ratings, auto-updating, exportable to Excel.</div></div>'+
     '<div class="stat-sports">'+cards+'</div></div>';
 }
+var DVP_LABEL={nfl:"🏈 NFL Defense vs Position",nba:"🏀 NBA Defense vs Position"};
 async function loadDvp(){
   const list=document.getElementById("list");
-  if(!dvpData){list.innerHTML=sportLoader("nfl","Building the matchup grid from box scores");dvpLoading=true;}
-  try{dvpData=await getJSON("/api/dvp/nfl?scoring="+dvpScoring);}catch(e){dvpData={error:"load failed",tables:{}};}
+  const sp=statSport||"nfl";
+  if(!dvpData||dvpData.sport!==sp){list.innerHTML=sportLoader(sp,"Building the matchup grid from box scores");dvpData=null;}
+  const url=(sp==="nfl")?("/api/dvp/nfl?scoring="+dvpScoring):("/api/dvp/"+sp);
+  try{const d=await getJSON(url);d.sport=d.sport||sp;dvpData=d;}catch(e){dvpData={error:"load failed",tables:{},sport:sp};}
+  if(dvpData.positions&&dvpData.positions.indexOf(dvpPos)<0)dvpPos=dvpData.positions[0];
   dvpLoading=false;renderDvp();}
 // red (allows least / tough D) -> green (allows most / soft matchup)
 function dvpHeat(h){if(h==null)return "";var hue=Math.round(h*125);return 'background:hsl('+hue+',62%,38%);color:#fff';}
@@ -3227,10 +3231,12 @@ function renderDvp(){
   const mk=dvpMode==="avgs"?"avgs":"totals",hk=dvpMode==="avgs"?"heat_avg":"heat_tot";
   if(dvpSort.key){rows.sort((a,b)=>((a[mk][dvpSort.key]||0)-(b[mk][dvpSort.key]||0))*dvpSort.dir);}
   // tabs + controls
-  const posTabs=["QB","RB","WR","TE"].map(p=>'<button class="dvp-tab'+(p===dvpPos?" active":"")+'" onclick="dvpPos=\''+p+'\';dvpSort={key:null,dir:1};renderDvp()">vs '+p+'</button>').join("");
+  const sp=dvpData.sport||"nfl";
+  const positions=dvpData.positions||["QB","RB","WR","TE"];
+  const posTabs=positions.map(p=>'<button class="dvp-tab'+(p===dvpPos?" active":"")+'" onclick="dvpPos=\''+p+'\';dvpSort={key:null,dir:1};renderDvp()">vs '+p+'</button>').join("");
   const modeTabs='<button class="dvp-seg'+(dvpMode==="avgs"?" active":"")+'" onclick="dvpMode=\'avgs\';renderDvp()">Per game</button>'+
                  '<button class="dvp-seg'+(dvpMode==="totals"?" active":"")+'" onclick="dvpMode=\'totals\';renderDvp()">Season totals</button>';
-  const scoreTabs=["ppr","half","standard"].map(s=>'<button class="dvp-seg sm'+(s===dvpScoring?" active":"")+'" onclick="dvpScoring=\''+s+'\';loadDvp()">'+(s==="ppr"?"PPR":s==="half"?"½ PPR":"Std")+'</button>').join("");
+  const scoreTabs=(sp==="nfl")?("<span class=\"dvp-seg-group\">"+["ppr","half","standard"].map(s=>'<button class="dvp-seg sm'+(s===dvpScoring?" active":"")+'" onclick="dvpScoring=\''+s+'\';loadDvp()">'+(s==="ppr"?"PPR":s==="half"?"½ PPR":"Std")+'</button>').join("")+"</span>"):"";
   let head='<th class="dvp-team" onclick="dvpSortBy(\'team\')">Team</th><th onclick="dvpSortBy(\'gms\')">Gms</th>';
   cols.forEach(c=>{const act=dvpSort.key===c[0]?' sorted':'';head+='<th class="dvp-num'+act+'" onclick="dvpSortBy(\''+c[0]+'\')">'+c[1]+'</th>';});
   let body="";
@@ -3243,14 +3249,14 @@ function renderDvp(){
   list.innerHTML=
     '<div class="dvp-wrap">'+
     '<button class="dvp-back" onclick="statSport=null;renderStatSheets()">‹ All stat sheets</button>'+
-    '<div class="dvp-head"><div class="dvp-title">🏈 NFL Defense vs Position</div>'+
+    '<div class="dvp-head"><div class="dvp-title">'+(DVP_LABEL[sp]||"Defense vs Position")+'</div>'+
       '<div class="dvp-meta">'+(dvpData.games_counted||0)+' games · '+upd+'</div></div>'+
     '<div class="dvp-tabs">'+posTabs+'</div>'+
     '<div class="dvp-ctrls"><span class="dvp-seg-group">'+modeTabs+'</span>'+
-      '<span class="dvp-seg-group">'+scoreTabs+'</span>'+
+      scoreTabs+
       '<button class="dvp-exp" onclick="dvpExport()">⬇ Export CSV</button></div>'+
     '<div class="dvp-scroll"><table class="dvp-table"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'+
-    '<div class="dvp-foot">Green = allows the most to '+dvpPos+'s (softest matchup) · red = toughest. Pts use '+(dvpScoring==="ppr"?"full PPR":dvpScoring==="half"?"half PPR":"standard")+' scoring. Auto-updates as games finish.</div>'+
+    '<div class="dvp-foot">Green = allows the most to '+dvpPos+'s (softest matchup) · red = toughest.'+(sp==="nfl"?(' Pts use '+(dvpScoring==="ppr"?"full PPR":dvpScoring==="half"?"half PPR":"standard")+' scoring.'):'')+' Auto-updates as games finish.</div>'+
     '</div>';
 }
 function dvpSortBy(k){if(dvpSort.key===k){dvpSort.dir*=-1;}else{dvpSort={key:k,dir:k==="team"?1:-1};}
@@ -3268,7 +3274,8 @@ function dvpExport(){
     cols.forEach(c=>csv+=","+((r.avgs||{})[c[0]]!=null?r.avgs[c[0]]:""));
     csv+="\n";});
   const blob=new Blob([csv],{type:"text/csv"});const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);a.download="NFL_defense_vs_"+dvpPos+"_"+dvpScoring+".csv";
+  const sp=(dvpData.sport||"nfl").toUpperCase();
+  a.href=URL.createObjectURL(blob);a.download=sp+"_defense_vs_"+dvpPos+(dvpData.sport==="nfl"?("_"+dvpScoring):"")+".csv";
   document.body.appendChild(a);a.click();document.body.removeChild(a);}
 function openRecord(){view="record";if(detailId)closeDetail();
   document.getElementById("home").classList.remove("show");
