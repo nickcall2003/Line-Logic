@@ -769,7 +769,7 @@ async function loadTournaments(){
     it.onclick=()=>{tFilter=t.key;render();};el.appendChild(it);});
 }
 let _accData=null,_clvData=null,_wagData=null,_toursData=null,_atsData=null;
-async function loadAccuracy(){try{_accData=await getJSON("/api/accuracy?days=30");}catch(e){}try{_clvData=await getJSON("/api/clv?days=30");}catch(e){}try{_wagData=await getJSON("/api/edges/wagers?days=3650&min_edge=0.03&min_sample=25");}catch(e){}try{_toursData=await getJSON("/api/tennis/tours");}catch(e){}try{_atsData=await getJSON("/api/ats");}catch(e){}renderAccuracy();}
+async function loadAccuracy(){try{_accData=await getJSON("/api/accuracy?days=30");}catch(e){}try{_clvData=await getJSON("/api/clv?days=30");}catch(e){}try{_wagData=await getJSON("/api/edges/wagers?days=3650&min_edge=0.03&min_sample=25");}catch(e){}try{_toursData=await getJSON("/api/tennis/tours");}catch(e){}try{_atsData=await getJSON("/api/ats");}catch(e){}renderAccuracy();if(view==="home")renderHome();}
 function _recCell(w,l){w=w||0;l=l||0;var cls=(w>l?"pos":(l>w?"neg":""));return '<span class="sb-v '+cls+'">'+w+"–"+l+'</span>';}
 function _uCell(u){if(u==null)return '<span class="sb-dash">—</span>';var cls=(u>=0?"pos":"neg");return '<span class="sb-v '+cls+'">'+(u>=0?"+":"")+u+'u</span>';}
 function _rCell(r){if(r==null)return '<span class="sb-dash">—</span>';var cls=(r>=0?"pos":"neg");return '<span class="sb-v '+cls+'">'+(r>=0?"+":"")+r+'%</span>';}
@@ -4499,43 +4499,64 @@ function renderHome(){
     return '<div class="sport-tile" onclick="setSport(\''+t[0]+'\')">'+am+'<span class="emoji">'+t[1]+'</span><div class="nm">'+t[2]+'</div><div class="sub">'+t[3]+'</div></div>';}).join("");
   const ov=_accData&&_accData.overall;
   document.getElementById("home").innerHTML=
-    '<img class="home-logo" src="logo.PNG" alt="Line Logic Sports" onerror="this.style.display=\'none\'">'+
-    heroProofHTML(ov)+
-    // Three gateways, right under the hero. A first-time visitor shouldn't have
-    // to parse a 15-sport directory to find what they came for — segment them
-    // by intent in one tap.
-    '<div class="gateways">'+
-      '<button class="gw gw-1" onclick="openPicks(\'free\')">'+
-        '<span class="gw-ic">\uD83C\uDFAF</span>'+
-        '<span class="gw-t">Just give me today\u2019s best bet</span>'+
-        '<span class="gw-s">One play, highest confidence</span></button>'+
-      '<button class="gw gw-2" onclick="openPicks(\'best\')">'+
-        '<span class="gw-ic">\uD83D\uDCCA</span>'+
-        '<span class="gw-t">Show me the full model board</span>'+
-        '<span class="gw-s">Every edge, every sport</span></button>'+
-      '<button class="gw gw-3" onclick="gotoDiscord()">'+
-        '<span class="gw-ic">\uD83D\uDCAC</span>'+
-        '<span class="gw-t">Join the community</span>'+
-        '<span class="gw-s">Live alerts in Discord</span></button>'+
+    '<div class="hh-lock"><img src="logo.PNG" alt="Line Logic" onerror="this.style.display=\'none\'"><span class="hh-wm">Line&nbsp;Logic<b>.</b></span></div>'+
+    '<div class="hh-tag">Welcome to Line Logic — multi-sport projections that prove their edge.</div>'+
+    homeHeroHTML(ov)+
+    '<div class="hh-sec">Start here</div>'+
+    '<div class="hgw-grid">'+
+      '<button class="hgw free" onclick="openPicks(\'free\')"><span class="hgw-ic">🎯</span><span class="hgw-t">Free Picks</span><span class="hgw-s">Today’s plays, no cost</span></button>'+
+      '<button class="hgw best" onclick="openPicks(\'best\')"><span class="hgw-ic">👑</span><span class="hgw-t">Best Bets</span><span class="hgw-s">Highest-edge plays</span></button>'+
+      '<button class="hgw disc" onclick="gotoDiscord()"><span class="hgw-ic">💬</span><span class="hgw-body"><span class="hgw-t">Join the Discord</span><span class="hgw-s">Live alerts &amp; community</span></span><span class="hgw-ar">›</span></button>'+
     '</div>'+
-    // Sport selection comes FIRST, right under the gateways \u2014 it's the primary
-    // navigation, so a visitor who knows what they want taps it immediately
-    // instead of scrolling past the highlight modules.
-    '<div style="font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:24px 0 10px;font-weight:700">Browse by sport</div>'+
-    '<div class="sport-grid">'+tileHTML+'</div>'+
-    // Highlights / reason-to-return modules now sit BELOW the sport picker.
+    '<div class="hh-sec">Explore</div>'+
+    '<div class="htile-grid">'+
+      '<div class="htile sports" onclick="toggleHomeSports(this)"><span class="htile-ic">🏈</span><span class="htile-t">Sports</span><span class="htile-s">Today’s board, every league</span></div>'+
+      '<div class="htile stats" onclick="openStatSheets()"><span class="htile-ic">📋</span><span class="htile-t">Stat Sheets</span><span class="htile-s">DvP &amp; team ratings</span></div>'+
+      '<div class="htile news" onclick="openNews()"><span class="htile-ic">📰</span><span class="htile-t">News &amp; Injuries</span><span class="htile-s">Today’s injury report</span></div>'+
+      '<div class="htile how" onclick="openHelp()"><span class="htile-ic">❓</span><span class="htile-t">How to Use</span><span class="htile-s">A quick 2-min tour</span></div>'+
+    '</div>'+
+    '<div id="home-sportgrid" class="sport-grid" style="display:none;margin-top:12px">'+tileHTML+'</div>'+
     '<div id="hotpick"></div>'+
-    '<div id="yesterday"></div>'+
     '<div id="ladder-card"></div>'+
-    '<div class="home-picks" style="margin-top:13px">'+
-      '<div class="home-pick-btn" style="background:var(--panel-2)" onclick="openStatSheets()"><div class="nm">\u{1F4CB} Stat Sheets</div><div class="sub">Defense vs position matchup grids \u2014 who\u2019s soft against each spot. Export to Excel.</div></div>'+
-      '<div class="home-pick-btn" style="background:var(--panel-2)" onclick="openNews()"><div class="nm">\u{1F4F0} News &amp; Injuries</div><div class="sub">Headlines and the injury report for today\u2019s games.</div></div>'+
+    '<div class="htile-grid" style="margin-top:12px">'+
+      '<div class="htile rec" onclick="openRecord()"><span class="htile-ic">📊</span><span class="htile-t">Track Record</span><span class="htile-s">Every graded pick, public</span></div>'+
+      '<div class="htile mkt" onclick="if(typeof openStocks===\'function\')openStocks()"><span class="htile-ic">📈</span><span class="htile-t">Markets</span><span class="htile-s">Stocks, ETFs &amp; crypto signals</span></div>'+
     '</div>'+
-    '<div class="home-picks" style="margin-top:13px"><div class="home-pick-btn" style="grid-column:1/-1;background:var(--panel-2)" onclick="openHelp()"><div class="nm">\u2753 New here? How Line Logic works</div><div class="sub">A quick tour \u2014 what the model does, and what the numbers mean.</div></div></div>'+
-    '<div class="home-picks" style="margin-top:13px"><div class="home-pick-btn" style="grid-column:1/-1;background:var(--panel-2)" onclick="if(typeof openStocks===\'function\')openStocks()"><div class="nm">\u{1F4C8} Markets</div><div class="sub">Stocks, ETFs &amp; crypto \u2014 live charts and the model\u2019s paper-traded signals. Educational only.</div></div></div>'+
     installHintHTML()+
-    '<div class="home-foot">Predictions are model estimates for informational purposes only. Not betting advice. Lines shown are the model\u2019s own fair numbers, not sportsbook odds.</div>';
-  loadHotPick();loadYesterday();}
+    '<div class="home-foot">Predictions are model estimates for informational purposes only. Not betting advice. Lines shown are the model’s own fair numbers, not sportsbook odds.</div>';
+  loadHotPick();}
+function toggleHomeSports(el){var g=document.getElementById("home-sportgrid");if(!g)return;
+  var show=g.style.display==="none";g.style.display=show?"grid":"none";
+  if(el)el.classList.toggle("open",show);
+  if(show&&g.scrollIntoView)g.scrollIntoView({behavior:"smooth",block:"nearest"});}
+function homeNetUnits(){
+  var ws=(_wagData&&_wagData.by_sport)||null;if(!ws)return null;
+  var t=0,any=false,teRoll=(_toursData&&_toursData.total_excl_itf)||null;
+  for(var k in ws){var wv=ws[k];
+    if(k==="tennis"){
+      if(teRoll&&teRoll.units!=null&&(teRoll.priced||0)>=((_wagData&&_wagData.min_sample)||25)){t+=teRoll.units;any=true;}
+      else if(wv&&wv.mature&&wv.units!=null){t+=wv.units;any=true;}
+      continue;}
+    if(wv&&wv.mature&&wv.units!=null){t+=wv.units;any=true;}}
+  return any?Math.round(t*100)/100:null;}
+function homeHeroHTML(ov){
+  var head='<span class="hh-badge"><span class="hh-pulse"></span>Every pick graded · in public</span>'+
+    '<h3 class="hh-h">Everyone sells winners.<br><span class="y">We show the receipts.</span></h3>';
+  var aw=(ov&&ov.alltime_wins)||0,al=(ov&&ov.alltime_losses)||0,n=aw+al;
+  if(!n)return '<div class="hh-hero">'+head+'<div class="hh-loading">Loading the public record…</div></div>';
+  var pct=Math.round(aw/n*100),oU=homeNetUnits();
+  var clv=(_clvData&&_clvData.beat_close_pct!=null)?_clvData.beat_close_pct:null;
+  var roi=(_clvData&&_clvData.roi_pct!=null)?_clvData.roi_pct:null;
+  function cell(v,k,cls,key){return '<div class="hh-stat'+(key?' key':'')+'"><div class="hh-v'+(cls?' '+cls:'')+'">'+v+'</div><div class="hh-k">'+k+'</div></div>';}
+  var cells=cell(pct+'%','Win rate','win')+
+    cell(oU!=null?((oU>=0?'+':'')+oU+'u'):'—','Net units','gold')+
+    (clv!=null?cell(clv+'%','Beat the close','',true):cell(aw+'–'+al,'All-time',''))+
+    (roi!=null?cell((roi>=0?'+':'')+roi+'%','ROI',''):cell(String(SPORTS_META.filter(function(s){return s.active!==false;}).length),'Sports',''));
+  return '<div class="hh-hero">'+head+
+    '<div class="hh-stats">'+cells+'</div>'+
+    '<div class="hh-mini"><span class="hh-m">🔍 Shows losses</span><span class="hh-m">📈 Beats the market</span><span class="hh-m">🧰 Tools included</span></div>'+
+    '<a class="hh-see" onclick="openRecord()">See every graded pick ›</a>'+
+    '</div>';}
 // Receipt-style proof card: the record IS the hero. Leads with the tagline,
 // then the numbers a bettor actually cares about (win %, net units, ROI,
 // all-time), laid out like a stamped, un-editable betting slip. Falls back to
