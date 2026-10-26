@@ -1698,7 +1698,9 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .htile.how{border-color:rgba(142,143,138,.4)} .htile.how .htile-ic{background:rgba(142,143,138,.18)}
 .htile.rec{border-color:rgba(95,207,134,.3)} .htile.rec .htile-ic{background:rgba(95,207,134,.14)}
 .htile.mkt{border-color:rgba(232,176,75,.3)} .htile.mkt .htile-ic{background:rgba(232,176,75,.14)}
+.htile.moves{border-color:rgba(242,196,106,.4)} .htile.moves .htile-ic{background:rgba(242,196,106,.16)}
 .htile.sports.open{border-color:var(--clay)}
+.news-body{margin-top:2px}
 
 /* ===== "How yesterday went" — the return-visit hook ===== */
 .yd{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;

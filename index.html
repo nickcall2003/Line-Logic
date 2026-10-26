@@ -548,7 +548,6 @@ font-family:var(--body);color:var(--fg)}
           <div class="menu-item" data-sport="ncaab">&#127936; NCAA Basketball</div>
           <div class="menu-item" data-sport="soccer">&#9917; Soccer</div>
           <div class="menu-item" data-sport="tennis">&#127934; Tennis</div>
-          <div class="menu-item" data-sport="golf">&#9971; Golf</div>
           <div class="menu-item" data-sport="ufc">&#129354; UFC</div>
           <div class="menu-item" data-sport="ncaabb">&#9918; NCAA Baseball</div>
           <div class="menu-item" data-sport="wncaab">&#127936; Women's CBB</div>
@@ -560,6 +559,7 @@ font-family:var(--body);color:var(--fg)}
           <div class="menu-sec menu-gear open" onclick="var s=document.getElementById('performance-body');var o=s.style.display==='none';s.style.display=o?'':'none';this.classList.toggle('open',o);">&#128202; Performance</div>
           <div id="performance-body">
           <div class="menu-item" data-view="statsheets">&#128203; Stat Sheets</div>
+          <div class="menu-item" data-view="moves">&#128260; Roster Moves</div>
           <div class="menu-item" data-view="record">&#128202; Track Record</div>
           <div class="menu-item" data-view="results">&#128203; Recent Results</div>
           <div class="menu-item menu-adv" data-view="calibration">&#128208; Model Accuracy</div>
@@ -1135,7 +1135,7 @@ function sportLoader(sp,msg){
   const icons={tennis:"\u{1F3BE}",mlb:"\u26BE",ncaabb:"\u26BE",nba:"\u{1F3C0}",ncaab:"\u{1F3C0}",wncaab:"\u{1F3C0}",nfl:"\u{1F3C8}",ncaaf:"\u{1F3C8}",nhl:"\u{1F3D2}",soccer:"\u26BD",golf:"\u26F3",ufc:"\u{1F94A}"};
   const ic=icons[sp]||"\u{1F3BE}";
   return '<div class="sload"><div class="sload-track"><span class="sload-ball s-'+(sp||"tennis")+'">'+ic+'</span></div><div class="sload-msg">'+(msg||"Loading")+'</div></div>';}
-async function reload(){if(detailId)return;if(view==="free"||view==="best"||view==="parlays"||view==="news"||view==="home"||view==="help"||view==="record"||view==="statsheets"||view==="bets"||view==="auth"||view==="calibration"||view==="transparency"||view==="simulator"||view==="value"||view==="ladder")return;const tok=++loadToken;const mySport=sport;
+async function reload(){if(detailId)return;if(view==="free"||view==="best"||view==="parlays"||view==="news"||view==="home"||view==="help"||view==="record"||view==="statsheets"||view==="moves"||view==="bets"||view==="auth"||view==="calibration"||view==="transparency"||view==="simulator"||view==="value"||view==="ladder")return;const tok=++loadToken;const mySport=sport;
   renderDatebar();document.getElementById("list").innerHTML=sportLoader(mySport,'Loading &middot; first load after idle can take ~30s');
   if(mySport==="soccer"){await loadSoccer();if(tok!==loadToken||sport!=="soccer"||view!=="sport")return;renderSoccer();}
   else if(mySport==="ufc"){await loadUFC();if(tok!==loadToken||sport!=="ufc"||view!=="sport")return;renderUFC();}
@@ -1194,6 +1194,7 @@ function selectMenu(el){
   else if(el.dataset.view==="news"){openNews();}
   else if(el.dataset.view==="record"){openRecord();}
   else if(el.dataset.view==="statsheets"){openStatSheets();}
+  else if(el.dataset.view==="moves"){openMoves();}
   else if(el.dataset.view==="results"){openResults();}
   else if(el.dataset.view==="ladder"){openLadder();}
   else if(el.dataset.view==="stocks"){if(typeof openStocks==="function")openStocks();}
@@ -3167,6 +3168,68 @@ function propModelHTML(pr){
     '<div class="chart-foot">Every projection is graded against what the player actually did — winners and losers. 52.4% is break-even at standard −110 juice. <b>This is model quality only; it never counts toward the site’s units or ROI.</b></div>'+
     '</div>';
 }
+// ===== Roster Moves hub (trades / signings / transfer portal) =====
+var movesSport=null,movesData=null;
+var MOVES_SPORTS=[
+  {key:"nfl",emoji:"🏈",label:"NFL",kind:"Trades & signings"},
+  {key:"nba",emoji:"🏀",label:"NBA",kind:"Trades & signings"},
+  {key:"nhl",emoji:"🏒",label:"NHL",kind:"Trades & signings"},
+  {key:"mlb",emoji:"⚾",label:"MLB",kind:"Trades & signings"},
+  {key:"ncaaf",emoji:"🏈",label:"College Football",kind:"Transfer portal"},
+  {key:"ncaab",emoji:"🏀",label:"College Basketball",kind:"Transfer portal"}
+];
+function openMoves(){view="moves";movesSport=null;if(detailId)closeDetail();
+  document.getElementById("home").classList.remove("show");
+  document.getElementById("main").style.display="";toTop();
+  document.getElementById("detail").style.display="none";
+  document.getElementById("sport-tag").textContent="Roster Moves";
+  document.querySelectorAll(".menu-item").forEach(it=>it.classList.toggle("active",it.dataset.view==="moves"));
+  var _ab=document.getElementById("acc-badge");if(_ab)_ab.style.display="none";var _tb=document.getElementById("today-badge");if(_tb)_tb.style.display="none";
+  document.getElementById("side").style.display="none";
+  document.querySelector(".shell").style.gridTemplateColumns="1fr";
+  document.getElementById("tabs").innerHTML="";document.getElementById("bubbles").innerHTML="";
+  document.getElementById("datebar")&&(document.getElementById("datebar").innerHTML="");
+  renderMoves();}
+function renderMoves(){
+  const list=document.getElementById("list");
+  if(movesSport){loadMoves();return;}
+  const card=function(s){return '<div class="stat-sport" onclick="movesSport=\''+s.key+'\';renderMoves()">'+
+    '<span class="stat-emoji">'+s.emoji+'</span><div class="stat-info"><div class="stat-nm">'+s.label+'</div>'+
+    '<div class="stat-sheet">'+s.kind+'</div></div><span class="stat-go">›</span></div>';};
+  const pro=MOVES_SPORTS.filter(s=>s.kind.indexOf("Trades")>=0).map(card).join("");
+  const col=MOVES_SPORTS.filter(s=>s.kind.indexOf("portal")>=0).map(card).join("");
+  list.innerHTML='<div class="dvp-wrap">'+
+    '<div class="dvp-head"><div class="dvp-title">Roster Moves</div>'+
+      '<div class="dvp-meta">Trades, signings, free agency & the transfer portal — the moves that shift the model’s ratings. Busiest in the offseason and around each trade deadline.</div></div>'+
+    '<div class="seclab" style="margin:16px 2px 9px">Pro — trades & signings</div><div class="stat-sports">'+pro+'</div>'+
+    '<div class="seclab" style="margin:18px 2px 9px">College — transfer portal</div><div class="stat-sports">'+col+'</div></div>';
+}
+async function loadMoves(){
+  const list=document.getElementById("list");const sp=movesSport;
+  list.innerHTML=sportLoader(sp==="ncaaf"||sp==="ncaab"?sp:sp,"Pulling the latest roster moves");
+  try{movesData=await getJSON("/api/moves/"+sp);}catch(e){movesData={moves:[],sport:sp};}
+  if(view!=="moves"||movesSport!==sp)return;
+  const meta=MOVES_SPORTS.find(s=>s.key===sp)||{label:sp.toUpperCase(),kind:""};
+  const moves=(movesData&&movesData.moves)||[];
+  let feed="";
+  if(moves.length){
+    feed=moves.map(h=>'<a class="yb-item" href="'+h.url+'" target="_blank" rel="noopener">'+
+      (h.transaction?'<span class="yb-badge">MOVE</span>':'')+
+      '<span class="yb-h">'+h.headline+'</span>'+
+      '<span class="yb-src">'+(h.section||"")+' · Yardbarker ↗</span></a>').join("");
+  }else{
+    feed='<div class="empty">No roster moves in the feed right now — this picks up in the offseason and around the trade deadline. Check back then.</div>';
+  }
+  const portalBtn=(movesData&&movesData.portal_board)?
+    ('<a class="dvp-exp" style="display:inline-block;margin-bottom:12px;text-decoration:none" href="'+movesData.portal_board+'" target="_blank" rel="noopener">🏈 Full portal board — teams ranked by transfer value ↗</a>'):"";
+  list.innerHTML='<div class="dvp-wrap">'+
+    '<button class="dvp-back" onclick="movesSport=null;renderMoves()">‹ All sports</button>'+
+    '<div class="dvp-head"><div class="dvp-title">'+meta.emoji+' '+meta.label+' — '+meta.kind+'</div></div>'+
+    portalBtn+
+    '<div class="news-body">'+feed+'</div>'+
+    '<div class="dvp-foot">Roster changes move lines before the market fully adjusts — a traded star, a portal commit or a key signing re-rates a team. Feed from Yardbarker, refreshed through the day.</div>'+
+    '</div>';
+}
 // ===== Stat Sheets hub (Defense vs Position + future sheets) =====
 var dvpPos="TE",dvpScoring="ppr",dvpMode="avgs",dvpData=null,dvpSort={key:null,dir:1},dvpLoading=false;
 var statSport=null;   // null = show the sport list; otherwise the chosen sport
@@ -4512,13 +4575,14 @@ function renderHome(){
     '<div class="htile-grid">'+
       '<div class="htile sports" onclick="toggleHomeSports(this)"><span class="htile-ic">🏈</span><span class="htile-t">Sports</span><span class="htile-s">Today’s board, every league</span></div>'+
       '<div class="htile stats" onclick="openStatSheets()"><span class="htile-ic">📋</span><span class="htile-t">Stat Sheets</span><span class="htile-s">DvP &amp; team ratings</span></div>'+
+      '<div class="htile moves" onclick="openMoves()"><span class="htile-ic">🔄</span><span class="htile-t">Roster Moves</span><span class="htile-s">Trades, signings &amp; transfer portal</span></div>'+
       '<div class="htile news" onclick="openNews()"><span class="htile-ic">📰</span><span class="htile-t">News &amp; Injuries</span><span class="htile-s">Today’s injury report</span></div>'+
-      '<div class="htile how" onclick="openHelp()"><span class="htile-ic">❓</span><span class="htile-t">How to Use</span><span class="htile-s">A quick 2-min tour</span></div>'+
     '</div>'+
     '<div id="home-sportgrid" class="sport-grid" style="display:none;margin-top:12px">'+tileHTML+'</div>'+
     '<div id="hotpick"></div>'+
     '<div id="ladder-card"></div>'+
     '<div class="htile-grid" style="margin-top:12px">'+
+      '<div class="htile how" onclick="openHelp()"><span class="htile-ic">❓</span><span class="htile-t">How to Use</span><span class="htile-s">A quick 2-min tour</span></div>'+
       '<div class="htile rec" onclick="openRecord()"><span class="htile-ic">📊</span><span class="htile-t">Track Record</span><span class="htile-s">Every graded pick, public</span></div>'+
       '<div class="htile mkt" onclick="if(typeof openStocks===\'function\')openStocks()"><span class="htile-ic">📈</span><span class="htile-t">Markets</span><span class="htile-s">Stocks, ETFs &amp; crypto signals</span></div>'+
     '</div>'+

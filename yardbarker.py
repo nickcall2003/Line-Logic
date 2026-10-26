@@ -16,7 +16,7 @@ import html as _html
 import httpx
 
 _SECTION = {
-    "nfl": "nfl", "mlb": "mlb", "nba": "nba",
+    "nfl": "nfl", "mlb": "mlb", "nba": "nba", "nhl": "nhl",
     "ncaaf": "college_football", "ncaab": "college_basketball",
 }
 _BASE = "https://www.yardbarker.com/"

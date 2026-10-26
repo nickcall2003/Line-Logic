@@ -4625,8 +4625,8 @@ SPORT_SEASON = {
     "ncaabb": {2, 3, 4, 5, 6},
     "nfl":    {8, 9, 10, 11, 12, 1, 2},
     "ncaaf":  {8, 9, 10, 11, 12, 1},
-    "ncaab":  {11, 12, 1, 2, 3, 4},
-    "wncaab": {11, 12, 1, 2, 3, 4},
+    "ncaab":  {10, 11, 12, 1, 2, 3, 4},
+    "wncaab": {10, 11, 12, 1, 2, 3, 4},
     "ufc":    set(range(1, 13)),
 }
 
@@ -4643,8 +4643,10 @@ def sports_meta():
     # so it's shown; WNBA's season is over, so it's hidden by default. Override with
     # the HIDDEN_SPORTS env var (comma-separated keys, or empty to show all).
     _hs = os.environ.get("HIDDEN_SPORTS")
+    # Golf is hidden by default now (we don't track it, and it's volatile).
+    # Set HIDDEN_SPORTS to override (e.g. "" shows all, "wnba" re-enables golf).
     hidden = {s.strip().lower() for s in
-              ((_hs if _hs is not None else "wnba").split(",")) if s.strip()}
+              ((_hs if _hs is not None else "wnba,golf").split(",")) if s.strip()}
     for entry in meta:
         in_season = mo in SPORT_SEASON.get(entry["key"], set(range(1, 13)))
         entry["active"] = in_season and entry["key"] not in hidden
@@ -6485,6 +6487,27 @@ def _dvp_nfl(scoring: str = "ppr"):
     except Exception as e:
         return JSONResponse({"error": str(e)[:300], "tables": {}},
                             headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/moves/{sport}")
+def _roster_moves(sport: str):
+    """Roster-change feed for a sport: trades, signings, free agency and (for
+    college) transfer-portal activity — the moves that actually shift the model's
+    ratings. Pulled from the Yardbarker transaction feed; NCAAF also carries a
+    link to the full value-ranked portal board. Busiest in the offseason and
+    around each league's trade deadline."""
+    sport = (sport or "").lower()
+    out = {"sport": sport, "moves": [], "kind": "trades"}
+    if sport in ("ncaaf", "ncaab", "wncaab"):
+        out["kind"] = "portal"
+    if sport == "ncaaf":
+        out["portal_board"] = "/portal"   # the ranked, value-scored CFB board
+    try:
+        from yardbarker import get_headlines
+        out["moves"] = get_headlines(sport, limit=30, only_transactions=True)
+    except Exception as e:
+        print(f"[moves] {sport} failed: {e}")
+    return out
 
 
 @app.get("/api/dvp/nba")
