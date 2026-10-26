@@ -119,7 +119,9 @@ def _player_value_index(seasons):
             nm = _norm(_g(p, "name"))
             if not nm:
                 continue
-            ws = _num(_g(p, "winShares", "win_shares"))
+            # winShares is an object {offensive, defensive, total, totalPer40}
+            ws_raw = _g(p, "winShares", "win_shares")
+            ws = _num(ws_raw.get("total")) if isinstance(ws_raw, dict) else _num(ws_raw)
             if ws is None:
                 por = _num(_g(p, "PORPAG", "porpag"))
                 g = _num(_g(p, "games")) or 25.0
@@ -138,6 +140,8 @@ def _player_value_index(seasons):
 def _transfer_value(t, pidx):
     """MAX(proven production, talent). Returns (value, basis)."""
     nm = _norm((_g(t, "firstName", "first_name") or "") + (_g(t, "lastName", "last_name") or ""))
+    if not nm:
+        nm = _norm(_g(t, "name", "fullName", "displayName", "player"))
     prod = None
     st = pidx.get(nm)
     if st and st.get("ws") is not None:
@@ -195,6 +199,8 @@ def build(year=None):
     for t in portal:
         player = ((_g(t, "firstName", "first_name") or "") + " "
                   + (_g(t, "lastName", "last_name") or "")).strip()
+        if not player:
+            player = (_g(t, "name", "fullName", "displayName", "player") or "").strip()
         pos = _g(t, "position") or ""
         stars = int(_g(t, "stars") or 0)
         val, basis = _transfer_value(t, pidx)
