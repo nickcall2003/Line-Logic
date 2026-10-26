@@ -3,3 +3,6 @@ __pycache__/
 
 # runtime odds usage counter
 odds_usage.json
+
+# local design mockups (reviewed as artifacts, not deployed)
+homepage-mockups.html
