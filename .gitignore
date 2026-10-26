@@ -6,3 +6,6 @@ odds_usage.json
 
 # local design mockups (reviewed as artifacts, not deployed)
 homepage-mockups.html
+
+# runtime CBB portal build cache
+cbb_portal.json

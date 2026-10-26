@@ -1701,6 +1701,27 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .htile.moves{border-color:rgba(242,196,106,.4)} .htile.moves .htile-ic{background:rgba(242,196,106,.16)}
 .htile.sports.open{border-color:var(--clay)}
 .news-body{margin-top:2px}
+/* NCAAB transfer-portal board */
+.cp-head{font-family:"Archivo",sans-serif;font-weight:800;font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin:4px 2px 10px}
+.cp-wrap{display:flex;flex-direction:column;gap:8px}
+.cp-team{background:var(--panel-2);border:1px solid var(--line);border-radius:13px;padding:12px 14px;cursor:pointer;transition:border-color .12s}
+.cp-team:hover{border-color:var(--gold-soft)}
+.cp-row{display:flex;align-items:center;gap:10px}
+.cp-rank{font-family:"Archivo",sans-serif;font-weight:800;font-size:12px;color:var(--muted-2);min-width:20px}
+.cp-nm{font-family:"Archivo",sans-serif;font-weight:800;font-size:15px;color:var(--text);flex:1}
+.cp-net{font-family:"Archivo",sans-serif;font-weight:900;font-size:16px}
+.cp-net.pos{color:var(--win)} .cp-net.neg{color:var(--loss)}
+.cp-sub{font-size:11px;color:var(--muted);margin-top:4px}
+.cp-detail{display:none;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
+.cp-team.open .cp-detail{display:block}
+.cp-pl{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:3px 0;flex-wrap:wrap}
+.cp-sign{font-weight:800;width:14px;text-align:center}
+.cp-sign.pos{color:var(--win)} .cp-sign.neg{color:var(--loss)}
+.cp-pos{font-size:10px;color:var(--muted-2);background:var(--panel-3);border-radius:5px;padding:1px 5px}
+.cp-v{font-family:"Archivo",sans-serif;font-weight:800;font-size:12px;color:var(--gold)}
+.cp-ctx{font-size:11px;color:var(--muted)}
+.cp-none{font-size:11.5px;color:var(--muted-2);padding:3px 0}
 
 /* ===== "How yesterday went" — the return-visit hook ===== */
 .yd{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;

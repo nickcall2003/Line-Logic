@@ -799,6 +799,14 @@ async def lifespan(app: FastAPI):
                         print(f"[dvp] {_cs} ratings warmed: {d.get('teams_counted')} teams")
                     except Exception as e:
                         print(f"[dvp] {_cs} ratings warm failed: {e}")
+                try:
+                    import cbb_portal
+                    if cbb_portal._key():
+                        d = cbb_portal.board()
+                        print(f"[cbb-portal] warmed: {len(d.get('teams') or [])} teams, "
+                              f"season {d.get('season')}")
+                except Exception as e:
+                    print(f"[cbb-portal] warm failed: {e}")
                 _t.sleep(int(os.environ.get("DVP_WARM_INTERVAL", "21600")))  # 6h
         import threading as _thr_dvp
         _thr_dvp.Thread(target=_dvp_warmer, daemon=True).start()
@@ -6487,6 +6495,45 @@ def _dvp_nfl(scoring: str = "ppr"):
     except Exception as e:
         return JSONResponse({"error": str(e)[:300], "tables": {}},
                             headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/cbb-portal")
+def _cbb_portal():
+    """NCAAB transfer-portal board, teams ranked by net production value gained
+    vs lost (CollegeBasketballData). Needs CBBD_API_KEY."""
+    try:
+        import cbb_portal
+        return JSONResponse(cbb_portal.board(),
+                            headers={"Cache-Control": "public, max-age=3600"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300], "teams": []},
+                            headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/cbb-portal/status")
+def _cbb_portal_status():
+    try:
+        import cbb_portal
+        return JSONResponse(cbb_portal.status(), headers={"Cache-Control": "no-store"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300]}, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/cbb-portal/build")
+def _cbb_portal_build(token: str = "", year: int = 0):
+    """Force a rebuild (owner token). Use ?year= to pin the portal cycle."""
+    admin_tok = os.environ.get("PROMO_CRON_TOKEN", "").strip()
+    if admin_tok and (token or "").strip() != admin_tok:
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        import cbb_portal
+        d = cbb_portal.build(year=year or None)
+        return JSONResponse({"status": "done", "season": d.get("season"),
+                             "entries": d.get("count_entries"),
+                             "teams": len(d.get("teams") or [])},
+                            headers={"Cache-Control": "no-store"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300]}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/moves/{sport}")

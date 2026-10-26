@@ -3204,9 +3204,28 @@ function renderMoves(){
     '<div class="seclab" style="margin:16px 2px 9px">Pro — trades & signings</div><div class="stat-sports">'+pro+'</div>'+
     '<div class="seclab" style="margin:18px 2px 9px">College — transfer portal</div><div class="stat-sports">'+col+'</div></div>';
 }
+function cbbPortalHTML(pb){
+  if(!pb)return "";
+  if(pb.needs_key)return '<div class="empty">The NCAAB portal board needs the CBBD API key set on the server (<b>CBBD_API_KEY</b>). Once it’s in, this fills with every team ranked by net transfer value.</div>';
+  var teams=(pb.teams||[]);
+  if(!teams.length)return '<div class="empty">Portal board is building from the '+(pb.season||"")+' cycle — check back shortly.</div>';
+  var rows=teams.map(function(t,i){
+    var net=t.net,cls=net>0?"pos":(net<0?"neg":"");
+    var ins=(t.in||[]).map(function(p){return '<div class="cp-pl"><span class="cp-sign pos">+</span>'+p.player+' <span class="cp-pos">'+(p.pos||"")+'</span><span class="cp-v">'+p.value+'</span><span class="cp-ctx">from '+p.from+'</span></div>';}).join("");
+    var outs=(t.out||[]).map(function(p){return '<div class="cp-pl"><span class="cp-sign neg">−</span>'+p.player+' <span class="cp-pos">'+(p.pos||"")+'</span><span class="cp-v">'+p.value+'</span><span class="cp-ctx">to '+p.to+'</span></div>';}).join("");
+    return '<div class="cp-team" onclick="this.classList.toggle(\'open\')">'+
+      '<div class="cp-row"><span class="cp-rank">'+(i+1)+'</span><span class="cp-nm">'+t.team+'</span>'+
+        '<span class="cp-net '+cls+'">'+(net>0?"+":"")+net+'</span></div>'+
+      '<div class="cp-sub">+'+t.gained+' gained · −'+t.lost+' lost'+(t.conference?' · '+t.conference:'')+' · tap to expand</div>'+
+      '<div class="cp-detail">'+(ins||'<div class="cp-none">no notable additions</div>')+(outs||'')+'</div></div>';
+  }).join("");
+  return '<div class="cp-head">Portal board · '+(pb.count_entries||0)+' moves · ranked by net production value</div><div class="cp-wrap">'+rows+'</div>';
+}
 async function loadMoves(){
   const list=document.getElementById("list");const sp=movesSport;
   list.innerHTML=sportLoader(sp==="ncaaf"||sp==="ncaab"?sp:sp,"Pulling the latest roster moves");
+  var portalHTML="";
+  if(sp==="ncaab"){try{var pb=await getJSON("/api/cbb-portal");if(movesSport==="ncaab")portalHTML=cbbPortalHTML(pb);}catch(e){}}
   try{movesData=await getJSON("/api/moves/"+sp);}catch(e){movesData={moves:[],sport:sp};}
   if(view!=="moves"||movesSport!==sp)return;
   const meta=MOVES_SPORTS.find(s=>s.key===sp)||{label:sp.toUpperCase(),kind:""};
@@ -3226,6 +3245,8 @@ async function loadMoves(){
     '<button class="dvp-back" onclick="movesSport=null;renderMoves()">‹ All sports</button>'+
     '<div class="dvp-head"><div class="dvp-title">'+meta.emoji+' '+meta.label+' — '+meta.kind+'</div></div>'+
     portalBtn+
+    portalHTML+
+    (portalHTML?'<div class="cp-head" style="margin-top:18px">Latest portal & roster headlines</div>':'')+
     '<div class="news-body">'+feed+'</div>'+
     '<div class="dvp-foot">Roster changes move lines before the market fully adjusts — a traded star, a portal commit or a key signing re-rates a team. Feed from Yardbarker, refreshed through the day.</div>'+
     '</div>';
