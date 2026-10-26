@@ -75,6 +75,17 @@ def _num(v):
         return None
 
 
+def _g(d, *keys):
+    """First present key — the raw CBBD JSON is camelCase (firstName, winShares,
+    PORPAG, displayName, primaryColor); we accept snake_case too for safety."""
+    if not isinstance(d, dict):
+        return None
+    for k in keys:
+        if d.get(k) is not None:
+            return d.get(k)
+    return None
+
+
 def _default_years():
     """Candidate portal years, most likely first. The 2026 spring cycle feeds the
     2026-27 season; CBBD may tag it 2026 (calendar) or 2027 (season-ending)."""
@@ -105,35 +116,35 @@ def _player_value_index(seasons):
     for season in seasons:
         rows = _get_safe("/stats/player/season", {"season": season})
         for p in rows:
-            nm = _norm(p.get("name"))
+            nm = _norm(_g(p, "name"))
             if not nm:
                 continue
-            ws = _num(p.get("win_shares"))
+            ws = _num(_g(p, "winShares", "win_shares"))
             if ws is None:
-                por = _num(p.get("porpag"))
-                g = _num(p.get("games")) or 25.0
+                por = _num(_g(p, "PORPAG", "porpag"))
+                g = _num(_g(p, "games")) or 25.0
                 ws = (por * g / 40.0) if por is not None else None
             if ws is None:
                 continue
             cur = idx.get(nm)
             # prefer the later season's line (seasons passed newest-first keeps first)
             if cur is None:
-                idx[nm] = {"ws": ws, "pts": _num(p.get("points")),
-                           "min": _num(p.get("minutes")), "usage": _num(p.get("usage")),
-                           "pos": p.get("position") or "", "team": p.get("team") or ""}
+                idx[nm] = {"ws": ws, "pts": _num(_g(p, "points")),
+                           "min": _num(_g(p, "minutes")), "usage": _num(_g(p, "usage")),
+                           "pos": _g(p, "position") or "", "team": _g(p, "team") or ""}
     return idx
 
 
 def _transfer_value(t, pidx):
     """MAX(proven production, talent). Returns (value, basis)."""
-    nm = _norm((t.get("first_name") or "") + (t.get("last_name") or ""))
+    nm = _norm((_g(t, "firstName", "first_name") or "") + (_g(t, "lastName", "last_name") or ""))
     prod = None
     st = pidx.get(nm)
     if st and st.get("ws") is not None:
         prod = round(st["ws"], 2)
-    stars = int(t.get("stars") or 0)
+    stars = int(_g(t, "stars") or 0)
     talent = _STAR_VALUE.get(stars, 0.5)
-    rating = _num(t.get("rating"))
+    rating = _num(_g(t, "rating"))
     if rating and rating > 0:
         # CBBD rating ~0.80-1.00 composite for blue-chips; scale into WS-equiv
         talent = max(talent, round((rating - 0.75) * 24, 2)) if rating > 0.75 else talent
@@ -160,13 +171,14 @@ def build(year=None):
     teams = {}
     for t in _get_safe("/teams", {"season": used_year}):
         rec = {
-            "team": t.get("school") or t.get("display_name") or "",
-            "abbr": t.get("abbreviation") or "",
-            "conference": t.get("conference") or "",
-            "logo": (t.get("logos") or [None])[0],
-            "color": t.get("primary_color")}
+            "team": _g(t, "school", "displayName", "display_name") or "",
+            "abbr": _g(t, "abbreviation") or "",
+            "conference": _g(t, "conference") or "",
+            "logo": (_g(t, "logos") or [None])[0],
+            "color": _g(t, "primaryColor", "primary_color")}
         # index by several name forms so the portal's team name matches
-        for nm in (t.get("school"), t.get("display_name"), t.get("short_display_name")):
+        for nm in (_g(t, "school"), _g(t, "displayName", "display_name"),
+                   _g(t, "shortDisplayName", "short_display_name")):
             if nm:
                 teams.setdefault(_norm(nm), rec)
 
@@ -181,27 +193,28 @@ def build(year=None):
     agg = {}
     n_valued = 0
     for t in portal:
-        player = ((t.get("first_name") or "") + " " + (t.get("last_name") or "")).strip()
-        pos = t.get("position") or ""
+        player = ((_g(t, "firstName", "first_name") or "") + " "
+                  + (_g(t, "lastName", "last_name") or "")).strip()
+        pos = _g(t, "position") or ""
+        stars = int(_g(t, "stars") or 0)
         val, basis = _transfer_value(t, pidx)
         n_valued += 1
-        dest = _team_name(t.get("destination"))
-        orig = _team_name(t.get("origin"))
+        dest = _team_name(_g(t, "destination"))
+        orig = _team_name(_g(t, "origin"))
         # incoming to destination
         if dest:
-            k, base = _team_rec(dest, _team_conf(t.get("destination")))
+            k, base = _team_rec(dest, _team_conf(_g(t, "destination")))
             r = agg.setdefault(k, {**base, "gained": 0.0, "lost": 0.0, "in": [], "out": []})
             r["gained"] += val
             r["in"].append({"player": player, "pos": pos, "from": orig or "—",
-                            "value": round(val, 2), "stars": int(t.get("stars") or 0),
-                            "basis": basis})
+                            "value": round(val, 2), "stars": stars, "basis": basis})
         # outgoing from origin
         if orig:
-            k, base = _team_rec(orig, _team_conf(t.get("origin")))
+            k, base = _team_rec(orig, _team_conf(_g(t, "origin")))
             r = agg.setdefault(k, {**base, "gained": 0.0, "lost": 0.0, "in": [], "out": []})
             r["lost"] += val
             r["out"].append({"player": player, "pos": pos, "to": dest or "Portal",
-                             "value": round(val, 2), "stars": int(t.get("stars") or 0)})
+                             "value": round(val, 2), "stars": stars})
     rows = []
     for r in agg.values():
         r["in"].sort(key=lambda x: -x["value"])
