@@ -6510,6 +6510,24 @@ def _cbb_portal():
                             headers={"Cache-Control": "no-store"})
 
 
+@app.get("/api/cbb-portal/raw")
+def _cbb_portal_raw(year: int = 0):
+    """Raw CBBD portal + player-stats samples so we can see the EXACT JSON keys
+    and whether names are actually present. Read-only, tiny."""
+    try:
+        import cbb_portal
+        yr = year or cbb_portal._default_years()[0]
+        portal = cbb_portal._get_safe("/recruiting/portal", {"year": yr})
+        stats = cbb_portal._get_safe("/stats/player/season", {"season": yr - 1})
+        out = {"year_tried": yr, "portal_count": len(portal),
+               "portal_sample": portal[:4],
+               "stats_count": len(stats),
+               "stats_sample": stats[:2]}
+        return JSONResponse(out, headers={"Cache-Control": "no-store"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300]}, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/cbb-portal/status")
 def _cbb_portal_status():
     try:
