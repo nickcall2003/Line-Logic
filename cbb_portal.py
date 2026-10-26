@@ -207,6 +207,9 @@ def build(year=None):
         n_valued += 1
         dest = _team_name(_g(t, "destination"))
         orig = _team_name(_g(t, "origin"))
+        # withdrew / returned to the same school -> net-zero noise, skip it
+        if dest and orig and _norm(dest) == _norm(orig):
+            continue
         # incoming to destination
         if dest:
             k, base = _team_rec(dest, _team_conf(_g(t, "destination")))
