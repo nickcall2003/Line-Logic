@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v81";   // bumped: NCAAB transfer-portal board (CBBD)
+const CACHE = "ll-shell-v82";   // bumped: spelling fixes (favors/offense)
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));

@@ -2018,7 +2018,7 @@ function heroStatHTML(g,sp){
   if(g.prob_home!=null){
     var ph=Math.round(g.prob_home*100);
     var lead=(ph>=50)?H:A, lp=(ph>=50)?ph:100-ph;
-    return '<div class="proj-line">model favours <span class="pr">'+lead+
+    return '<div class="proj-line">model favors <span class="pr">'+lead+
       ' <b>'+lp+'%</b></span></div>';
   }
   return "";
@@ -4025,7 +4025,7 @@ var CHANGELOG=[
     "Added per-pick units and closing-line value to the results feed, which unlocked the units and CLV charts on this record."]},
   {v:"3.1", date:"2026-07-22", items:[
     "MLB projections now publish a full <b>driver breakdown</b> \u2014 every multiplier the model applied, in order, which multiplies out to the projection itself.",
-    "Fixed the offence factor being reported from season-only run rate while the model actually used a 70/30 blend with recent form (a ~0.3-run gap on hot teams).",
+    "Fixed the offense factor being reported from season-only run rate while the model actually used a 70/30 blend with recent form (a ~0.3-run gap on hot teams).",
     "Pitching lines now label <b>FIP</b> where FIP is what the model consumed, rather than mislabelling it as ERA.",
     "Added model notes: when confidence drops, the reason is stated (unannounced starter, thin innings sample, tired bullpen)."]},
 ];
