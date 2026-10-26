@@ -80,7 +80,22 @@ def _default_years():
     2026-27 season; CBBD may tag it 2026 (calendar) or 2027 (season-ending)."""
     today = dt.date.today()
     end_year = today.year + 1 if today.month >= 7 else today.year
-    return [end_year, today.year, end_year - 1]
+    out = []
+    for y in (end_year, today.year, end_year - 1, today.year - 1):
+        if y not in out:
+            out.append(y)
+    return out
+
+
+def _team_name(o):
+    """origin/destination come back as {name, conference, id} objects (or null)."""
+    if isinstance(o, dict):
+        return o.get("name")
+    return o if isinstance(o, str) else None
+
+
+def _team_conf(o):
+    return o.get("conference") if isinstance(o, dict) else None
 
 
 def _player_value_index(seasons):
@@ -144,20 +159,23 @@ def build(year=None):
     # team universe for names/logos/colors
     teams = {}
     for t in _get_safe("/teams", {"season": used_year}):
-        nm = t.get("school") or t.get("display_name")
-        if not nm:
-            continue
-        teams[_norm(nm)] = {
-            "team": t.get("display_name") or nm,
+        rec = {
+            "team": t.get("school") or t.get("display_name") or "",
             "abbr": t.get("abbreviation") or "",
             "conference": t.get("conference") or "",
             "logo": (t.get("logos") or [None])[0],
             "color": t.get("primary_color")}
+        # index by several name forms so the portal's team name matches
+        for nm in (t.get("school"), t.get("display_name"), t.get("short_display_name")):
+            if nm:
+                teams.setdefault(_norm(nm), rec)
 
-    def _team_rec(name):
+    def _team_rec(name, conf=None):
         key = _norm(name)
-        base = teams.get(key) or {"team": name or "Unknown", "abbr": "", "conference": "",
-                                  "logo": None, "color": None}
+        base = teams.get(key)
+        if base is None:
+            base = {"team": name or "Unknown", "abbr": "", "conference": conf or "",
+                    "logo": None, "color": None}
         return key, base
 
     agg = {}
@@ -167,10 +185,11 @@ def build(year=None):
         pos = t.get("position") or ""
         val, basis = _transfer_value(t, pidx)
         n_valued += 1
-        dest, orig = t.get("destination"), t.get("origin")
+        dest = _team_name(t.get("destination"))
+        orig = _team_name(t.get("origin"))
         # incoming to destination
         if dest:
-            k, base = _team_rec(dest)
+            k, base = _team_rec(dest, _team_conf(t.get("destination")))
             r = agg.setdefault(k, {**base, "gained": 0.0, "lost": 0.0, "in": [], "out": []})
             r["gained"] += val
             r["in"].append({"player": player, "pos": pos, "from": orig or "—",
@@ -178,7 +197,7 @@ def build(year=None):
                             "basis": basis})
         # outgoing from origin
         if orig:
-            k, base = _team_rec(orig)
+            k, base = _team_rec(orig, _team_conf(t.get("origin")))
             r = agg.setdefault(k, {**base, "gained": 0.0, "lost": 0.0, "in": [], "out": []})
             r["lost"] += val
             r["out"].append({"player": player, "pos": pos, "to": dest or "Portal",
@@ -219,24 +238,40 @@ def _load_persisted():
     return None
 
 
+_building = {"on": False}
+
+
+def _bg_build():
+    try:
+        build()
+    except Exception as e:
+        print(f"[cbb_portal] bg build failed: {e}")
+    finally:
+        _building["on"] = False
+
+
 def board(force=False):
-    """Cached board; builds on first call (or when stale). Returns {} with a
-    'needs_key' flag if CBBD_API_KEY isn't set."""
+    """Cached board. The build walks a full season of player stats, so it runs in
+    the BACKGROUND — a cold request returns {building:true} instead of hanging,
+    and fills in once the build finishes. Returns needs_key if no API key."""
     if not _key():
         return {"error": "CBBD_API_KEY not set", "needs_key": True, "teams": []}
     c = _cache
     if not force and c["data"] and time.time() - c["ts"] < _TTL:
         return c["data"]
     disk = _load_persisted()
-    if not force and disk and (time.time() - c["ts"] < _TTL):
+    if not force and disk:
         c["data"] = disk
+        c["ts"] = time.time()
         return disk
-    try:
+    if force:
         return build()
-    except Exception as e:
-        if disk:
-            return disk
-        return {"error": str(e)[:200], "teams": []}
+    # need to build and nothing cached — kick it off in the background
+    if not _building["on"]:
+        _building["on"] = True
+        import threading
+        threading.Thread(target=_bg_build, daemon=True).start()
+    return {"building": True, "teams": [], "season": _default_years()[0]}
 
 
 def status():

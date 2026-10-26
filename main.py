@@ -802,9 +802,9 @@ async def lifespan(app: FastAPI):
                 try:
                     import cbb_portal
                     if cbb_portal._key():
-                        d = cbb_portal.board()
+                        d = cbb_portal.build()   # synchronous warm (already in bg thread)
                         print(f"[cbb-portal] warmed: {len(d.get('teams') or [])} teams, "
-                              f"season {d.get('season')}")
+                              f"season {d.get('season')}, {d.get('count_entries')} moves")
                 except Exception as e:
                     print(f"[cbb-portal] warm failed: {e}")
                 _t.sleep(int(os.environ.get("DVP_WARM_INTERVAL", "21600")))  # 6h
