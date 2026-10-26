@@ -41,6 +41,16 @@ _cache = {}          # (sport,date) -> (ts, [games])
 _DAY_TTL = 6 * 3600
 _LIVE_TTL = 8
 
+# Extra scoreboard params per sport. ESPN's college scoreboards return only a
+# featured handful unless the division group + a high limit are passed, so the
+# full D1 board (100+ CBB games a night) comes back. 50 = D1 basketball,
+# 80 = FBS football.
+_SB_EXTRA = {
+    "ncaab":  {"groups": "50", "limit": "900"},
+    "wncaab": {"groups": "50", "limit": "900"},
+    "ncaaf":  {"groups": "80", "limit": "900"},
+}
+
 
 def _get(url, params=None):
     import httpx
@@ -266,8 +276,13 @@ def get_games(sport: str, date: dt.date, force_live=False):
     ttl = _LIVE_TTL if force_live else (45 if is_current else _DAY_TTL)
     if c and time.time() - c[0] < ttl:
         return c[1]
+    # College scoreboards default to a small FEATURED set (~top-25, ~18 games).
+    # Pass the division group + a high limit so the FULL D1 slate comes back
+    # (men's/women's CBB = group 50; FBS football = group 80).
+    params = {"dates": date.strftime("%Y%m%d")}
+    params.update(_SB_EXTRA.get(sport, {}))
     try:
-        data = _get(SCOREBOARD[sport], {"dates": date.strftime("%Y%m%d")})
+        data = _get(SCOREBOARD[sport], params)
     except Exception:
         return []
     games = []
