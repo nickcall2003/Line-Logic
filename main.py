@@ -534,6 +534,24 @@ async def lifespan(app: FastAPI):
         import threading as _thr
         _thr.Thread(target=_warm_rpi, daemon=True).start()
 
+        # One-shot: dump ESPN transactions structure to the logs so we can build
+        # the NBA/NFL/NHL roster boards without needing a browser tap (the probe
+        # URL keeps getting stale-DNS'd on the client). Prints once, then done.
+        def _probe_espn_to_log():
+            import time as _t, json as _json
+            _t.sleep(20)
+            try:
+                import pro_moves
+                for _lg in ("nba", "nfl", "nhl"):
+                    try:
+                        pr = pro_moves.espn_probe(_lg)
+                        print(f"[espn-probe] {_lg} === " + _json.dumps(pr)[:6000])
+                    except Exception as e:
+                        print(f"[espn-probe] {_lg} failed: {e}")
+            except Exception as e:
+                print(f"[espn-probe] setup failed: {e}")
+        _thr.Thread(target=_probe_espn_to_log, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy
