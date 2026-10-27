@@ -533,6 +533,43 @@ def src_probe(sport):
     return out
 
 
+def _espn_txns_from_html(txt):
+    data = _espnfitt_blob(txt)
+    if not data:
+        return []
+    pc = (data.get("page") or {}).get("content") or {}
+    return pc.get("transactions") or []
+
+
+def espn_txn_probe(sport):
+    """Confirm ESPN date-anchored transaction pagination so we can walk the whole
+    offseason. Fetch the base page + a couple /_/date/YYYYMMDD pages and report
+    how many transactions each returns and their date range."""
+    import httpx
+    path = {"nba": "nba", "nfl": "nfl", "nhl": "nhl"}[sport]
+    out = {"sport": sport, "pages": []}
+
+    def summarize(label, url, txns):
+        dates = sorted(t.get("date", "")[:10] for t in txns if t.get("date"))
+        out["pages"].append({"label": label, "url": url, "n": len(txns),
+                             "date_min": dates[0] if dates else None,
+                             "date_max": dates[-1] if dates else None,
+                             "samples": [t.get("description") for t in txns[:3]]})
+    with httpx.Client(timeout=25, follow_redirects=True,
+                      headers={"User-Agent": "Mozilla/5.0"}) as cx:
+        for label, url in [
+            ("base", f"https://www.espn.com/{path}/transactions"),
+            ("date-0801", f"https://www.espn.com/{path}/transactions/_/date/20260801"),
+            ("date-0701", f"https://www.espn.com/{path}/transactions/_/date/20260701"),
+        ]:
+            try:
+                r = cx.get(url)
+                summarize(label, url, _espn_txns_from_html(r.text or ""))
+            except Exception as e:
+                out["pages"].append({"label": label, "error": str(e)[:120]})
+    return out
+
+
 def board(sport):
     sport = (sport or "").lower()
     if sport not in _LEAGUE:
