@@ -547,20 +547,13 @@ async def lifespan(app: FastAPI):
                         pro_moves.board(_lg)
                     except Exception as e:
                         print(f"[pro-moves] warm {_lg} failed: {e}")
+                try:
+                    pro_moves.cbase_board()
+                except Exception as e:
+                    print(f"[pro-moves] warm cbase failed: {e}")
             except Exception as e:
                 print(f"[pro-moves] warm setup failed: {e}")
         _thr.Thread(target=_warm_pro_moves, daemon=True).start()
-
-        # TEMP: locate ESPN's college-baseball transfer source (prints once).
-        def _probe_cbase():
-            import time as _t, json as _json
-            _t.sleep(25)
-            try:
-                import pro_moves
-                print("[cbase] === " + _json.dumps(pro_moves.cbase_article_probe())[:6800])
-            except Exception as e:
-                print(f"[cbase] failed: {e}")
-        _thr.Thread(target=_probe_cbase, daemon=True).start()
 
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
@@ -6622,6 +6615,19 @@ def _pro_moves(sport: str):
     try:
         import pro_moves
         return JSONResponse(pro_moves.board(sport),
+                            headers={"Cache-Control": "public, max-age=3600"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300], "teams": []},
+                            headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/cbase-portal")
+def _cbase_portal():
+    """College baseball transfer board (per school), parsed from ESPN's ranked
+    top transfers. Each entry carries the player's overall rank. Cached ~12h."""
+    try:
+        import pro_moves
+        return JSONResponse(pro_moves.cbase_board(),
                             headers={"Cache-Control": "public, max-age=3600"})
     except Exception as e:
         return JSONResponse({"error": str(e)[:300], "teams": []},

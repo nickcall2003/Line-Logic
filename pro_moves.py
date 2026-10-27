@@ -394,76 +394,87 @@ def board(sport):
             "window_start": _offseason_start(sport).isoformat()}
 
 
-def cbase_probe():
-    """Find ESPN's college-baseball transfer source: do the structured transfer-
-    portal tracker pages exist (like CFB/CBB), or only the rankings article?
-    Dump each candidate's page.content structure."""
-    import httpx
-    import json as _j
-    urls = [
-        "https://www.espn.com/college-baseball/transferportal",
-        "https://www.espn.com/college-baseball/transfer-portal",
-        "https://www.espn.com/college-baseball/transactions",
-        "https://www.espn.com/college-baseball/story/_/id/49168943/2026-college-baseball-transfer-portal-rankings-signed",
-    ]
-    out = {"pages": []}
-    with httpx.Client(timeout=25, follow_redirects=True,
-                      headers={"User-Agent": "Mozilla/5.0"}) as cx:
-        for u in urls:
-            row = {"url": u}
-            try:
-                r = cx.get(u)
-                row["status"] = r.status_code
-                row["final_url"] = str(r.url)
-                data = _espnfitt_blob(r.text or "") or {}
-                pc = (data.get("page") or {}).get("content") or {}
-                if isinstance(pc, dict):
-                    cmap = {}
-                    for k, v in pc.items():
-                        if isinstance(v, list):
-                            cmap[k] = f"list[{len(v)}]" + ((" e0=" + _j.dumps(v[0])[:220]) if v else "")
-                        elif isinstance(v, dict):
-                            cmap[k] = "dict{" + ",".join(list(v.keys())[:10]) + "}"
-                        else:
-                            cmap[k] = type(v).__name__
-                    row["content_keys"] = cmap
-            except Exception as e:
-                row["error"] = str(e)[:120]
-            out["pages"].append(row)
-    return out
+# ---- college baseball transfer board (ESPN rankings article, option B) ----
+_CBASE_URL = ("https://www.espn.com/college-baseball/story/_/id/49168943/"
+              "2026-college-baseball-transfer-portal-rankings-signed")
+_CB_RE = re.compile(
+    r"(\d{1,2})\.\s+"
+    r"([A-Z][A-Za-z.'\u2019\- ]+?),\s*"
+    r"([A-Za-z0-9/]{1,6}),\s*"
+    r".*?Transferring from:\s*([^|\n]+?)\s*[|\n]\s*"
+    r"Transferring to:\s*([A-Za-z&.'\u2019\- ]+?)(?=\s{2,}|\n|$)",
+    re.S)
+_cbase = {"data": None, "ts": 0}
+_CBASE_TTL = 12 * 3600
 
 
-def cbase_article_probe():
-    """Dump the ESPN college-baseball transfer rankings article's structure and
-    body text so we can see if the ranked list is parseable."""
+def _cbase_build():
     import httpx
-    import re
-    url = ("https://www.espn.com/college-baseball/story/_/id/49168943/"
-           "2026-college-baseball-transfer-portal-rankings-signed")
-    out = {"url": url}
     with httpx.Client(timeout=25, follow_redirects=True,
                       headers={"User-Agent": "Mozilla/5.0"}) as cx:
-        r = cx.get(url)
-        out["status"] = r.status_code
+        r = cx.get(_CBASE_URL)
         html = r.text or ""
-    data = _espnfitt_blob(html) or {}
-    out["top_keys"] = list(data.keys())[:20]
-    page = data.get("page") or {}
-    content = page.get("content") if isinstance(page, dict) else None
-    if isinstance(content, dict):
-        out["content_keys"] = list(content.keys())[:30]
-        story = content.get("story")
-        if isinstance(story, dict):
-            out["story_keys"] = list(story.keys())[:30]
-            body = story.get("body") or story.get("content") or ""
-            if isinstance(body, str) and body:
-                out["body_excerpt"] = re.sub(r"<[^>]+>", " ", body)[:2600]
-    if "body_excerpt" not in out:
-        txt = re.sub(r"<script[\s\S]*?</script>", " ", html)
-        txt = re.sub(r"<[^>]+>", " ", txt)
-        i = txt.find("1.")
-        out["text_excerpt"] = txt[i:i + 2600] if i > 0 else txt[:2000]
-    return out
+    txt = re.sub(r"<script[\s\S]*?</script>", " ", html)
+    txt = re.sub(r"<[^>]+>", " ", txt)
+    entries = []
+    seen = set()
+    for m in _CB_RE.finditer(txt):
+        rank = int(m.group(1))
+        if rank in seen:
+            continue
+        seen.add(rank)
+        entries.append((rank, m.group(2).strip(), m.group(3).strip(),
+                        m.group(4).strip(), m.group(5).strip()))
+    if not entries:
+        return None
+    nmax = max(e[0] for e in entries)
+    schools = {}
+
+    def slot(name):
+        return schools.setdefault(_norm(name), {"team": name, "conference": "",
+                                                "gained": 0, "lost": 0, "in": [], "out": [],
+                                                "_tw": 0})
+    for rank, player, pos, frm, to in entries:
+        w = nmax - rank + 1
+        s = slot(to)
+        s["gained"] += 1
+        s["_tw"] += w
+        s["in"].append({"player": player, "pos": pos, "from": frm,
+                        "value": "#%d" % rank, "_r": rank})
+        s = slot(frm)
+        s["lost"] += 1
+        s["out"].append({"player": player, "pos": pos, "to": to,
+                         "value": "#%d" % rank, "_r": rank})
+    rows = []
+    for s in schools.values():
+        s["net"] = s["gained"] - s["lost"]
+        s["in"].sort(key=lambda x: x["_r"])
+        s["out"].sort(key=lambda x: x["_r"])
+        for p in s["in"] + s["out"]:
+            p.pop("_r", None)
+        rows.append(s)
+    rows.sort(key=lambda s: (s["net"], s.pop("_tw")), reverse=True)
+    for i, s in enumerate(rows):
+        s["rank"] = i + 1
+    return {"sport": "cbase", "source": "ESPN top transfers", "season": "2026",
+            "count_entries": len(entries), "teams": rows}
+
+
+def cbase_board():
+    """College baseball transfer board (per school, from ESPN's ranked top-60
+    transfers). Cached; refreshes every 12h."""
+    now = time.time()
+    if _cbase["data"] and now - _cbase["ts"] < _CBASE_TTL:
+        return _cbase["data"]
+    try:
+        d = _cbase_build()
+        if d:
+            _cbase["data"] = d
+            _cbase["ts"] = now
+    except Exception as e:
+        print(f"[pro_moves] cbase build failed: {e}")
+    return _cbase["data"] or {"sport": "cbase", "teams": [],
+                              "building": True, "season": "2026"}
 
 
 def status():

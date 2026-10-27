@@ -3176,7 +3176,8 @@ var MOVES_SPORTS=[
   {key:"nhl",emoji:"🏒",label:"NHL",kind:"Trades & signings"},
   {key:"mlb",emoji:"⚾",label:"MLB",kind:"Trades & signings"},
   {key:"ncaaf",emoji:"🏈",label:"College Football",kind:"Transfer portal"},
-  {key:"ncaab",emoji:"🏀",label:"College Basketball",kind:"Transfer portal"}
+  {key:"ncaab",emoji:"🏀",label:"College Basketball",kind:"Transfer portal"},
+  {key:"cbase",emoji:"⚾",label:"College Baseball",kind:"Transfer portal"}
 ];
 function openMoves(){view="moves";movesSport=null;if(detailId)closeDetail();
   document.getElementById("home").classList.remove("show");
@@ -3256,6 +3257,7 @@ async function loadMoves(){
   // CFB=/api/portal) and pro (nba/mlb/nfl/nhl=/api/pro-moves/{sp}).
   var portalHTML="";
   var portalURL=(sp==="ncaab")?"/api/cbb-portal":(sp==="ncaaf")?"/api/portal":
+    (sp==="cbase")?"/api/cbase-portal":
     (["nba","mlb","nfl","nhl"].indexOf(sp)>=0)?("/api/pro-moves/"+sp):null;
   if(portalURL){try{var pb=await getJSON(portalURL);if(movesSport===sp)portalHTML=portalBoardHTML(pb);}catch(e){}}
   try{movesData=await getJSON("/api/moves/"+sp);}catch(e){movesData={moves:[],sport:sp};}
