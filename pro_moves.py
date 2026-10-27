@@ -303,10 +303,10 @@ def _espnfitt_blob(txt):
         if idx < 0:
             break
         pos = idx + 12
-        eq = txt.find("=", idx, idx + 10)
+        eq = txt.find("=", idx + 12, idx + 60)   # '=' comes after the 12-char name
         if eq < 0:
             continue
-        start = txt.find("{", eq, eq + 8)
+        start = txt.find("{", eq, eq + 12)
         if start < 0:
             continue
         obj = _match_braces(txt, start)
