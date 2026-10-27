@@ -214,6 +214,54 @@ def _build(sport):
             _building.discard(sport)
 
 
+def espn_probe_sources(sport):
+    """Try the candidate ESPN transaction sources and report which actually
+    carries data, so we can pick the real feed for the NBA/NFL/NHL boards. The
+    core API came back empty; these are the site APIs + the HTML page ESPN's own
+    transactions tab is built from (it embeds a __espnfitt__ JSON state)."""
+    import httpx
+    if sport not in _LEAGUE or sport == "mlb":
+        return {"error": "nba/nfl/nhl only"}
+    group, league, _ = _LEAGUE[sport]
+    yr = dt.date.today().year
+    cands = [
+        f"https://site.web.api.espn.com/apis/fitt/v3/sports/{group}/{league}/transactions?limit=50",
+        f"https://site.web.api.espn.com/apis/common/v3/sports/{group}/{league}/transactions?limit=50",
+        f"https://sports.core.api.espn.com/v2/sports/{group}/leagues/{league}/seasons/{yr}/transactions?limit=50",
+    ]
+    out = []
+    with httpx.Client(timeout=20, follow_redirects=True,
+                      headers={"User-Agent": "Mozilla/5.0"}) as cx:
+        for u in cands:
+            row = {"url": u}
+            try:
+                r = cx.get(u)
+                row["status"] = r.status_code
+                try:
+                    j = r.json()
+                    if isinstance(j, dict):
+                        row["keys"] = list(j.keys())[:12]
+                        row["count"] = j.get("count")
+                        items = j.get("items") or j.get("transactions") or []
+                        row["n_items"] = len(items) if isinstance(items, list) else None
+                        row["sample"] = (items[0] if items else None)
+                except Exception:
+                    row["body_head"] = (r.text or "")[:160]
+            except Exception as e:
+                row["error"] = str(e)[:160]
+            out.append(row)
+        try:
+            h = cx.get(f"https://www.espn.com/{league}/transactions")
+            txt = h.text or ""
+            out.append({"url": f"www.espn.com/{league}/transactions",
+                        "status": h.status_code, "len": len(txt),
+                        "has_fitt": "__espnfitt__" in txt,
+                        "transaction_word_hits": txt.lower().count("transaction")})
+        except Exception as e:
+            out.append({"url": "html-page", "error": str(e)[:160]})
+    return out
+
+
 def board(sport):
     sport = (sport or "").lower()
     if sport not in _LEAGUE:
