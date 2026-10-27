@@ -551,6 +551,17 @@ async def lifespan(app: FastAPI):
                 print(f"[pro-moves] warm setup failed: {e}")
         _thr.Thread(target=_warm_pro_moves, daemon=True).start()
 
+        # TEMP: locate ESPN's college-baseball transfer source (prints once).
+        def _probe_cbase():
+            import time as _t, json as _json
+            _t.sleep(25)
+            try:
+                import pro_moves
+                print("[cbase] === " + _json.dumps(pro_moves.cbase_probe())[:6500])
+            except Exception as e:
+                print(f"[cbase] failed: {e}")
+        _thr.Thread(target=_probe_cbase, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy

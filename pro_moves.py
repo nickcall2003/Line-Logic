@@ -394,6 +394,45 @@ def board(sport):
             "window_start": _offseason_start(sport).isoformat()}
 
 
+def cbase_probe():
+    """Find ESPN's college-baseball transfer source: do the structured transfer-
+    portal tracker pages exist (like CFB/CBB), or only the rankings article?
+    Dump each candidate's page.content structure."""
+    import httpx
+    import json as _j
+    urls = [
+        "https://www.espn.com/college-baseball/transferportal",
+        "https://www.espn.com/college-baseball/transfer-portal",
+        "https://www.espn.com/college-baseball/transactions",
+        "https://www.espn.com/college-baseball/story/_/id/49168943/2026-college-baseball-transfer-portal-rankings-signed",
+    ]
+    out = {"pages": []}
+    with httpx.Client(timeout=25, follow_redirects=True,
+                      headers={"User-Agent": "Mozilla/5.0"}) as cx:
+        for u in urls:
+            row = {"url": u}
+            try:
+                r = cx.get(u)
+                row["status"] = r.status_code
+                row["final_url"] = str(r.url)
+                data = _espnfitt_blob(r.text or "") or {}
+                pc = (data.get("page") or {}).get("content") or {}
+                if isinstance(pc, dict):
+                    cmap = {}
+                    for k, v in pc.items():
+                        if isinstance(v, list):
+                            cmap[k] = f"list[{len(v)}]" + ((" e0=" + _j.dumps(v[0])[:220]) if v else "")
+                        elif isinstance(v, dict):
+                            cmap[k] = "dict{" + ",".join(list(v.keys())[:10]) + "}"
+                        else:
+                            cmap[k] = type(v).__name__
+                    row["content_keys"] = cmap
+            except Exception as e:
+                row["error"] = str(e)[:120]
+            out["pages"].append(row)
+    return out
+
+
 def status():
     with _lock:
         return {s: {"cached": s in _cache, "building": s in _building,
