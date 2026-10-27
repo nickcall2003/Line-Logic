@@ -1132,7 +1132,7 @@ async function loadOfficials(sport,gameId,baseTotal){
     '<div class="off-chips">'+chips+'</div>'+tend+
     '<div class="off-note">'+(isMLB&&d.hp_tendency?"Umpire run/strikeout tendency is computed from the season\u2019s completed games. A modest, capped nudge \u2014 shown for context.":"Assignment only \u2014 shown for context. No public feed has official tendency data, so this isn\u2019t factored into the model.")+'</div>';}
 function sportLoader(sp,msg){
-  const icons={tennis:"\u{1F3BE}",mlb:"\u26BE",ncaabb:"\u26BE",nba:"\u{1F3C0}",ncaab:"\u{1F3C0}",wncaab:"\u{1F3C0}",nfl:"\u{1F3C8}",ncaaf:"\u{1F3C8}",nhl:"\u{1F3D2}",soccer:"\u26BD",golf:"\u26F3",ufc:"\u{1F94A}"};
+  const icons={tennis:"\u{1F3BE}",mlb:"\u26BE",ncaabb:"\u26BE",cbase:"\u26BE",nba:"\u{1F3C0}",ncaab:"\u{1F3C0}",wncaab:"\u{1F3C0}",nfl:"\u{1F3C8}",ncaaf:"\u{1F3C8}",nhl:"\u{1F3D2}",soccer:"\u26BD",golf:"\u26F3",ufc:"\u{1F94A}"};
   const ic=icons[sp]||"\u{1F3BE}";
   return '<div class="sload"><div class="sload-track"><span class="sload-ball s-'+(sp||"tennis")+'">'+ic+'</span></div><div class="sload-msg">'+(msg||"Loading")+'</div></div>';}
 async function reload(){if(detailId)return;if(view==="free"||view==="best"||view==="parlays"||view==="news"||view==="home"||view==="help"||view==="record"||view==="statsheets"||view==="moves"||view==="bets"||view==="auth"||view==="calibration"||view==="transparency"||view==="simulator"||view==="value"||view==="ladder")return;const tok=++loadToken;const mySport=sport;

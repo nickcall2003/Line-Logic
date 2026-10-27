@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v87";   // bumped: hide slate search bar off non-slate pages
+const CACHE = "ll-shell-v88";   // bumped: college baseball loader icon
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));
