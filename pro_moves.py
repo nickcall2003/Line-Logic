@@ -635,19 +635,25 @@ def espn_team_txn_probe(sport):
         except Exception as e:
             out["teams_err"] = str(e)[:120]
             return out
-        for label, url in [
-            ("team-abbr", f"https://www.espn.com/{league}/team/transactions/_/name/{abbr}"),
-        ]:
-            try:
-                r = cx.get(url)
-                txns = _espn_txns_from_html(r.text or "")
-                dates = sorted(x.get("date", "")[:10] for x in txns if x.get("date"))
-                out[label] = {"url": url, "status": r.status_code, "n": len(txns),
-                              "date_min": dates[0] if dates else None,
-                              "date_max": dates[-1] if dates else None,
-                              "samples": [x.get("description") for x in txns[:4]]}
-            except Exception as e:
-                out[label] = {"url": url, "error": str(e)[:120]}
+        import json as _j
+        url = f"https://www.espn.com/{league}/team/transactions/_/name/{abbr}"
+        out["url"] = url
+        try:
+            r = cx.get(url)
+            out["status"] = r.status_code
+            data = _espnfitt_blob(r.text or "") or {}
+            pc = (data.get("page") or {}).get("content") or {}
+            out["content_keys"] = list(pc.keys())[:40]
+            txns = pc.get("transactions")
+            out["txn_type"] = type(txns).__name__
+            if isinstance(txns, list):
+                out["txn_n"] = len(txns)
+                out["txn_head"] = txns[:3]
+            elif isinstance(txns, dict):
+                out["txn_keys"] = list(txns.keys())[:20]
+                out["txn_peek"] = _j.dumps(txns)[:1800]
+        except Exception as e:
+            out["error"] = str(e)[:150]
     return out
 
 
