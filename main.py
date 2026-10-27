@@ -807,6 +807,15 @@ async def lifespan(app: FastAPI):
                               f"season {d.get('season')}, {d.get('count_entries')} moves")
                 except Exception as e:
                     print(f"[cbb-portal] warm failed: {e}")
+                try:
+                    import cfb_portal
+                    cfb_portal.OUT = "/data/cfb_portal.json"
+                    if cfb_portal._key() and not cfb_portal.load():
+                        d = cfb_portal.build()   # only if not already persisted
+                        print(f"[cfb-portal] warmed: {d.get('ranked')} teams, "
+                              f"season {d.get('season')}")
+                except Exception as e:
+                    print(f"[cfb-portal] warm failed: {e}")
                 _t.sleep(int(os.environ.get("DVP_WARM_INTERVAL", "21600")))  # 6h
         import threading as _thr_dvp
         _thr_dvp.Thread(target=_dvp_warmer, daemon=True).start()

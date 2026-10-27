@@ -3204,28 +3204,49 @@ function renderMoves(){
     '<div class="seclab" style="margin:16px 2px 9px">Pro — trades & signings</div><div class="stat-sports">'+pro+'</div>'+
     '<div class="seclab" style="margin:18px 2px 9px">College — transfer portal</div><div class="stat-sports">'+col+'</div></div>';
 }
-function cbbPortalHTML(pb){
+// One renderer for both portal boards (CBB uses gained/in/value, CFB uses
+// added/incoming/impact — normalized here) with a live team search.
+function portalBoardHTML(pb){
   if(!pb)return "";
-  if(pb.needs_key)return '<div class="empty">The NCAAB portal board needs the CBBD API key set on the server (<b>CBBD_API_KEY</b>). Once it’s in, this fills with every team ranked by net transfer value.</div>';
+  if(pb.needs_key)return '<div class="empty">The portal board needs the CBBD API key set on the server (<b>CBBD_API_KEY</b>).</div>';
   var teams=(pb.teams||[]);
-  if(!teams.length)return '<div class="empty">Portal board is building from the '+(pb.season||"")+' cycle — check back shortly.</div>';
-  var rows=teams.map(function(t,i){
-    var net=t.net,cls=net>0?"pos":(net<0?"neg":"");
-    var ins=(t.in||[]).map(function(p){return '<div class="cp-pl"><span class="cp-sign pos">+</span>'+p.player+' <span class="cp-pos">'+(p.pos||"")+'</span><span class="cp-v">'+p.value+'</span><span class="cp-ctx">from '+p.from+'</span></div>';}).join("");
-    var outs=(t.out||[]).map(function(p){return '<div class="cp-pl"><span class="cp-sign neg">−</span>'+p.player+' <span class="cp-pos">'+(p.pos||"")+'</span><span class="cp-v">'+p.value+'</span><span class="cp-ctx">to '+p.to+'</span></div>';}).join("");
-    return '<div class="cp-team" onclick="this.classList.toggle(\'open\')">'+
-      '<div class="cp-row"><span class="cp-rank">'+(i+1)+'</span><span class="cp-nm">'+t.team+'</span>'+
+  if(!teams.length)return '<div class="empty">Portal board is building'+(pb.season?(' from the '+pb.season+' cycle'):'')+' — check back shortly.</div>';
+  var rows=teams.map(function(tt,i){
+    var net=(tt.net!=null?tt.net:0),cls=net>0?"pos":(net<0?"neg":"");
+    var gained=(tt.gained!=null?tt.gained:(tt.added!=null?tt.added:0));
+    var lost=(tt.lost!=null?tt.lost:0);
+    var inList=(tt.in||tt.incoming||[]),outList=(tt.out||tt.outgoing||[]);
+    var rank=tt.rank||(i+1);
+    function pv(p){return (p.value!=null?p.value:(p.impact!=null?p.impact:""));}
+    var ins=inList.map(function(p){return '<div class="cp-pl"><span class="cp-sign pos">+</span>'+(p.player||p.name||"")+' <span class="cp-pos">'+(p.pos||"")+'</span><span class="cp-v">'+pv(p)+'</span><span class="cp-ctx">from '+(p.from||p.origin||"—")+'</span></div>';}).join("");
+    var outs=outList.map(function(p){return '<div class="cp-pl"><span class="cp-sign neg">−</span>'+(p.player||p.name||"")+' <span class="cp-pos">'+(p.pos||"")+'</span><span class="cp-v">'+pv(p)+'</span><span class="cp-ctx">to '+(p.to||p.destination||"Portal")+'</span></div>';}).join("");
+    return '<div class="cp-team" data-team="'+(tt.team||"").toLowerCase()+'" onclick="this.classList.toggle(\'open\')">'+
+      '<div class="cp-row"><span class="cp-rank">'+rank+'</span><span class="cp-nm">'+tt.team+'</span>'+
         '<span class="cp-net '+cls+'">'+(net>0?"+":"")+net+'</span></div>'+
-      '<div class="cp-sub">+'+t.gained+' gained · −'+t.lost+' lost'+(t.conference?' · '+t.conference:'')+' · tap to expand</div>'+
+      '<div class="cp-sub">+'+gained+' gained · −'+lost+' lost'+(tt.conference?' · '+tt.conference:'')+' · tap to expand</div>'+
       '<div class="cp-detail">'+(ins||'<div class="cp-none">no notable additions</div>')+(outs||'')+'</div></div>';
   }).join("");
-  return '<div class="cp-head">Portal board · '+(pb.count_entries||0)+' moves · ranked by net production value</div><div class="cp-wrap">'+rows+'</div>';
+  return '<div class="cp-head">Portal board · '+(pb.count_entries||teams.length)+' moves · ranked by net value</div>'+
+    '<input class="portal-search" id="portal-search" type="text" placeholder="🔍 Search teams…" oninput="portalFilter(this.value)" autocomplete="off">'+
+    '<div class="cp-wrap" id="portal-rows">'+rows+'</div>'+
+    '<div class="cp-noresult" id="portal-noresult" style="display:none">No team matches that search.</div>';
+}
+function portalFilter(q){
+  q=(q||"").toLowerCase().trim();
+  var rows=document.querySelectorAll("#portal-rows .cp-team"),shown=0;
+  rows.forEach(function(el){
+    var hit=!q||(el.getAttribute("data-team")||"").indexOf(q)>=0;
+    el.style.display=hit?"":"none";if(hit)shown++;
+  });
+  var nr=document.getElementById("portal-noresult");if(nr)nr.style.display=shown?"none":"block";
 }
 async function loadMoves(){
   const list=document.getElementById("list");const sp=movesSport;
-  list.innerHTML=sportLoader(sp==="ncaaf"||sp==="ncaab"?sp:sp,"Pulling the latest roster moves");
+  list.innerHTML=sportLoader(sp,"Pulling the latest roster moves");
+  // college portal boards render inline (CBB = /api/cbb-portal, CFB = /api/portal)
   var portalHTML="";
-  if(sp==="ncaab"){try{var pb=await getJSON("/api/cbb-portal");if(movesSport==="ncaab")portalHTML=cbbPortalHTML(pb);}catch(e){}}
+  var portalURL=(sp==="ncaab")?"/api/cbb-portal":(sp==="ncaaf")?"/api/portal":null;
+  if(portalURL){try{var pb=await getJSON(portalURL);if(movesSport===sp)portalHTML=portalBoardHTML(pb);}catch(e){}}
   try{movesData=await getJSON("/api/moves/"+sp);}catch(e){movesData={moves:[],sport:sp};}
   if(view!=="moves"||movesSport!==sp)return;
   const meta=MOVES_SPORTS.find(s=>s.key===sp)||{label:sp.toUpperCase(),kind:""};
@@ -3239,12 +3260,9 @@ async function loadMoves(){
   }else{
     feed='<div class="empty">No roster moves in the feed right now — this picks up in the offseason and around the trade deadline. Check back then.</div>';
   }
-  const portalBtn=(movesData&&movesData.portal_board)?
-    ('<a class="dvp-exp" style="display:inline-block;margin-bottom:12px;text-decoration:none" href="'+movesData.portal_board+'" target="_blank" rel="noopener">🏈 Full portal board — teams ranked by transfer value ↗</a>'):"";
   list.innerHTML='<div class="dvp-wrap">'+
     '<button class="dvp-back" onclick="movesSport=null;renderMoves()">‹ All sports</button>'+
     '<div class="dvp-head"><div class="dvp-title">'+meta.emoji+' '+meta.label+' — '+meta.kind+'</div></div>'+
-    portalBtn+
     portalHTML+
     (portalHTML?'<div class="cp-head" style="margin-top:18px">Latest portal & roster headlines</div>':'')+
     '<div class="news-body">'+feed+'</div>'+
