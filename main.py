@@ -6584,6 +6584,35 @@ def _roster_moves(sport: str):
     return out
 
 
+@app.get("/api/pro-moves/{sport}")
+def _pro_moves(sport: str):
+    """Pro roster-change board (nba/mlb/nfl/nhl): per team, who they ADDED and
+    LOST via trades / free agency / waivers from the start of the most recent
+    offseason through today. Same shape as the college portal boards, so the
+    frontend renders it identically. Builds in a background thread (never blocks
+    the request); cached, settled moves never change."""
+    try:
+        import pro_moves
+        return JSONResponse(pro_moves.board(sport),
+                            headers={"Cache-Control": "public, max-age=3600"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300], "teams": []},
+                            headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/pro-moves-probe/{sport}")
+def _pro_moves_probe(sport: str):
+    """TEMP: dump the ESPN core-API transactions structure for an ESPN league
+    (nba/nfl/nhl) — the list shape plus one followed transaction detail — so we
+    can confirm the exact fields before finishing the aggregator."""
+    try:
+        import pro_moves
+        return JSONResponse(pro_moves.espn_probe((sport or "").lower()),
+                            headers={"Cache-Control": "no-store"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)[:300]}, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/dvp/nba")
 def _dvp_nba():
     """Defense vs Position tables for the NBA (PG/SG/SF/PF/C), auto-built from box
