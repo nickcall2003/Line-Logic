@@ -481,6 +481,58 @@ def wiki_probe(sport):
     return out
 
 
+def src_probe(sport):
+    """Decisive source probe: can we pull current + historical rosters from ESPN
+    (which already works from this server)? If so, roster-diff gives the offseason
+    add/drop list with no text parsing. Report team count, current roster sample,
+    and which season-scoped roster years actually carry data."""
+    import httpx
+    group, league, _ = _LEAGUE[sport]
+    out = {"sport": sport}
+    with httpx.Client(timeout=25, follow_redirects=True,
+                      headers={"User-Agent": "Mozilla/5.0"}) as cx:
+        tid = None
+        try:
+            tr = cx.get(f"https://site.api.espn.com/apis/site/v2/sports/{group}/{league}/teams")
+            tj = tr.json()
+            teams = tj["sports"][0]["leagues"][0]["teams"]
+            tid = teams[0]["team"]["id"]
+            out["teams"] = {"n": len(teams), "sample_id": tid,
+                            "sample_name": teams[0]["team"]["displayName"]}
+        except Exception as e:
+            out["teams_err"] = str(e)[:150]
+        if tid:
+            try:
+                rr = cx.get(f"https://site.api.espn.com/apis/site/v2/sports/{group}/{league}/teams/{tid}/roster")
+                rj = rr.json()
+                names = []
+
+                def collect(o):
+                    if isinstance(o, dict):
+                        if o.get("fullName"):
+                            names.append(o["fullName"])
+                        for v in o.values():
+                            collect(v)
+                    elif isinstance(o, list):
+                        for v in o:
+                            collect(v)
+                collect(rj.get("athletes"))
+                out["roster_current"] = {"status": rr.status_code, "n": len(names),
+                                         "sample": names[:4]}
+            except Exception as e:
+                out["roster_err"] = str(e)[:150]
+            for yr in (2024, 2025, 2026, 2027):
+                try:
+                    cr = cx.get(f"https://sports.core.api.espn.com/v2/sports/{group}/leagues/{league}/seasons/{yr}/teams/{tid}/athletes",
+                                params={"limit": 80})
+                    cj = cr.json()
+                    out[f"core_{yr}"] = {"count": cj.get("count"),
+                                         "n_items": len(cj.get("items") or [])}
+                except Exception as e:
+                    out[f"core_{yr}_err"] = str(e)[:100]
+    return out
+
+
 def board(sport):
     sport = (sport or "").lower()
     if sport not in _LEAGUE:
