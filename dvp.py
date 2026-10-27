@@ -396,6 +396,49 @@ _NBA_POS_CANON = {"pg": "G", "sg": "G", "g": "G", "gf": "G", "fg": "F",
 _valid_ids_cache = {}
 
 
+def ncaaf_diag():
+    """TEMP: where do CFB games go? Per-week raw/completed/kept, the valid-team
+    set size, and sample dropped games with in_valid flags."""
+    sport = "ncaaf"
+    base = EP.SCOREBOARD.get(sport)
+    today = dt.date.today()
+    yr = today.year if today.month >= 8 else today.year - 1
+    group = "80"
+    valid = _valid_team_ids(sport, group)
+    out = {"year": yr, "valid_n": len(valid), "weeks": [],
+           "total_raw": 0, "total_completed": 0, "total_kept": 0, "dropped": []}
+    for wk in range(1, 17):
+        p = {"dates": str(yr), "seasontype": 2, "week": wk, "limit": "900", "groups": group}
+        try:
+            data = EP._get(base, p) or {}
+        except Exception as e:
+            out["weeks"].append({"wk": wk, "err": str(e)[:80]})
+            continue
+        evs = data.get("events") or []
+        comp_n = kept = 0
+        for ev in evs:
+            comp = (ev.get("competitions") or [{}])[0]
+            if not (((comp.get("status") or {}).get("type") or {}).get("completed")):
+                continue
+            comp_n += 1
+            cs = comp.get("competitors") or []
+            if len(cs) != 2:
+                continue
+            ids = [str((c.get("team") or {}).get("id")) for c in cs]
+            nms = [(c.get("team") or {}).get("displayName") for c in cs]
+            if valid and (ids[0] not in valid or ids[1] not in valid):
+                if len(out["dropped"]) < 8:
+                    out["dropped"].append({"wk": wk, "teams": nms, "ids": ids,
+                                           "in_valid": [i in valid for i in ids]})
+                continue
+            kept += 1
+        out["weeks"].append({"wk": wk, "raw": len(evs), "done": comp_n, "kept": kept})
+        out["total_raw"] += len(evs)
+        out["total_completed"] += comp_n
+        out["total_kept"] += kept
+    return out
+
+
 def _valid_team_ids(sport, group=None):
     """Set of real team ids for a league (e.g. the 30 NBA franchises, or FBS-only
     for CFB) from the teams endpoint, so exhibitions vs international clubs and

@@ -555,6 +555,17 @@ async def lifespan(app: FastAPI):
                 print(f"[pro-moves] warm setup failed: {e}")
         _thr.Thread(target=_warm_pro_moves, daemon=True).start()
 
+        # TEMP: diagnose the CFB ratings game-count shortfall (prints once).
+        def _cfb_diag():
+            import time as _t, json as _json
+            _t.sleep(30)
+            try:
+                import dvp
+                print("[cfb-diag] === " + _json.dumps(dvp.ncaaf_diag())[:6500])
+            except Exception as e:
+                print(f"[cfb-diag] failed: {e}")
+        _thr.Thread(target=_cfb_diag, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy
