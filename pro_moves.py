@@ -315,37 +315,46 @@ def espn_scrape_probe(sport):
             r = cx.get(url)
             out["status"] = r.status_code
             txt = r.text or ""
+        import json as _j
         data = _espnfitt_blob(txt)
         if data is None:
             out["error"] = "no __espnfitt__ blob parsed"
             return out
-        hits = []
+        out["top_keys"] = list(data.keys())[:25]
+        pc = data.get("page", {})
+        pc = pc.get("content", {}) if isinstance(pc, dict) else {}
+        if isinstance(pc, dict):
+            cmap = {}
+            for k, v in pc.items():
+                if isinstance(v, list):
+                    cmap[k] = f"list[{len(v)}]" + ((" e0=" + _j.dumps(v[0])[:220]) if v else "")
+                elif isinstance(v, dict):
+                    cmap[k] = "dict{" + ",".join(list(v.keys())[:12]) + "}"
+                else:
+                    cmap[k] = f"{type(v).__name__}:{str(v)[:30]}"
+            out["content_map"] = cmap
+        # heuristic: any list whose elements carry a description/text + a date
+        cands = []
 
-        def walk(o, path):
-            if len(hits) >= 4:
+        def txnish(d):
+            if not isinstance(d, dict):
+                return False
+            ks = {k.lower() for k in d.keys()}
+            return bool(ks & {"description", "text", "desc", "note", "headline"})
+
+        def walk(o, path, depth=0):
+            if len(cands) >= 5 or depth > 14:
                 return
-            if isinstance(o, dict):
+            if isinstance(o, list):
+                if o and txnish(o[0]):
+                    cands.append((path, len(o), o[0]))
+                for j, v in enumerate(o[:40]):
+                    walk(v, f"{path}[{j}]", depth + 1)
+            elif isinstance(o, dict):
                 for k, v in o.items():
-                    if k.lower() == "transactions" and isinstance(v, (list, dict)) and v:
-                        hits.append((path + "." + k, v))
-                    walk(v, path + "." + k)
-            elif isinstance(o, list):
-                for j, v in enumerate(o[:30]):
-                    walk(v, f"{path}[{j}]")
+                    walk(v, path + "." + k, depth + 1)
         walk(data, "")
-        out["transactions_paths"] = [p for p, _ in hits]
-        if hits:
-            v = hits[0][1]
-            if isinstance(v, list):
-                out["kind"] = "list"
-                out["n"] = len(v)
-                out["sample"] = v[:3]
-            else:
-                out["kind"] = "dict"
-                out["keys"] = list(v.keys())[:25]
-                # grouped (often by date) -> show a trimmed nested peek
-                import json as _j
-                out["peek"] = _j.dumps(v)[:2000]
+        out["candidates"] = [{"path": p, "n": n, "sample": s} for p, n, s in cands[:3]]
     except Exception as e:
         out["error"] = str(e)[:200]
     return out
