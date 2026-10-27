@@ -13,10 +13,20 @@ betting record (and vice versa).
 Nothing here is allowed to break a page: every function is best-effort.
 """
 import datetime as dt
+import re
 
 from sqlalchemy import select
 
 from models import PropResult
+
+# Stats whose hit rate is structurally skewed by "take the under on almost
+# everyone" (rare, low-event props) — excluded from the model-accuracy record so
+# they can't flatter the headline. Matched on a normalized stat key.
+_SKEW_STATS = {"homeruns", "hr", "stolenbases", "stolenbase", "sb"}
+
+
+def _stat_key(s):
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
 
 
 # ---------- record (when props are shown) ----------
@@ -102,7 +112,8 @@ def prop_record(db, sport=None, days=30):
     if sport:
         q = q.where(PropResult.sport == sport)
     rows = db.execute(q).scalars().all()
-    graded = [r for r in rows if r.correct is not None]
+    graded = [r for r in rows if r.correct is not None
+              and _stat_key(r.stat) not in _SKEW_STATS]
     by_stat = {}
     for r in graded:
         b = by_stat.setdefault(r.stat, {"w": 0, "l": 0})

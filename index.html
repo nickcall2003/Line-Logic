@@ -3138,6 +3138,36 @@ function clvSummaryHTML(res){
     '<div class="chart-foot">CLV is the strongest evidence a model has real signal \u2014 it shows up in dozens of bets, where win/loss takes hundreds. Above 50% means we\u2019re consistently getting the better side of the number.</div>'+
     '</div>';
 }
+// Against-the-spread — the spread version of the record. The headline units/ROI
+// above are moneyline plays; this shows how the model's side did vs the OPENING
+// spread, with units assuming a flat 1u on every lean at standard -110 juice
+// (separate from the real +EV moneyline units). Own metric.
+function atsSectionHTML(ats){
+  if(!ats||!ats.by_sport)return "";
+  var bs=ats.by_sport;
+  var keys=Object.keys(bs).filter(function(k){return (bs[k].graded||0)>=10;});
+  if(!keys.length)return "";
+  function U(b){return (b.covers||0)*0.909-(b.no_covers||0);}   // flat 1u @ -110
+  var sg=function(u){return (u>0?"+":"")+u.toFixed(2)+"u";};
+  var uc=function(u){return u>0?"u-pos":(u<0?"u-neg":"");};
+  keys.sort(function(a,b){return U(bs[b])-U(bs[a]);});
+  var rows=keys.map(function(k){
+    var b=bs[k],u=U(b);
+    var lbl=(typeof SPORT_LABEL!=="undefined"&&SPORT_LABEL[k])||k.toUpperCase();
+    return '<div class="rec-row"><div class="rec-row-top"><span class="rec-sport">'+lbl+'</span>'+
+      '<span class="rec-u '+uc(u)+'">'+sg(u)+'</span></div>'+
+      '<div class="rec-row-sub"><span class="rec-rec">'+b.record+' ATS</span>'+
+      '<span class="rec-roi">'+(b.ats_pct!=null?b.ats_pct+'% cover':'')+' · '+b.graded+' graded</span></div></div>';
+  }).join("");
+  var ov=ats.overall||{},ovU=(ov.covers||0)*0.909-(ov.no_covers||0);
+  return '<div class="chart-card">'+
+    '<div class="chart-h">Against the spread <span>if we took the spread instead — flat 1u at −110</span></div>'+
+    '<div class="clv-big '+(ovU>=0?"pos":"neg")+'">'+sg(ovU)+'</div>'+
+    '<div class="clv-sub">'+(ov.ats_pct!=null?ov.ats_pct+'% cover':'')+(ov.record?' · '+ov.record+' ATS':'')+' vs the opening line</div>'+
+    rows+
+    '<div class="chart-foot">The model’s side graded cover / no-cover against the <b>opening</b> spread (pushes excluded from the %). Units assume a flat 1u on every lean at −110 — a what-if, separate from the +EV moneyline units above, which are real recommended plays.</div>'+
+    '</div>';
+}
 // Prop-model accuracy — separate from the betting record (it never touches
 // units/ROI). Pure "how often does our projection land on the right side of the
 // line, and how close is it." Hidden until there's a publishable sample so a
@@ -3459,6 +3489,8 @@ async function renderRecord(){
   let _res=null;try{_res=await getJSON("/api/results/recent?days=30");}catch(e){}
   // prop-model accuracy (separate from the betting record)
   let _pr=null;try{_pr=await getJSON("/api/props/record?days=30");}catch(e){}
+  // against-the-spread record (its own metric — the spread version of the record)
+  let _ats=null;try{_ats=await getJSON("/api/ats");}catch(e){}
   const ws=wag.by_sport||{},accs=acc.by_sport||{},ov=acc.overall||{},wov=wag.overall||{};
   const minN=wag.min_sample||25;
   const keys={};Object.keys(accs).forEach(k=>keys[k]=1);Object.keys(ws).forEach(k=>keys[k]=1);
@@ -3494,7 +3526,7 @@ async function renderRecord(){
   let h='<div class="rec-hero"><div class="rec-hero-u">'+tPct+'%</div>'+
     '<div class="rec-hero-sub">'+tW+'-'+tL+' all-time across '+rows.length+' sports'+(hasU?' &middot; '+sg(tU)+' on graded wagers':'')+'</div></div>'+
     '<div class="rec-note">Verified prediction accuracy across every graded pick. <b>Betting units are tracked separately, only on recommended +EV wagers</b>, and each sport posts its ROI once it clears '+minN+' graded wagers \u2014 so the units you see are real plays, never \u201Cbet every favorite.\u201D</div>'+
-    unitsTrendHTML(_res)+clvSummaryHTML(_res)+winRateTrendHTML(_res)+propModelHTML(_pr)+profitBySportHTML(rows,minN);
+    clvSummaryHTML(_res)+winRateTrendHTML(_res)+propModelHTML(_pr)+profitBySportHTML(rows,minN)+atsSectionHTML(_ats);
   rows.forEach(function(r){
     if(r.sport==="golf")return;  // golf removed from the record
     const lbl=(typeof SPORT_LABEL!=="undefined"&&SPORT_LABEL[r.sport])||r.sport.toUpperCase();
