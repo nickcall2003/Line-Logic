@@ -534,23 +534,22 @@ async def lifespan(app: FastAPI):
         import threading as _thr
         _thr.Thread(target=_warm_rpi, daemon=True).start()
 
-        # One-shot: dump ESPN transactions structure to the logs so we can build
-        # the NBA/NFL/NHL roster boards without needing a browser tap (the probe
-        # URL keeps getting stale-DNS'd on the client). Prints once, then done.
-        def _probe_espn_to_log():
-            import time as _t, json as _json
-            _t.sleep(20)
+        # Pre-warm the pro roster-move boards (MLB via statsapi, NBA/NFL/NHL via
+        # ESPN per-team pages) a bit after boot so they're ready on first view.
+        # Each board() call builds in its own background thread and caches.
+        def _warm_pro_moves():
+            import time as _t
+            _t.sleep(75)
             try:
                 import pro_moves
-                for _lg in ("nba",):
+                for _lg in ("mlb", "nba", "nfl", "nhl"):
                     try:
-                        pr = pro_moves.espn_team_txn_probe(_lg)
-                        print(f"[espn-team] {_lg} === " + _json.dumps(pr)[:5000])
+                        pro_moves.board(_lg)
                     except Exception as e:
-                        print(f"[espn-api] {_lg} failed: {e}")
+                        print(f"[pro-moves] warm {_lg} failed: {e}")
             except Exception as e:
-                print(f"[espn-shape] setup failed: {e}")
-        _thr.Thread(target=_probe_espn_to_log, daemon=True).start()
+                print(f"[pro-moves] warm setup failed: {e}")
+        _thr.Thread(target=_warm_pro_moves, daemon=True).start()
 
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
@@ -6616,19 +6615,6 @@ def _pro_moves(sport: str):
     except Exception as e:
         return JSONResponse({"error": str(e)[:300], "teams": []},
                             headers={"Cache-Control": "no-store"})
-
-
-@app.get("/api/pro-moves-probe/{sport}")
-def _pro_moves_probe(sport: str):
-    """TEMP: dump the ESPN core-API transactions structure for an ESPN league
-    (nba/nfl/nhl) — the list shape plus one followed transaction detail — so we
-    can confirm the exact fields before finishing the aggregator."""
-    try:
-        import pro_moves
-        return JSONResponse(pro_moves.espn_probe((sport or "").lower()),
-                            headers={"Cache-Control": "no-store"})
-    except Exception as e:
-        return JSONResponse({"error": str(e)[:300]}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/dvp/nba")
