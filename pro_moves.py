@@ -382,6 +382,56 @@ def espn_scrape_probe(sport):
     return out
 
 
+_PST_PATH = {"nba": "basketball", "nfl": "football", "nhl": "hockey"}
+
+
+def pst_probe(sport):
+    """Probe prosportstransactions.com — a structured transactions DB with clean
+    HTML tables (Date | Team | Acquired | Relinquished | Notes). Report the table
+    shape + sample rows so we can build the real NBA/NFL/NHL parser from it."""
+    import httpx
+    import re
+    path = _PST_PATH.get(sport)
+    if not path:
+        return {"error": "nba/nfl/nhl only"}
+    start = _offseason_start(sport).isoformat()
+    end = dt.date.today().isoformat()
+    url = f"https://www.prosportstransactions.com/{path}/Search/SearchResults.php"
+    params = {"Player": "", "Team": "", "BeginDate": start, "EndDate": end,
+              "ILChkBx": "yes", "InjuriesChkBx": "yes", "PersonalChkBx": "yes",
+              "Submit": "Search", "start": 0}
+    out = {"url": url, "begin": start, "end": end}
+    try:
+        with httpx.Client(timeout=25, follow_redirects=True,
+                          headers={"User-Agent": "Mozilla/5.0"}) as cx:
+            r = cx.get(url, params=params)
+            out["status"] = r.status_code
+            html = r.text or ""
+            out["len"] = len(html)
+        trs = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S)
+
+        def cells(tr):
+            return [re.sub(r"<[^>]+>", " ", c).replace("&nbsp;", " ").strip()
+                    for c in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)]
+        allrows = [cells(t) for t in trs]
+        datarows = [c for c in allrows if c and re.match(r"\d{4}-\d{2}-\d{2}", c[0] or "")]
+        # header row = the first all-<td>/<th> row before data; grab any <th> row
+        ths = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S)
+        header = None
+        for t in ths:
+            hc = [re.sub(r"<[^>]+>", " ", c).strip()
+                  for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", t, re.S)]
+            if hc and any("Date" in x for x in hc):
+                header = hc
+                break
+        out["header"] = header
+        out["n_datarows"] = len(datarows)
+        out["sample_rows"] = datarows[:6]
+    except Exception as e:
+        out["error"] = str(e)[:200]
+    return out
+
+
 def board(sport):
     sport = (sport or "").lower()
     if sport not in _LEAGUE:
