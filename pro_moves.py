@@ -434,17 +434,25 @@ def _cbase_build():
         return schools.setdefault(_norm(name), {"team": name, "conference": "",
                                                 "gained": 0, "lost": 0, "in": [], "out": [],
                                                 "_tw": 0})
+    _PLACE = {"tbd", "undecided", "uncommitted", "unknown", "portal", ""}
     for rank, player, pos, frm, to in entries:
         w = nmax - rank + 1
-        s = slot(to)
-        s["gained"] += 1
-        s["_tw"] += w
-        s["in"].append({"player": player, "pos": pos, "from": frm,
-                        "value": "#%d" % rank, "_r": rank})
-        s = slot(frm)
-        s["lost"] += 1
-        s["out"].append({"player": player, "pos": pos, "to": to,
-                         "value": "#%d" % rank, "_r": rank})
+        to_place = _norm(to) in _PLACE
+        # only count a GAINED entry for a real destination (uncommitted players
+        # haven't landed anywhere yet — no fake "TBD" team)
+        if not to_place:
+            s = slot(to)
+            s["gained"] += 1
+            s["_tw"] += w
+            s["in"].append({"player": player, "pos": pos, "from": frm,
+                            "value": "#%d" % rank, "_r": rank})
+        # the old school still loses them (to the portal, destination pending)
+        if _norm(frm) not in _PLACE:
+            s = slot(frm)
+            s["lost"] += 1
+            s["out"].append({"player": player, "pos": pos,
+                             "to": (to if not to_place else "Portal (TBD)"),
+                             "value": "#%d" % rank, "_r": rank})
     rows = []
     for s in schools.values():
         s["net"] = s["gained"] - s["lost"]
