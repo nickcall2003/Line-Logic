@@ -643,15 +643,21 @@ def espn_team_txn_probe(sport):
             out["status"] = r.status_code
             data = _espnfitt_blob(r.text or "") or {}
             pc = (data.get("page") or {}).get("content") or {}
-            out["content_keys"] = list(pc.keys())[:40]
-            txns = pc.get("transactions")
-            out["txn_type"] = type(txns).__name__
-            if isinstance(txns, list):
-                out["txn_n"] = len(txns)
-                out["txn_head"] = txns[:3]
-            elif isinstance(txns, dict):
-                out["txn_keys"] = list(txns.keys())[:20]
-                out["txn_peek"] = _j.dumps(txns)[:1800]
+            cont = pc.get("transactions") or {}
+            out["heading"] = cont.get("pageHeading")
+            out["currentSeason"] = cont.get("currentSeason")
+            out["seasons"] = cont.get("seasons")
+            inner = cont.get("transactions")
+            if isinstance(inner, list):
+                dates = sorted(x.get("date", "")[:10] for x in inner
+                               if isinstance(x, dict) and x.get("date"))
+                out["inner_n"] = len(inner)
+                out["inner_date_min"] = dates[0] if dates else None
+                out["inner_date_max"] = dates[-1] if dates else None
+                out["inner_head"] = inner[:3]
+            else:
+                out["inner_type"] = type(inner).__name__
+                out["inner_peek"] = _j.dumps(inner)[:1200]
         except Exception as e:
             out["error"] = str(e)[:150]
     return out
