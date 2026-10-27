@@ -557,7 +557,7 @@ async def lifespan(app: FastAPI):
             _t.sleep(25)
             try:
                 import pro_moves
-                print("[cbase] === " + _json.dumps(pro_moves.cbase_probe())[:6500])
+                print("[cbase] === " + _json.dumps(pro_moves.cbase_article_probe())[:6800])
             except Exception as e:
                 print(f"[cbase] failed: {e}")
         _thr.Thread(target=_probe_cbase, daemon=True).start()

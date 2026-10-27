@@ -433,6 +433,39 @@ def cbase_probe():
     return out
 
 
+def cbase_article_probe():
+    """Dump the ESPN college-baseball transfer rankings article's structure and
+    body text so we can see if the ranked list is parseable."""
+    import httpx
+    import re
+    url = ("https://www.espn.com/college-baseball/story/_/id/49168943/"
+           "2026-college-baseball-transfer-portal-rankings-signed")
+    out = {"url": url}
+    with httpx.Client(timeout=25, follow_redirects=True,
+                      headers={"User-Agent": "Mozilla/5.0"}) as cx:
+        r = cx.get(url)
+        out["status"] = r.status_code
+        html = r.text or ""
+    data = _espnfitt_blob(html) or {}
+    out["top_keys"] = list(data.keys())[:20]
+    page = data.get("page") or {}
+    content = page.get("content") if isinstance(page, dict) else None
+    if isinstance(content, dict):
+        out["content_keys"] = list(content.keys())[:30]
+        story = content.get("story")
+        if isinstance(story, dict):
+            out["story_keys"] = list(story.keys())[:30]
+            body = story.get("body") or story.get("content") or ""
+            if isinstance(body, str) and body:
+                out["body_excerpt"] = re.sub(r"<[^>]+>", " ", body)[:2600]
+    if "body_excerpt" not in out:
+        txt = re.sub(r"<script[\s\S]*?</script>", " ", html)
+        txt = re.sub(r"<[^>]+>", " ", txt)
+        i = txt.find("1.")
+        out["text_excerpt"] = txt[i:i + 2600] if i > 0 else txt[:2000]
+    return out
+
+
 def status():
     with _lock:
         return {s: {"cached": s in _cache, "building": s in _building,
