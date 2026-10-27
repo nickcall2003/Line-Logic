@@ -5492,6 +5492,10 @@ setInterval(loadAccuracy,300000);
     try{
       if(typeof view!=="undefined" && SKIP_VIEWS[view])return false;       // not on picks/news/home
       if(typeof sport!=="undefined" && sport==="golf")return false;        // golf has its own search
+      // only show where there's actually a slate to filter — keeps it off
+      // Roster Moves, Stat Sheets, portal boards, etc. (they have no .card)
+      var list=document.getElementById("list");
+      if(list && list.querySelectorAll(".card").length===0) return false;
     }catch(e){}
     return true;
   }
