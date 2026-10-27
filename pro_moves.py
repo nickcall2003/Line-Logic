@@ -618,6 +618,39 @@ def espn_api_probe(sport):
     return out
 
 
+def espn_team_txn_probe(sport):
+    """Check whether ESPN's per-team transactions page embeds that team's full
+    season history (which would let us build complete per-team boards by fetching
+    each team), vs just the league-wide latest 25."""
+    import httpx
+    group, league, _ = _LEAGUE[sport]
+    out = {"sport": sport}
+    with httpx.Client(timeout=25, follow_redirects=True,
+                      headers={"User-Agent": "Mozilla/5.0"}) as cx:
+        try:
+            tr = cx.get(f"https://site.api.espn.com/apis/site/v2/sports/{group}/{league}/teams")
+            t = tr.json()["sports"][0]["leagues"][0]["teams"][0]["team"]
+            abbr = (t.get("abbreviation") or "").lower()
+            out["team"] = t.get("displayName")
+        except Exception as e:
+            out["teams_err"] = str(e)[:120]
+            return out
+        for label, url in [
+            ("team-abbr", f"https://www.espn.com/{league}/team/transactions/_/name/{abbr}"),
+        ]:
+            try:
+                r = cx.get(url)
+                txns = _espn_txns_from_html(r.text or "")
+                dates = sorted(x.get("date", "")[:10] for x in txns if x.get("date"))
+                out[label] = {"url": url, "status": r.status_code, "n": len(txns),
+                              "date_min": dates[0] if dates else None,
+                              "date_max": dates[-1] if dates else None,
+                              "samples": [x.get("description") for x in txns[:4]]}
+            except Exception as e:
+                out[label] = {"url": url, "error": str(e)[:120]}
+    return out
+
+
 def board(sport):
     sport = (sport or "").lower()
     if sport not in _LEAGUE:

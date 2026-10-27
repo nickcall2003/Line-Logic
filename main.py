@@ -544,8 +544,8 @@ async def lifespan(app: FastAPI):
                 import pro_moves
                 for _lg in ("nba",):
                     try:
-                        pr = pro_moves.espn_api_probe(_lg)
-                        print(f"[espn-api] {_lg} === " + _json.dumps(pr)[:5500])
+                        pr = pro_moves.espn_team_txn_probe(_lg)
+                        print(f"[espn-team] {_lg} === " + _json.dumps(pr)[:5000])
                     except Exception as e:
                         print(f"[espn-api] {_lg} failed: {e}")
             except Exception as e:
