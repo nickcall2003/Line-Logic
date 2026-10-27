@@ -262,6 +262,95 @@ def espn_probe_sources(sport):
     return out
 
 
+def _espnfitt_blob(txt):
+    """Extract and parse the window['__espnfitt__'] = {...} JSON embedded in an
+    ESPN page, matching braces while skipping string contents."""
+    import json
+    idx = txt.find("__espnfitt__")
+    if idx < 0:
+        return None
+    start = txt.find("{", idx)
+    if start < 0:
+        return None
+    depth = 0
+    i = start
+    instr = False
+    esc = False
+    end = None
+    while i < len(txt):
+        c = txt[i]
+        if instr:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                instr = False
+        else:
+            if c == '"':
+                instr = True
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        i += 1
+    if end is None:
+        return None
+    return json.loads(txt[start:end])
+
+
+def espn_scrape_probe(sport):
+    """Pull the ESPN transactions page, parse its embedded state, and locate the
+    transactions list + a couple sample entries so we can see the exact shape."""
+    import httpx
+    group, league, _ = _LEAGUE[sport]
+    url = f"https://www.espn.com/{league}/transactions"
+    out = {"url": url}
+    try:
+        with httpx.Client(timeout=25, follow_redirects=True,
+                          headers={"User-Agent": "Mozilla/5.0"}) as cx:
+            r = cx.get(url)
+            out["status"] = r.status_code
+            txt = r.text or ""
+        data = _espnfitt_blob(txt)
+        if data is None:
+            out["error"] = "no __espnfitt__ blob parsed"
+            return out
+        hits = []
+
+        def walk(o, path):
+            if len(hits) >= 4:
+                return
+            if isinstance(o, dict):
+                for k, v in o.items():
+                    if k.lower() == "transactions" and isinstance(v, (list, dict)) and v:
+                        hits.append((path + "." + k, v))
+                    walk(v, path + "." + k)
+            elif isinstance(o, list):
+                for j, v in enumerate(o[:30]):
+                    walk(v, f"{path}[{j}]")
+        walk(data, "")
+        out["transactions_paths"] = [p for p, _ in hits]
+        if hits:
+            v = hits[0][1]
+            if isinstance(v, list):
+                out["kind"] = "list"
+                out["n"] = len(v)
+                out["sample"] = v[:3]
+            else:
+                out["kind"] = "dict"
+                out["keys"] = list(v.keys())[:25]
+                # grouped (often by date) -> show a trimmed nested peek
+                import json as _j
+                out["peek"] = _j.dumps(v)[:2000]
+    except Exception as e:
+        out["error"] = str(e)[:200]
+    return out
+
+
 def board(sport):
     sport = (sport or "").lower()
     if sport not in _LEAGUE:
