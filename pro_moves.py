@@ -432,6 +432,55 @@ def pst_probe(sport):
     return out
 
 
+_WIKI_TITLES = {
+    "nba": ["2026–27 NBA season transactions",
+            "List of 2026–27 NBA season transactions", "2026–27 NBA season"],
+    "nhl": ["2026–27 NHL season transactions",
+            "List of 2026–27 NHL transactions", "2026–27 NHL season"],
+    "nfl": ["2026 NFL season transactions",
+            "List of 2026 NFL transactions", "2026 NFL season"],
+}
+
+
+def wiki_probe(sport):
+    """Probe Wikipedia's season-transaction article for a league: which candidate
+    title resolves, how many wikitables it has, and sample rows — so we can see
+    whether the transactions sit in a clean table we can parse."""
+    import httpx
+    import re
+    titles = _WIKI_TITLES.get(sport, [])
+    out = {"sport": sport, "titles_tried": titles}
+    with httpx.Client(timeout=25, follow_redirects=True,
+                      headers={"User-Agent": "LineLogic/1.0 (analytics)"}) as cx:
+        for t in titles:
+            try:
+                r = cx.get("https://en.wikipedia.org/w/api.php",
+                           params={"action": "parse", "page": t, "prop": "text",
+                                   "format": "json", "redirects": 1})
+                j = r.json()
+                if "error" in j:
+                    out["miss_" + t] = j["error"].get("code")
+                    continue
+                html = j.get("parse", {}).get("text", {}).get("*", "")
+                tables = re.findall(r'<table[^>]*wikitable[^>]*>(.*?)</table>', html, re.S)
+                out["resolved_title"] = j["parse"].get("title")
+                out["n_wikitables"] = len(tables)
+
+                def cells(tr):
+                    return [re.sub(r"<[^>]+>", " ", c).replace("&#160;", " ").strip()[:70]
+                            for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", tr, re.S)]
+                if tables:
+                    big = max(tables, key=len)
+                    trs = re.findall(r"<tr[^>]*>(.*?)</tr>", big, re.S)
+                    rows = [c for c in (cells(x) for x in trs) if c]
+                    out["sample_rows"] = rows[:7]
+                break
+            except Exception as e:
+                out["err_" + t] = str(e)[:120]
+                break
+    return out
+
+
 def board(sport):
     sport = (sport or "").lower()
     if sport not in _LEAGUE:

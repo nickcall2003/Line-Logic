@@ -542,12 +542,12 @@ async def lifespan(app: FastAPI):
             _t.sleep(20)
             try:
                 import pro_moves
-                for _lg in ("nba",):
+                for _lg in ("nba", "nfl", "nhl"):
                     try:
-                        pr = pro_moves.pst_probe(_lg)
-                        print(f"[pst] {_lg} === " + _json.dumps(pr)[:7500])
+                        pr = pro_moves.wiki_probe(_lg)
+                        print(f"[wiki] {_lg} === " + _json.dumps(pr)[:5000])
                     except Exception as e:
-                        print(f"[pst] {_lg} failed: {e}")
+                        print(f"[wiki] {_lg} failed: {e}")
             except Exception as e:
                 print(f"[espn-shape] setup failed: {e}")
         _thr.Thread(target=_probe_espn_to_log, daemon=True).start()
