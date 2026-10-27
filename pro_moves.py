@@ -570,6 +570,54 @@ def espn_txn_probe(sport):
     return out
 
 
+def espn_api_probe(sport):
+    """Dump the transactions page's requestParams (what its data call uses) and
+    try the candidate transaction APIs with pagination/date params to find one
+    that returns the full offseason, not just the latest 25."""
+    import httpx
+    group, league, _ = _LEAGUE[sport]
+    out = {"sport": sport}
+    with httpx.Client(timeout=20, follow_redirects=True,
+                      headers={"User-Agent": "Mozilla/5.0"}) as cx:
+        try:
+            r = cx.get(f"https://www.espn.com/{league}/transactions")
+            data = _espnfitt_blob(r.text or "") or {}
+            pc = (data.get("page") or {}).get("content") or {}
+            out["requestParams"] = pc.get("requestParams")
+            out["currentSeason"] = pc.get("currentSeason")
+        except Exception as e:
+            out["page_err"] = str(e)[:120]
+        cands = [
+            f"https://site.web.api.espn.com/apis/fitt/v3/sports/{group}/{league}/transactions?region=us&lang=en&limit=100",
+            f"https://site.web.api.espn.com/apis/fitt/v3/sports/{group}/{league}/transactions?region=us&lang=en&dates=20260701-20261027",
+            f"https://site.api.espn.com/apis/common/v3/sports/{group}/{league}/transactions?limit=100",
+            f"https://site.web.api.espn.com/apis/v2/sports/{group}/{league}/transactions?limit=100",
+        ]
+        res = []
+        for u in cands:
+            row = {"url": u}
+            try:
+                r = cx.get(u)
+                row["status"] = r.status_code
+                try:
+                    j = r.json()
+                    if isinstance(j, dict):
+                        items = j.get("transactions") or j.get("items") or []
+                        row["keys"] = list(j.keys())[:8]
+                        row["n"] = len(items) if isinstance(items, list) else None
+                        if isinstance(items, list) and items:
+                            s = items[0]
+                            row["sample"] = ({k: s[k] for k in list(s)[:4]}
+                                             if isinstance(s, dict) else str(s)[:100])
+                except Exception:
+                    row["body_head"] = (r.text or "")[:100]
+            except Exception as e:
+                row["error"] = str(e)[:120]
+            res.append(row)
+        out["candidates"] = res
+    return out
+
+
 def board(sport):
     sport = (sport or "").lower()
     if sport not in _LEAGUE:
