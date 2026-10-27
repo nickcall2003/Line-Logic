@@ -655,6 +655,10 @@ def get_props(sport: str, date: dt.date, game_id: str):
                 avgs = _team_athlete_avgs(sport, team_id, season=_last) or {}
             except Exception:
                 pass
+        # TRADES: season stats can still list a player under his OLD team, so
+        # drop anyone no longer on this team's live roster (gated so a bad roster
+        # fetch never wipes the board). Reflects every trade/signing automatically.
+        avgs = current_roster_filter(sport, team_id, avgs)
         # RECENT FORM: blend each rotation player's last-N games into the season
         # average so projections react to current form. Capped to the rotation
         # (top ~12 by minutes) and cached per player, so a full board stays cheap.
@@ -926,8 +930,31 @@ _ROSTER_URL = {
     "nhl": "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/teams/{team}/roster",
     "nba": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team}/roster",
     "wnba": "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/teams/{team}/roster",
+    "mlb": "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/{team}/roster",
 }
 _roster_names_cache = {}
+
+
+def current_roster_filter(sport, team_id, avgs):
+    """Drop players no longer on this team from a {name: data} map, using the
+    live ESPN roster (which reflects trades/signings the moment they happen — so
+    a player dealt in the offseason stops showing on his old team). Gated hard:
+    returns the map UNCHANGED if the roster can't be fetched, is thin (<8), or
+    the overlap is poor, so a bad fetch never wipes the board."""
+    if sport not in _ROSTER_URL or not team_id or not avgs:
+        return avgs
+    import re as _re
+    try:
+        cur = team_roster_names(sport, team_id) or {}
+    except Exception:
+        return avgs
+    if len(cur) < 8:
+        return avgs
+    _n = lambda s: _re.sub(r"[^a-z0-9]", "", (s or "").lower())
+    kept = {nm: v for nm, v in avgs.items() if _n(nm) in cur}
+    if len(kept) >= max(3, int(0.5 * len(avgs))):
+        return kept
+    return avgs
 
 
 def team_roster_names(sport, team_id):
