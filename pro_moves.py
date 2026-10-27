@@ -262,21 +262,13 @@ def espn_probe_sources(sport):
     return out
 
 
-def _espnfitt_blob(txt):
-    """Extract and parse the window['__espnfitt__'] = {...} JSON embedded in an
-    ESPN page, matching braces while skipping string contents."""
-    import json
-    idx = txt.find("__espnfitt__")
-    if idx < 0:
-        return None
-    start = txt.find("{", idx)
-    if start < 0:
-        return None
+def _match_braces(txt, start):
+    """Return the balanced {...} substring beginning at index `start`, skipping
+    braces that appear inside JSON strings."""
     depth = 0
     i = start
     instr = False
     esc = False
-    end = None
     while i < len(txt):
         c = txt[i]
         if instr:
@@ -294,12 +286,42 @@ def _espnfitt_blob(txt):
             elif c == "}":
                 depth -= 1
                 if depth == 0:
-                    end = i + 1
-                    break
+                    return txt[start:i + 1]
         i += 1
-    if end is None:
-        return None
-    return json.loads(txt[start:end])
+    return None
+
+
+def _espnfitt_blob(txt):
+    """Find and parse the window['__espnfitt__'] = {...} state. The name appears
+    several times in the page (references, not just the assignment), so try each
+    occurrence and keep the biggest object — the real state has `page`/`app`."""
+    import json
+    best = None
+    pos = 0
+    while True:
+        idx = txt.find("__espnfitt__", pos)
+        if idx < 0:
+            break
+        pos = idx + 12
+        eq = txt.find("=", idx, idx + 10)
+        if eq < 0:
+            continue
+        start = txt.find("{", eq, eq + 8)
+        if start < 0:
+            continue
+        obj = _match_braces(txt, start)
+        if not obj:
+            continue
+        try:
+            d = json.loads(obj)
+        except Exception:
+            continue
+        if isinstance(d, dict):
+            if "page" in d or "app" in d:
+                return d
+            if best is None or len(d) > len(best):
+                best = d
+    return best
 
 
 def espn_scrape_probe(sport):
