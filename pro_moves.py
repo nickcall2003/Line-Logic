@@ -70,12 +70,25 @@ _MLB_KEEP = {"TR": "Trade", "FA": "Free Agent", "SFA": "Free Agent",
              "SE": "Signed", "SC": "Signed"}
 
 
+def _mlb_team_ids(cx):
+    """The 30 MLB clubs' team IDs (sportId=1). Used to drop every minor-league
+    affiliate so only big-league teams appear on the board."""
+    try:
+        r = cx.get("https://statsapi.mlb.com/api/v1/teams", params={"sportId": 1})
+        r.raise_for_status()
+        return {t["id"] for t in (r.json() or {}).get("teams", []) if t.get("id")}
+    except Exception as e:
+        print(f"[pro_moves] mlb team-id fetch failed: {e}")
+        return set()
+
+
 def _mlb_board():
     import httpx
     start = _offseason_start("mlb")
     end = dt.date.today()
     txns = []
     with httpx.Client(timeout=30) as cx:
+        mlb_ids = _mlb_team_ids(cx)        # the 30 big-league clubs
         for a, b in _month_spans(start, end):
             try:
                 r = cx.get("https://statsapi.mlb.com/api/v1/transactions",
@@ -89,34 +102,52 @@ def _mlb_board():
     teams = {}
 
     def slot(name):
-        if not name:
-            return None
         k = _norm(name)
         return teams.setdefault(k, {"team": name, "conference": "",
                                     "gained": 0, "lost": 0, "in": [], "out": []})
+
+    def touches_minors(*objs):
+        # True if any named side is a non-MLB club (an affiliate) — i.e. the move
+        # is a minor-league transaction / internal assignment, not a big-league one.
+        if not mlb_ids:
+            return False
+        return any(o.get("name") and o.get("id") not in mlb_ids for o in objs)
+
     kept = 0
     for t in txns:
         code = t.get("typeCode")
         label = _MLB_KEEP.get(code)
         if not label:
             continue
+        # drop minor-league contracts and any move touching a minor-league club
+        if "minor league" in (t.get("description") or "").lower():
+            continue
+        to_obj = t.get("toTeam") or {}
+        from_obj = t.get("fromTeam") or {}
+        if touches_minors(to_obj, from_obj):
+            continue
         player = (t.get("person") or {}).get("fullName") or ""
         if not player:
             continue
         date = (t.get("date") or t.get("effectiveDate") or "")[:10]
-        to_t = (t.get("toTeam") or {}).get("name")
-        from_t = (t.get("fromTeam") or {}).get("name")
-        kept += 1
-        if to_t:
-            r = slot(to_t)
+        to_name, from_name = to_obj.get("name"), from_obj.get("name")
+        if not (to_name or from_name):
+            continue
+        counted = False
+        if to_name:
+            r = slot(to_name)
             r["gained"] += 1
-            r["in"].append({"player": player, "pos": label, "from": from_t or "FA",
+            r["in"].append({"player": player, "pos": label, "from": from_name or "FA",
                             "value": "", "date": date})
-        if from_t and code in ("TR", "REL", "CU", "CL"):
-            r = slot(from_t)
+            counted = True
+        if from_name and code in ("TR", "REL", "CU", "CL"):
+            r = slot(from_name)
             r["lost"] += 1
-            r["out"].append({"player": player, "pos": label, "to": to_t or "—",
+            r["out"].append({"player": player, "pos": label, "to": to_name or "—",
                              "value": "", "date": date})
+            counted = True
+        if counted:
+            kept += 1
     rows = []
     for r in teams.values():
         r["net"] = r["gained"] - r["lost"]
@@ -126,6 +157,11 @@ def _mlb_board():
         r["out"] = r["out"][:12]
         rows.append(r)
     rows.sort(key=lambda r: (r["gained"] + r["lost"]), reverse=True)
+    # 1-100 activity score: busiest offseason = 100, scaled down from there.
+    max_act = max((r["gained"] + r["lost"] for r in rows), default=0) or 1
+    for i, r in enumerate(rows):
+        r["rank"] = i + 1
+        r["score"] = max(1, round(100 * (r["gained"] + r["lost"]) / max_act))
     return {"sport": "mlb", "source": "MLB Stats API", "kind": "trades",
             "window_start": start.isoformat(),
             "built_at": dt.datetime.utcnow().isoformat() + "Z",

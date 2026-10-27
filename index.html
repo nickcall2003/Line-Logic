@@ -3219,6 +3219,9 @@ function portalBoardHTML(pb){
   if(!teams.length)return '<div class="empty">'+boardNm+' is building'+(pb.season?(' from the '+pb.season+' cycle'):(isPro&&pb.window_start?(' from '+pb.window_start):''))+' — check back shortly.</div>';
   var rows=teams.map(function(tt,i){
     var net=(tt.net!=null?tt.net:0),cls=net>0?"pos":(net<0?"neg":"");
+    var hasScore=(isPro&&tt.score!=null);               // pro: show a 1-100 activity score
+    var bigVal=hasScore?tt.score:((net>0?"+":"")+net);
+    var bigCls=hasScore?"score":cls;
     var gained=(tt.gained!=null?tt.gained:(tt.added!=null?tt.added:0));
     var lost=(tt.lost!=null?tt.lost:0);
     var inList=(tt.in||tt.incoming||[]),outList=(tt.out||tt.outgoing||[]);
@@ -3228,7 +3231,7 @@ function portalBoardHTML(pb){
     var outs=outList.map(function(p){return '<div class="cp-pl"><span class="cp-sign neg">−</span>'+(p.player||p.name||"")+' <span class="cp-pos">'+(p.pos||"")+'</span><span class="cp-v">'+pv(p)+'</span><span class="cp-ctx">to '+(p.to||p.destination||"Portal")+'</span></div>';}).join("");
     return '<div class="cp-team" data-team="'+(tt.team||"").toLowerCase()+'" onclick="this.classList.toggle(\'open\')">'+
       '<div class="cp-row"><span class="cp-rank">'+rank+'</span><span class="cp-nm">'+tt.team+'</span>'+
-        '<span class="cp-net '+cls+'">'+(net>0?"+":"")+net+'</span></div>'+
+        '<span class="cp-net '+bigCls+'">'+bigVal+'</span></div>'+
       '<div class="cp-sub">+'+gained+' gained · −'+lost+' lost'+(tt.conference?' · '+tt.conference:'')+' · tap to expand</div>'+
       '<div class="cp-detail">'+(ins||'<div class="cp-none">no notable additions</div>')+(outs||'')+'</div></div>';
   }).join("");
