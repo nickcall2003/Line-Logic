@@ -3209,14 +3209,8 @@ function renderMoves(){
 function portalBoardHTML(pb){
   if(!pb)return "";
   if(pb.needs_key)return '<div class="empty">The portal board needs the CBBD API key set on the server (<b>CBBD_API_KEY</b>).</div>';
-  // pro roster boards (pro_moves.py) set window_start and rank by activity, not
-  // a net-value score; the college portal boards rank by net production value.
-  var isPro=!!pb.window_start;
-  var boardNm=isPro?"Roster moves":"Portal board";
-  var rankBy=isPro?"most active first":"ranked by net value";
   var teams=(pb.teams||[]);
-  if(pb.pending)return '<div class="empty">This league’s roster board is being built on the server — check back in a minute.</div>';
-  if(!teams.length)return '<div class="empty">'+boardNm+' is building'+(pb.season?(' from the '+pb.season+' cycle'):(isPro&&pb.window_start?(' from '+pb.window_start):''))+' — check back shortly.</div>';
+  if(!teams.length)return '<div class="empty">Portal board is building'+(pb.season?(' from the '+pb.season+' cycle'):'')+' — check back shortly.</div>';
   var rows=teams.map(function(tt,i){
     var net=(tt.net!=null?tt.net:0),cls=net>0?"pos":(net<0?"neg":"");
     var gained=(tt.gained!=null?tt.gained:(tt.added!=null?tt.added:0));
@@ -3232,7 +3226,7 @@ function portalBoardHTML(pb){
       '<div class="cp-sub">+'+gained+' gained · −'+lost+' lost'+(tt.conference?' · '+tt.conference:'')+' · tap to expand</div>'+
       '<div class="cp-detail">'+(ins||'<div class="cp-none">no notable additions</div>')+(outs||'')+'</div></div>';
   }).join("");
-  return '<div class="cp-head">'+boardNm+' · '+(pb.count_entries||teams.length)+' moves · '+rankBy+'</div>'+
+  return '<div class="cp-head">Portal board · '+(pb.count_entries||teams.length)+' moves · ranked by net value</div>'+
     '<input class="portal-search" id="portal-search" type="text" placeholder="🔍 Search teams…" oninput="portalFilter(this.value)" autocomplete="off">'+
     '<div class="cp-wrap" id="portal-rows">'+rows+'</div>'+
     '<div class="cp-noresult" id="portal-noresult" style="display:none">No team matches that search.</div>';
@@ -3249,11 +3243,9 @@ function portalFilter(q){
 async function loadMoves(){
   const list=document.getElementById("list");const sp=movesSport;
   list.innerHTML=sportLoader(sp,"Pulling the latest roster moves");
-  // portal/roster boards render inline: college (CBB=/api/cbb-portal,
-  // CFB=/api/portal) and pro (nba/mlb/nfl/nhl=/api/pro-moves/{sp}).
+  // college portal boards render inline (CBB = /api/cbb-portal, CFB = /api/portal)
   var portalHTML="";
-  var portalURL=(sp==="ncaab")?"/api/cbb-portal":(sp==="ncaaf")?"/api/portal":
-    (["nba","mlb","nfl","nhl"].indexOf(sp)>=0)?("/api/pro-moves/"+sp):null;
+  var portalURL=(sp==="ncaab")?"/api/cbb-portal":(sp==="ncaaf")?"/api/portal":null;
   if(portalURL){try{var pb=await getJSON(portalURL);if(movesSport===sp)portalHTML=portalBoardHTML(pb);}catch(e){}}
   try{movesData=await getJSON("/api/moves/"+sp);}catch(e){movesData={moves:[],sport:sp};}
   if(view!=="moves"||movesSport!==sp)return;

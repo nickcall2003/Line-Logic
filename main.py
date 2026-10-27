@@ -816,13 +816,6 @@ async def lifespan(app: FastAPI):
                               f"season {d.get('season')}")
                 except Exception as e:
                     print(f"[cfb-portal] warm failed: {e}")
-                try:
-                    import pro_moves
-                    d = pro_moves.board("mlb")   # clean statsapi source; warm + cache
-                    print(f"[pro-moves] mlb warmed: {len(d.get('teams') or [])} teams, "
-                          f"{d.get('count_entries')} moves")
-                except Exception as e:
-                    print(f"[pro-moves] warm failed: {e}")
                 _t.sleep(int(os.environ.get("DVP_WARM_INTERVAL", "21600")))  # 6h
         import threading as _thr_dvp
         _thr_dvp.Thread(target=_dvp_warmer, daemon=True).start()
@@ -6589,34 +6582,6 @@ def _roster_moves(sport: str):
     except Exception as e:
         print(f"[moves] {sport} failed: {e}")
     return out
-
-
-@app.get("/api/pro-moves/{sport}")
-def _pro_moves(sport: str):
-    """Pro roster-change board (nba/mlb/nfl/nhl): per team, who they ADDED and
-    LOST via trades / free agency / waivers from the start of the most recent
-    offseason through today. Same shape as the college portal boards, so the
-    frontend renders it identically. Cached; settled moves never change."""
-    try:
-        import pro_moves
-        return JSONResponse(pro_moves.board(sport),
-                            headers={"Cache-Control": "public, max-age=3600"})
-    except Exception as e:
-        return JSONResponse({"error": str(e)[:300], "teams": []},
-                            headers={"Cache-Control": "no-store"})
-
-
-@app.get("/api/pro-moves-probe/{sport}")
-def _pro_moves_probe(sport: str):
-    """TEMP: dump the ESPN core-API transactions structure for an ESPN league
-    (nba/nfl/nhl) — the list shape plus one followed transaction detail — so we
-    can confirm the exact fields before finishing the aggregator."""
-    try:
-        import pro_moves
-        return JSONResponse(pro_moves.espn_probe((sport or "").lower()),
-                            headers={"Cache-Control": "no-store"})
-    except Exception as e:
-        return JSONResponse({"error": str(e)[:300]}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/dvp/nba")
