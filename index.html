@@ -1133,6 +1133,13 @@ async function loadOfficials(sport,gameId,baseTotal){
     '<div class="off-note">'+(isMLB&&d.hp_tendency?"Umpire run/strikeout tendency is computed from the season\u2019s completed games. A modest, capped nudge \u2014 shown for context.":"Assignment only \u2014 shown for context. No public feed has official tendency data, so this isn\u2019t factored into the model.")+'</div>';}
 function sportLoader(sp,msg){
   const icons={tennis:"\u{1F3BE}",mlb:"\u26BE",ncaabb:"\u26BE",cbase:"\u26BE",nba:"\u{1F3C0}",ncaab:"\u{1F3C0}",wncaab:"\u{1F3C0}",nfl:"\u{1F3C8}",ncaaf:"\u{1F3C8}",nhl:"\u{1F3D2}",soccer:"\u26BD",golf:"\u26F3",ufc:"\u{1F94A}"};
+  // "all" (e.g. the track record, which spans every sport): a rolling parade of
+  // sport balls instead of a single tennis ball.
+  if(sp==="all"){
+    const ems=["\u{1F3C8}","\u{1F3C0}","\u26BE","\u{1F3D2}","\u{1F3BE}","\u26BD"];
+    const balls=ems.map(function(e,i){return '<span class="sload-ball" style="animation-delay:'+(i*0.25).toFixed(2)+'s">'+e+'</span>';}).join("");
+    return '<div class="sload"><div class="sload-track">'+balls+'</div><div class="sload-msg">'+(msg||"Loading")+'</div></div>';
+  }
   const ic=icons[sp]||"\u{1F3BE}";
   return '<div class="sload"><div class="sload-track"><span class="sload-ball s-'+(sp||"tennis")+'">'+ic+'</span></div><div class="sload-msg">'+(msg||"Loading")+'</div></div>';}
 async function reload(){if(detailId)return;if(view==="free"||view==="best"||view==="parlays"||view==="news"||view==="home"||view==="help"||view==="record"||view==="statsheets"||view==="moves"||view==="bets"||view==="auth"||view==="calibration"||view==="transparency"||view==="simulator"||view==="value"||view==="ladder")return;const tok=++loadToken;const mySport=sport;
@@ -3480,7 +3487,7 @@ function openRecord(){view="record";if(detailId)closeDetail();
   renderRecord();}
 async function renderRecord(){
   const list=document.getElementById("list");
-  list.innerHTML=sportLoader("tennis","Crunching your numbers");
+  list.innerHTML=sportLoader("all","Crunching your numbers");
   let wag={by_sport:{},overall:{}},acc={by_sport:{},overall:{}};
   try{wag=await getJSON("/api/edges/wagers?days=3650&min_edge=0.03&min_sample=25");}catch(e){}
   try{acc=await getJSON("/api/accuracy?days=30");}catch(e){}
