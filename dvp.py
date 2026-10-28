@@ -436,6 +436,21 @@ def ncaaf_diag():
         out["total_raw"] += len(evs)
         out["total_completed"] += comp_n
         out["total_kept"] += kept
+    # does a DATE-based query break the 25 cap? test a Saturday + a 7-day range.
+    def _count(params):
+        try:
+            d = EP._get(base, dict(params, limit="900", groups=group)) or {}
+            evs = d.get("events") or []
+            done = sum(1 for e in evs if ((((e.get("competitions") or [{}])[0]
+                       .get("status") or {}).get("type") or {}).get("completed")))
+            return {"raw": len(evs), "done": done}
+        except Exception as e:
+            return {"err": str(e)[:80]}
+    out["datetest"] = {
+        "sat_20261017": _count({"dates": "20261017"}),
+        "range_1015_1020": _count({"dates": "20261015-20261020"}),
+        "range_whole_season": _count({"dates": f"{yr}0823-{yr}1027"}),
+    }
     return out
 
 
