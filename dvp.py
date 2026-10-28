@@ -396,84 +396,62 @@ _NBA_POS_CANON = {"pg": "G", "sg": "G", "g": "G", "gf": "G", "fg": "F",
 _valid_ids_cache = {}
 
 
-def ncaaf_diag():
-    """TEMP: where do CFB games go? Per-week raw/completed/kept, the valid-team
-    set size, and sample dropped games with in_valid flags."""
-    sport = "ncaaf"
-    base = EP.SCOREBOARD.get(sport)
-    today = dt.date.today()
-    yr = today.year if today.month >= 8 else today.year - 1
-    group = "80"
-    valid = _valid_team_ids(sport, group)
-    out = {"year": yr, "valid_n": len(valid), "weeks": [],
-           "total_raw": 0, "total_completed": 0, "total_kept": 0, "dropped": []}
-    for wk in range(1, 17):
-        p = {"dates": str(yr), "seasontype": 2, "week": wk, "limit": "900", "groups": group}
-        try:
-            data = EP._get(base, p) or {}
-        except Exception as e:
-            out["weeks"].append({"wk": wk, "err": str(e)[:80]})
-            continue
-        evs = data.get("events") or []
-        comp_n = kept = 0
-        for ev in evs:
-            comp = (ev.get("competitions") or [{}])[0]
-            if not (((comp.get("status") or {}).get("type") or {}).get("completed")):
-                continue
-            comp_n += 1
-            cs = comp.get("competitors") or []
-            if len(cs) != 2:
-                continue
-            ids = [str((c.get("team") or {}).get("id")) for c in cs]
-            nms = [(c.get("team") or {}).get("displayName") for c in cs]
-            if valid and (ids[0] not in valid or ids[1] not in valid):
-                if len(out["dropped"]) < 8:
-                    out["dropped"].append({"wk": wk, "teams": nms, "ids": ids,
-                                           "in_valid": [i in valid for i in ids]})
-                continue
-            kept += 1
-        out["weeks"].append({"wk": wk, "raw": len(evs), "done": comp_n, "kept": kept})
-        out["total_raw"] += len(evs)
-        out["total_completed"] += comp_n
-        out["total_kept"] += kept
-    # does a DATE-based query break the 25 cap? test a Saturday + a 7-day range.
-    def _count(params):
-        try:
-            d = EP._get(base, dict(params, limit="900", groups=group)) or {}
-            evs = d.get("events") or []
-            done = sum(1 for e in evs if ((((e.get("competitions") or [{}])[0]
-                       .get("status") or {}).get("type") or {}).get("completed")))
-            return {"raw": len(evs), "done": done}
-        except Exception as e:
-            return {"err": str(e)[:80]}
-    out["datetest"] = {
-        "sat_page2": _count({"dates": "20261017", "page": "2"}),
-        "sat_page1_limit50": _count({"dates": "20261017", "limit": "50"}),
-    }
-    # ESPN CORE API week-events — usually returns the full list, no 25 cap.
-    import httpx
-    core = (f"https://sports.core.api.espn.com/v2/sports/football/leagues/"
-            f"college-football/seasons/{yr}/types/2/weeks/7/events")
+_cfbd_fbs_cache = {}
+
+
+def _cfbd_fbs_set(key, yr):
+    """Set of FBS school names for a season, from CFBD /teams/fbs. Cached."""
+    if yr in _cfbd_fbs_cache:
+        return _cfbd_fbs_cache[yr]
+    import cfb_portal as CP
+    rows = CP._get_safe("/teams/fbs", key, {"year": yr}) or []
+    names = {t.get("school") or t.get("team") or t.get("name")
+             for t in rows if (t.get("school") or t.get("team") or t.get("name"))}
+    _cfbd_fbs_cache[yr] = names
+    return names
+
+
+def _cfbd_games(yr):
+    """Every completed FBS-vs-FBS game this season with scores, from CollegeFootball
+    Data (/games). ESPN's scoreboard hard-caps at 25 games/query and ignores limit,
+    so it can never return the full slate — CFBD does, in one call. Returns the same
+    (home_id, home_name, home_pts, away_id, away_name, away_pts) tuples _srs wants
+    (team name doubles as the id, since CFBD has no ESPN ids)."""
+    import cfb_portal as CP
     try:
-        with httpx.Client(timeout=20, headers={"User-Agent": "Mozilla/5.0"}) as cx:
-            r = cx.get(core, params={"limit": 1000})
-            j = r.json() or {}
-            out["core_week7"] = {"count": j.get("count"), "pageCount": j.get("pageCount"),
-                                 "n_items": len(j.get("items") or [])}
-            ref = ((j.get("items") or [{}])[0] or {}).get("$ref")
-            if ref:
-                ev = cx.get(ref).json() or {}
-                comp = (ev.get("competitions") or [{}])[0]
-                cs = comp.get("competitors") or []
-                # is the score inline, or a $ref we'd have to fetch too?
-                sc = (cs[0].get("score") if cs else None)
-                out["core_event_sample"] = {
-                    "date": ev.get("date"), "comp_keys": list(comp.keys())[:12],
-                    "score_type": type(sc).__name__,
-                    "score_val": (sc if isinstance(sc, (str, int, float)) else
-                                  (list(sc.keys())[:6] if isinstance(sc, dict) else None))}
+        key = CP._key()
     except Exception as e:
-        out["core_week7"] = {"err": str(e)[:120]}
+        print(f"[cfbd] no key: {e}")
+        return []
+    fbs = _cfbd_fbs_set(key, yr)
+    games = CP._get_safe("/games", key, {"year": yr, "seasonType": "regular"}) or []
+
+    def G(o, *ks):
+        for k in ks:
+            v = o.get(k)
+            if v is not None:
+                return v
+        return None
+    out = []
+    if games:
+        print(f"[cfbd] games_raw={len(games)} fbs_set={len(fbs)} keys={list(games[0].keys())[:14]}")
+    for gm in games:
+        if not G(gm, "completed"):
+            continue
+        ht = G(gm, "homeTeam", "home_team")
+        at = G(gm, "awayTeam", "away_team")
+        hp = G(gm, "homePoints", "home_points")
+        ap = G(gm, "awayPoints", "away_points")
+        if not ht or not at or hp is None or ap is None:
+            continue
+        if fbs and (ht not in fbs or at not in fbs):   # FBS-vs-FBS only
+            continue
+        try:
+            hp, ap = int(hp), int(ap)
+        except (TypeError, ValueError):
+            continue
+        out.append((ht, ht, hp, at, at, ap))
+    print(f"[cfbd] fbs_completed_games={len(out)}")
     return out
 
 
@@ -772,7 +750,10 @@ def _college_games(sport):
                         hp, aid, at.get("displayName") or at.get("shortDisplayName"), ap))
 
     if sport == "ncaaf":
-        for wk in range(1, 17):
+        cfbd = _cfbd_games(yr)              # full slate from CollegeFootballData
+        if cfbd:
+            return cfbd
+        for wk in range(1, 17):            # fallback: ESPN (capped at 25/wk)
             _pull({"dates": str(yr), "seasontype": 2, "week": wk})
     else:
         # basketball: scan the season to date (opens early Nov); the member-set
