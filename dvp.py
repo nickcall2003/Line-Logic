@@ -487,34 +487,34 @@ def _cbbd_games():
             if v is not None:
                 return v
         return None
-    for season in CBP._default_years():
-        games = CBP._get_safe("/games", {"season": season}) or []
-        if not games:
-            continue
-        d1 = _cbbd_d1_set(season)
+    seasons = CBP._default_years()
+    if not seasons:
+        return []
+    season = seasons[0]                       # CURRENT season only — never fall
+    games = CBP._get_safe("/games", {"season": season}) or []  # back to last year
+    d1 = _cbbd_d1_set(season)
+    if games:
         print(f"[cbbd] season={season} games_raw={len(games)} d1_set={len(d1)} "
               f"keys={list(games[0].keys())[:14]}")
-        out = []
-        for gm in games:
-            ht = G(gm, "homeTeam", "home_team")
-            at = G(gm, "awayTeam", "away_team")
-            hp = G(gm, "homePoints", "home_points")
-            ap = G(gm, "awayPoints", "away_points")
-            if not ht or not at or hp is None or ap is None:   # unplayed -> null points
-                continue
-            if d1 and (ht not in d1 or at not in d1):
-                continue
-            try:
-                hp, ap = int(hp), int(ap)
-            except (TypeError, ValueError):
-                continue
-            if hp + ap <= 0:
-                continue
-            out.append((ht, ht, hp, at, at, ap))
-        print(f"[cbbd] season={season} d1_completed_games={len(out)}")
-        if out:
-            return out
-    return []
+    out = []
+    for gm in games:
+        ht = G(gm, "homeTeam", "home_team")
+        at = G(gm, "awayTeam", "away_team")
+        hp = G(gm, "homePoints", "home_points")
+        ap = G(gm, "awayPoints", "away_points")
+        if not ht or not at or hp is None or ap is None:   # unplayed -> null points
+            continue
+        if d1 and (ht not in d1 or at not in d1):
+            continue
+        try:
+            hp, ap = int(hp), int(ap)
+        except (TypeError, ValueError):
+            continue
+        if hp + ap <= 0:
+            continue
+        out.append((ht, ht, hp, at, at, ap))
+    print(f"[cbbd] season={season} d1_completed_games={len(out)}")
+    return out
 
 
 def _valid_team_ids(sport, group=None):
@@ -818,16 +818,10 @@ def _college_games(sport):
         for wk in range(1, 17):            # fallback: ESPN (capped at 25/wk)
             _pull({"dates": str(yr), "seasontype": 2, "week": wk})
     elif sport == "ncaab":
-        cbbd = _cbbd_games()               # full slate from CollegeBasketballData
-        if cbbd:
-            return cbbd
-        # fallback: ESPN day-by-day (capped at 25/day)
-        season_open = dt.date(yr, 10, 15)
-        start = max(season_open, today - dt.timedelta(days=120))
-        d = today
-        while d >= start:
-            _pull({"dates": d.strftime("%Y%m%d")})
-            d -= dt.timedelta(days=1)
+        # CBBD full slate (current season). No ESPN fallback — ESPN's 25-cap would
+        # just reintroduce the bug; empty pre-season is correct and fills as games
+        # are played.
+        return _cbbd_games()
     else:
         # women's basketball: scan the season to date (ESPN; CBBD is men's only).
         season_open = dt.date(yr, 10, 15)
