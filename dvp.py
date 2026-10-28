@@ -455,6 +455,68 @@ def _cfbd_games(yr):
     return out
 
 
+_cbbd_d1_cache = {}
+
+
+def _cbbd_d1_set(season):
+    """D1 men's school names for a season, from CBBD /teams. Cached."""
+    if season in _cbbd_d1_cache:
+        return _cbbd_d1_cache[season]
+    import cbb_portal as CBP
+    rows = CBP._get_safe("/teams", {"season": season}) or []
+    names = {t.get("school") or t.get("team") or t.get("name")
+             for t in rows if (t.get("school") or t.get("team") or t.get("name"))}
+    _cbbd_d1_cache[season] = names
+    return names
+
+
+def _cbbd_games():
+    """Every completed D1-vs-D1 men's game this season with scores, from College
+    BasketballData (/games) — same reason as CFB: ESPN's scoreboard caps at 25 and
+    can't return the full slate. Tries the season-year conventions CBBD may use."""
+    import cbb_portal as CBP
+    try:
+        CBP._key()
+    except Exception as e:
+        print(f"[cbbd] no key: {e}")
+        return []
+
+    def G(o, *ks):
+        for k in ks:
+            v = o.get(k)
+            if v is not None:
+                return v
+        return None
+    for season in CBP._default_years():
+        games = CBP._get_safe("/games", {"season": season}) or []
+        if not games:
+            continue
+        d1 = _cbbd_d1_set(season)
+        print(f"[cbbd] season={season} games_raw={len(games)} d1_set={len(d1)} "
+              f"keys={list(games[0].keys())[:14]}")
+        out = []
+        for gm in games:
+            ht = G(gm, "homeTeam", "home_team")
+            at = G(gm, "awayTeam", "away_team")
+            hp = G(gm, "homePoints", "home_points")
+            ap = G(gm, "awayPoints", "away_points")
+            if not ht or not at or hp is None or ap is None:   # unplayed -> null points
+                continue
+            if d1 and (ht not in d1 or at not in d1):
+                continue
+            try:
+                hp, ap = int(hp), int(ap)
+            except (TypeError, ValueError):
+                continue
+            if hp + ap <= 0:
+                continue
+            out.append((ht, ht, hp, at, at, ap))
+        print(f"[cbbd] season={season} d1_completed_games={len(out)}")
+        if out:
+            return out
+    return []
+
+
 def _valid_team_ids(sport, group=None):
     """Set of real team ids for a league (e.g. the 30 NBA franchises, or FBS-only
     for CFB) from the teams endpoint, so exhibitions vs international clubs and
@@ -755,9 +817,19 @@ def _college_games(sport):
             return cfbd
         for wk in range(1, 17):            # fallback: ESPN (capped at 25/wk)
             _pull({"dates": str(yr), "seasontype": 2, "week": wk})
+    elif sport == "ncaab":
+        cbbd = _cbbd_games()               # full slate from CollegeBasketballData
+        if cbbd:
+            return cbbd
+        # fallback: ESPN day-by-day (capped at 25/day)
+        season_open = dt.date(yr, 10, 15)
+        start = max(season_open, today - dt.timedelta(days=120))
+        d = today
+        while d >= start:
+            _pull({"dates": d.strftime("%Y%m%d")})
+            d -= dt.timedelta(days=1)
     else:
-        # basketball: scan the season to date (opens early Nov); the member-set
-        # filter removes any exhibition vs a non-D1 school.
+        # women's basketball: scan the season to date (ESPN; CBBD is men's only).
         season_open = dt.date(yr, 10, 15)
         start = max(season_open, today - dt.timedelta(days=120))
         d = today
