@@ -4683,8 +4683,10 @@ def sports_meta():
     _hs = os.environ.get("HIDDEN_SPORTS")
     # Golf is hidden by default now (we don't track it, and it's volatile).
     # Set HIDDEN_SPORTS to override (e.g. "" shows all, "wnba" re-enables golf).
+    # wncaab (women's CBB) hidden by request; mlb hidden for the offseason
+    # (re-enable it for spring, or just drop it from this default).
     hidden = {s.strip().lower() for s in
-              ((_hs if _hs is not None else "wnba,golf").split(",")) if s.strip()}
+              ((_hs if _hs is not None else "wnba,golf,wncaab,mlb").split(",")) if s.strip()}
     for entry in meta:
         in_season = mo in SPORT_SEASON.get(entry["key"], set(range(1, 13)))
         entry["active"] = in_season and entry["key"] not in hidden
