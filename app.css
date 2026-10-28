@@ -1679,6 +1679,7 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .hgw-s{color:var(--muted);font-size:11px;margin-top:2px;display:block}
 .hgw.free{background:linear-gradient(150deg,rgba(232,176,75,.18),rgba(232,176,75,.02));border-color:rgba(232,176,75,.4)}
 .hgw.best{background:linear-gradient(150deg,rgba(95,207,134,.18),rgba(95,207,134,.02));border-color:rgba(95,207,134,.4)}
+.hgw.parlay{background:linear-gradient(150deg,rgba(167,139,250,.18),rgba(167,139,250,.02));border-color:rgba(167,139,250,.42)}
 .hgw.disc{background:linear-gradient(150deg,rgba(88,101,242,.2),rgba(88,101,242,.03));border-color:rgba(88,101,242,.45);
   grid-column:1/-1;flex-direction:row;align-items:center;gap:13px;min-height:0}
 .hgw.disc .hgw-t{margin-top:0}
