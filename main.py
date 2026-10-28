@@ -4656,7 +4656,7 @@ def _team_analysis(g, sport):
 SPORT_SEASON = {
     "tennis": set(range(1, 13)),
     "soccer": set(range(1, 13)),
-    "mlb":    {2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+    "mlb":    {3, 4, 5, 6, 7, 8, 9},   # regular season; auto-hides Oct-Feb offseason
     "nba":    {10, 11, 12, 1, 2, 3, 4, 5, 6},
     "wnba":   {5, 6, 7, 8, 9, 10},
     "nhl":    {9, 10, 11, 12, 1, 2, 3, 4, 5, 6},
@@ -4683,10 +4683,11 @@ def sports_meta():
     _hs = os.environ.get("HIDDEN_SPORTS")
     # Golf is hidden by default now (we don't track it, and it's volatile).
     # Set HIDDEN_SPORTS to override (e.g. "" shows all, "wnba" re-enables golf).
-    # wncaab (women's CBB) hidden by request; mlb hidden for the offseason
-    # (re-enable it for spring, or just drop it from this default).
+    # wncaab (women's CBB) hidden by request. MLB is handled by its season window
+    # (SPORT_SEASON) now, so it hides in the offseason and returns in spring on its
+    # own — no need to list it here.
     hidden = {s.strip().lower() for s in
-              ((_hs if _hs is not None else "wnba,golf,wncaab,mlb").split(",")) if s.strip()}
+              ((_hs if _hs is not None else "wnba,golf,wncaab").split(",")) if s.strip()}
     for entry in meta:
         in_season = mo in SPORT_SEASON.get(entry["key"], set(range(1, 13)))
         entry["active"] = in_season and entry["key"] not in hidden
