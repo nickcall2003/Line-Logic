@@ -447,10 +447,33 @@ def ncaaf_diag():
         except Exception as e:
             return {"err": str(e)[:80]}
     out["datetest"] = {
-        "sat_20261017": _count({"dates": "20261017"}),
-        "range_1015_1020": _count({"dates": "20261015-20261020"}),
-        "range_whole_season": _count({"dates": f"{yr}0823-{yr}1027"}),
+        "sat_page2": _count({"dates": "20261017", "page": "2"}),
+        "sat_page1_limit50": _count({"dates": "20261017", "limit": "50"}),
     }
+    # ESPN CORE API week-events — usually returns the full list, no 25 cap.
+    import httpx
+    core = (f"https://sports.core.api.espn.com/v2/sports/football/leagues/"
+            f"college-football/seasons/{yr}/types/2/weeks/7/events")
+    try:
+        with httpx.Client(timeout=20, headers={"User-Agent": "Mozilla/5.0"}) as cx:
+            r = cx.get(core, params={"limit": 1000})
+            j = r.json() or {}
+            out["core_week7"] = {"count": j.get("count"), "pageCount": j.get("pageCount"),
+                                 "n_items": len(j.get("items") or [])}
+            ref = ((j.get("items") or [{}])[0] or {}).get("$ref")
+            if ref:
+                ev = cx.get(ref).json() or {}
+                comp = (ev.get("competitions") or [{}])[0]
+                cs = comp.get("competitors") or []
+                # is the score inline, or a $ref we'd have to fetch too?
+                sc = (cs[0].get("score") if cs else None)
+                out["core_event_sample"] = {
+                    "date": ev.get("date"), "comp_keys": list(comp.keys())[:12],
+                    "score_type": type(sc).__name__,
+                    "score_val": (sc if isinstance(sc, (str, int, float)) else
+                                  (list(sc.keys())[:6] if isinstance(sc, dict) else None))}
+    except Exception as e:
+        out["core_week7"] = {"err": str(e)[:120]}
     return out
 
 
