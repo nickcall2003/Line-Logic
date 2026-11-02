@@ -577,6 +577,18 @@ async def lifespan(app: FastAPI):
                 _t.sleep(max(300, _WT_TTL - 300))   # refresh a bit before TTL
         _thr.Thread(target=_warm_wintotals, daemon=True).start()
 
+        # TEMP: confirm which sports' win-total market-line sources are reachable
+        # and parse from Railway (the sandbox can't reach them). Prints once.
+        def _wtl_diag():
+            import time as _t, json as _json
+            _t.sleep(30)
+            try:
+                import win_total_lines as WTL
+                print("[wtl-diag] === " + _json.dumps(WTL.diag())[:2000])
+            except Exception as e:
+                print(f"[wtl-diag] failed: {e}")
+        _thr.Thread(target=_wtl_diag, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy

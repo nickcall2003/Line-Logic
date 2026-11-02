@@ -433,6 +433,18 @@ def project_league(sport, teams=None, lines=None):
     lines = lines or {}
     if teams is None:
         teams = league_teams(sport)
+    # No explicit lines -> pull season win-total market lines (sportsbettingdime)
+    # and match each team by name. Fails soft: no lines == pure projection.
+    if not lines:
+        try:
+            import win_total_lines as WTL
+            if WTL.lines(sport):
+                for t in teams:
+                    m = WTL.line_for(sport, t.get("name") or "", t.get("abbr"))
+                    if m and m.get("line") is not None:
+                        lines[str(t.get("team_id"))] = m["line"]
+        except Exception as e:
+            print(f"[wintotals] lines {sport} failed: {e}")
     out = []
     for t in teams:
         tid = str(t.get("team_id"))
