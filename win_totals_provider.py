@@ -414,6 +414,39 @@ def _project_ncaaf_cfbd(lines=None):
     return {"sport": "ncaaf", "count": len(out), "teams": out, "has_lines": False}
 
 
+def wt_diag(sport):
+    """TEMP: why is a sport's win-total board empty? Report team count, a sample
+    team's schedule length + rating, whether project_team suppresses it, and the
+    league count."""
+    import espn_elo
+    out = {"sport": sport, "min_sched": _MIN_SCHED.get(sport)}
+    teams = league_teams(sport)
+    out["n_teams"] = len(teams)
+    if teams:
+        t = teams[0]
+        tid = str(t["team_id"])
+        sched = _full_schedule(sport, tid)
+        out["sample"] = t.get("name")
+        out["sched_len"] = len(sched)
+        out["n_played"] = sum(1 for g in sched if g.get("completed"))
+        try:
+            out["my_rating"] = espn_elo.lookup(sport, tid)
+        except Exception as e:
+            out["rating_err"] = str(e)[:80]
+        pr = project_team(sport, tid, t.get("name") or tid)
+        out["project_none"] = pr is None
+        if pr:
+            out["expected_wins"] = pr.get("expected_wins")
+            out["games_no_rating"] = pr.get("games_no_rating")
+            out["model_source"] = pr.get("model_source")
+    try:
+        lg = project_league(sport)
+        out["league_count"] = lg.get("count")
+    except Exception as e:
+        out["league_err"] = str(e)[:120]
+    return out
+
+
 def project_league(sport, teams=None, lines=None):
     """teams: list of {team_id, name}. If omitted, projects the whole league.
     lines: optional {team_id: win_total}. Returns projections sorted by biggest

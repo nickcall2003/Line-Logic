@@ -555,6 +555,21 @@ async def lifespan(app: FastAPI):
                 print(f"[pro-moves] warm setup failed: {e}")
         _thr.Thread(target=_warm_pro_moves, daemon=True).start()
 
+        # TEMP: diagnose why NBA/CBB win-total boards are empty (prints once).
+        def _wt_diag():
+            import time as _t, json as _json
+            _t.sleep(35)
+            try:
+                import win_totals_provider as WTP
+                for _s in ("nba", "ncaab"):
+                    try:
+                        print("[wt-diag] === " + _json.dumps(WTP.wt_diag(_s))[:2000])
+                    except Exception as e:
+                        print(f"[wt-diag] {_s} failed: {e}")
+            except Exception as e:
+                print(f"[wt-diag] setup failed: {e}")
+        _thr.Thread(target=_wt_diag, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy
