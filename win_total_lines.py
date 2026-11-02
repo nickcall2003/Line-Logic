@@ -88,29 +88,39 @@ def _parse_table(html):
         if len(cells) < 2:
             continue
         team = None
-        line = None
-        int_line = None
+        decs = []        # decimal numbers in range (candidate lines)
+        ints = []        # bare integers in range
         odds = []
         for c in cells:
             if team is None and re.search(r"[A-Za-z]{3,}", c) and not _ODDS.match(c):
                 team = c
                 continue
-            if line is None and _DEC.match(c):
-                v = float(c)
-                if 0.5 <= v <= 130:
-                    line = v
-                    continue
             if _ODDS.match(c):
                 odds.append(c)
                 continue
-            if int_line is None and _INT.match(c):
+            if _DEC.match(c):
+                v = float(c)
+                if 0.5 <= v <= 130:
+                    decs.append(v)
+                continue
+            if _INT.match(c):
                 v = int(c)
                 if 1 <= v <= 120:
-                    int_line = v
+                    ints.append(float(v))
         if team is None:
             continue
-        use = line if line is not None else int_line
-        if use is None:
+        # Betting win totals end in .5 almost without exception; other decimals
+        # in the row are model/average columns (e.g. an NFL "proj wins" 7.7), so
+        # prefer a half, then a whole line, and only then any other decimal.
+        halves = [v for v in decs if abs((v % 1) - 0.5) < 1e-9]
+        wholes = [v for v in decs if (v % 1) < 1e-9] + ints
+        if halves:
+            use = halves[0]
+        elif wholes:
+            use = wholes[0]
+        elif decs:
+            use = decs[0]
+        else:
             continue
         o = odds[0] if len(odds) >= 1 else None
         u = odds[1] if len(odds) >= 2 else None
@@ -186,5 +196,8 @@ def diag():
             rec["err"] = err
         samp = list(tbl.values())[:3]
         rec["sample"] = [{"t": s["team"], "line": s["line"]} for s in samp]
+        # quality: how many lines don't end in .5 (should be ~0 if parsed right)
+        rec["non_half"] = sum(1 for s in tbl.values()
+                              if abs((s["line"] % 1) - 0.5) > 1e-9)
         out[sp] = rec
     return out
