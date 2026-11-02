@@ -24,17 +24,20 @@ import time
 # verified live via the startup diag.
 _SOURCES = {
     "nba": [
+        "https://www.sportsbettingdime.com/nba/futures/win-totals-best-odds/",
         "https://www.sportsbettingdime.com/nba/win-totals-best-odds",
     ],
     "nfl": [
+        "https://www.sportsbettingdime.com/nfl/futures/win-totals-best-odds/",
         "https://www.sportsbettingdime.com/nfl/win-totals-best-odds",
     ],
     "mlb": [
+        "https://www.sportsbettingdime.com/mlb/futures/win-totals-best-odds/",
         "https://www.sportsbettingdime.com/mlb/win-totals-best-odds",
     ],
     "ncaaf": [
+        "https://www.sportsbettingdime.com/college-football/futures/win-totals-best-odds/",
         "https://www.sportsbettingdime.com/college-football/win-totals-best-odds",
-        "https://www.sportsbettingdime.com/ncaaf/win-totals-best-odds",
     ],
 }
 
@@ -56,6 +59,7 @@ def _strip_tags(s):
     return re.sub(r"\s+", " ", s).strip()
 
 
+_TABLE = re.compile(r"<table\b.*?</table>", re.S | re.I)
 _TR = re.compile(r"<tr\b[^>]*>(.*?)</tr>", re.S | re.I)
 _CELL = re.compile(r"<t[dh]\b[^>]*>(.*?)</t[dh]>", re.S | re.I)
 _ODDS = re.compile(r"^[+-]\d{2,4}$")          # -105, +120, -110
@@ -128,18 +132,41 @@ def _parse_table(html):
     return out
 
 
+def _halves(tbl):
+    return sum(1 for v in tbl.values() if abs((v["line"] % 1) - 0.5) < 1e-9)
+
+
+def _best_table(html):
+    """A page can carry several tables (the win-total board AND a 'past records'
+    table whose numbers aren't lines). Parse each separately and keep the one
+    that most looks like betting lines — the most cells ending in .5 — so a
+    records table never overwrites the real board."""
+    best, best_score = {}, -1
+    for tb in _TABLE.findall(html):
+        d = _parse_table(tb)
+        if len(d) < 8:
+            continue
+        score = _halves(d)
+        if score > best_score:
+            best, best_score = d, score
+    return best
+
+
 def _build(sport):
     urls = _SOURCES.get(sport) or []
+    last = None
     for u in urls:
         try:
             html = _fetch(u)
-            tbl = _parse_table(html)
-            if len(tbl) >= 8:          # a real league table, not a stray 1-row
+            tbl = _best_table(html)
+            # require it to actually look like lines (win totals end in .5),
+            # else it's a records/projection table -> leave projection-only
+            if len(tbl) >= 8 and _halves(tbl) >= max(4, len(tbl) // 2):
                 return tbl, u, None
         except Exception as e:
             last = f"{type(e).__name__}: {str(e)[:120]}"
             continue
-    return {}, (urls[0] if urls else None), locals().get("last")
+    return {}, (urls[0] if urls else None), last
 
 
 def lines(sport):
