@@ -219,11 +219,12 @@ def league_teams(sport):
     if cached is not None:
         return cached
     _GROUP = {"ncaaf": "80", "ncaab": "50"}   # ESPN group ids for top division
+    _LIMIT = 100
     out, seen = [], set()
     try:
         page = 1
         while page <= 12:                       # hard cap
-            params = {"limit": 100, "page": page}
+            params = {"limit": _LIMIT, "page": page}
             if sport in _GROUP:
                 params["groups"] = _GROUP[sport]
             data = EP._get(f"{base}/teams", params) or {}
@@ -231,12 +232,14 @@ def league_teams(sport):
             groups = league.get("teams") or []
             if not groups:
                 break
+            added = 0
             for wrap in groups:
                 t = wrap.get("team") or {}
                 tid = str(t.get("id") or "")
                 if not tid or tid in seen:
                     continue
                 seen.add(tid)
+                added += 1
                 logos = t.get("logos") or []
                 out.append({
                     "team_id": tid,
@@ -244,8 +247,10 @@ def league_teams(sport):
                     "abbr": t.get("abbreviation") or "",
                     "logo": (logos[0].get("href") if logos else None),
                 })
-            page_count = league.get("pageCount") or data.get("pageCount")
-            if not page_count or page >= int(page_count):
+            # Don't trust ESPN's pageCount (college hoops misreports it as 1).
+            # Keep paging while pages stay full; stop on a short page or when a
+            # page adds nothing new (ESPN ignoring the page param -> all dupes).
+            if added == 0 or len(groups) < _LIMIT:
                 break
             page += 1
     except Exception:
@@ -412,39 +417,6 @@ def _project_ncaaf_cfbd(lines=None):
         return None
     out.sort(key=lambda p: p["expected_wins"], reverse=True)
     return {"sport": "ncaaf", "count": len(out), "teams": out, "has_lines": False}
-
-
-def wt_diag(sport):
-    """TEMP: why is a sport's win-total board empty? Report team count, a sample
-    team's schedule length + rating, whether project_team suppresses it, and the
-    league count."""
-    import espn_elo
-    out = {"sport": sport, "min_sched": _MIN_SCHED.get(sport)}
-    teams = league_teams(sport)
-    out["n_teams"] = len(teams)
-    if teams:
-        t = teams[0]
-        tid = str(t["team_id"])
-        sched = _full_schedule(sport, tid)
-        out["sample"] = t.get("name")
-        out["sched_len"] = len(sched)
-        out["n_played"] = sum(1 for g in sched if g.get("completed"))
-        try:
-            out["my_rating"] = espn_elo.lookup(sport, tid)
-        except Exception as e:
-            out["rating_err"] = str(e)[:80]
-        pr = project_team(sport, tid, t.get("name") or tid)
-        out["project_none"] = pr is None
-        if pr:
-            out["expected_wins"] = pr.get("expected_wins")
-            out["games_no_rating"] = pr.get("games_no_rating")
-            out["model_source"] = pr.get("model_source")
-    try:
-        lg = project_league(sport)
-        out["league_count"] = lg.get("count")
-    except Exception as e:
-        out["league_err"] = str(e)[:120]
-    return out
 
 
 def project_league(sport, teams=None, lines=None):

@@ -4145,10 +4145,18 @@ async function renderWinTotals(){
     '<div class="wt-chips">'+chips+'</div></div>';
   list.innerHTML=head+'<div id="wt-body">'+sportLoader(_wtSport,"Projecting the season")+'</div>';
   var body=document.getElementById("wt-body");
-  var d;try{d=await getJSON("/api/wintotals/"+_wtSport);}catch(e){d=null;}
-  if(!body||!body.isConnected)return;
+  var reqSport=_wtSport;
+  var d;try{d=await getJSON("/api/wintotals/"+reqSport);}catch(e){d=null;}
+  if(!body||!body.isConnected||reqSport!==_wtSport)return;
+  if(d&&d.building&&(!d.teams||!d.teams.length)){
+    // First build runs server-side (30-100 team schedules). Show progress and
+    // poll until it's ready instead of a misleading "no season" message.
+    body.innerHTML=sportLoader(reqSport,"Building "+reqSport.toUpperCase()+" projections \u2014 first load can take a minute");
+    setTimeout(function(){if(view==="wintotals"&&reqSport===_wtSport)renderWinTotals();},5000);
+    return;
+  }
   if(!d||d.error||!d.teams||!d.teams.length){
-    body.innerHTML='<div class="empty">No projections available for '+_wtSport.toUpperCase()+
+    body.innerHTML='<div class="empty">No projections available for '+reqSport.toUpperCase()+
       ' right now \u2014 this fills in once the season schedule is posted.</div>';
     return;
   }

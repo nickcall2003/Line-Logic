@@ -555,20 +555,27 @@ async def lifespan(app: FastAPI):
                 print(f"[pro-moves] warm setup failed: {e}")
         _thr.Thread(target=_warm_pro_moves, daemon=True).start()
 
-        # TEMP: diagnose why NBA/CBB win-total boards are empty (prints once).
-        def _wt_diag():
-            import time as _t, json as _json
-            _t.sleep(35)
-            try:
-                import win_totals_provider as WTP
-                for _s in ("nba", "ncaab"):
-                    try:
-                        print("[wt-diag] === " + _json.dumps(WTP.wt_diag(_s))[:2000])
-                    except Exception as e:
-                        print(f"[wt-diag] {_s} failed: {e}")
-            except Exception as e:
-                print(f"[wt-diag] setup failed: {e}")
-        _thr.Thread(target=_wt_diag, daemon=True).start()
+        # Keep win-total projections warm so NBA/CBB (30-100 team schedules)
+        # load instantly instead of building live on the first click.
+        def _warm_wintotals():
+            import time as _t
+            _t.sleep(45)
+            while True:
+                try:
+                    import win_totals_provider as WTP
+                    for _s in sorted(WIN_TOTAL_SPORTS):
+                        try:
+                            data = WTP.project_league(_s)
+                            _wt_cache[_s] = (_t.time(), data)
+                            n = len((data or {}).get("teams") or [])
+                            print(f"[wintotals] warmed {_s}: {n} teams")
+                        except Exception as e:
+                            print(f"[wintotals] warm {_s} failed: {e}")
+                        _t.sleep(3)
+                except Exception as e:
+                    print(f"[wintotals] warm setup failed: {e}")
+                _t.sleep(max(300, _WT_TTL - 300))   # refresh a bit before TTL
+        _thr.Thread(target=_warm_wintotals, daemon=True).start()
 
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
@@ -7462,13 +7469,35 @@ _QUICK_TTL = int(os.environ.get("PICKS_QUICK_TTL", "600"))   # seconds
 # ---- Win totals : projected season wins vs the book -------------------------
 WIN_TOTAL_SPORTS = {"nfl", "ncaaf", "nba", "ncaab", "nhl", "mlb"}
 _wt_cache: dict = {}
+_wt_building: set = set()
 _WT_TTL = int(os.environ.get("WIN_TOTALS_TTL", "3600"))   # schedules move slowly
+
+
+def _wt_build(sport: str):
+    """Build one league's projections in the background. Projecting 30-100
+    team schedules live takes 30-100s, so this never runs on the request
+    path — it populates _wt_cache for the endpoint and warmer to serve."""
+    if sport in _wt_building:
+        return
+    _wt_building.add(sport)
+
+    def _go():
+        try:
+            import win_totals_provider as WTP
+            data = WTP.project_league(sport)
+            _wt_cache[sport] = (time.time(), data)
+        except Exception as e:
+            print(f"[wintotals] {sport} failed: {e}")
+        finally:
+            _wt_building.discard(sport)
+    threading.Thread(target=_go, daemon=True).start()
 
 
 @app.get("/api/wintotals/{sport}")
 def win_totals_league(sport: str):
     """Whole-league win-total projections. Projection-only for now (no book
-    lines wired), ranked by projected wins."""
+    lines wired), ranked by projected wins. Served from a background-built
+    cache so a cold request never blocks the browser for a minute."""
     sport = sport.lower()
     if sport not in WIN_TOTAL_SPORTS:
         return {"error": "unsupported", "supported": sorted(WIN_TOTAL_SPORTS)}
@@ -7476,14 +7505,11 @@ def win_totals_league(sport: str):
     hit = _wt_cache.get(sport)
     if hit and now - hit[0] < _WT_TTL:
         return hit[1]
-    try:
-        import win_totals_provider as WTP
-        data = WTP.project_league(sport)
-    except Exception as e:
-        print(f"[wintotals] {sport} failed: {e}")
-        return {"error": "unavailable"}
-    _wt_cache[sport] = (now, data)
-    return data
+    # Stale or cold: kick a background rebuild, serve what we have meanwhile.
+    _wt_build(sport)
+    if hit:
+        return hit[1]
+    return {"sport": sport, "teams": [], "building": True, "count": 0}
 
 
 @app.get("/api/wintotals/{sport}/{team_id}")
