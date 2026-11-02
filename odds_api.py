@@ -112,6 +112,10 @@ def _over_pace():
     return used > target
 
 
+_QUOTA_STALE = int(os.environ.get("ODDS_QUOTA_STALE", "1800"))  # re-probe live quota every 30m
+_last_probe = {"ts": 0.0}
+
+
 def _quota_ok():
     today = dt.date.today().isoformat()
     if _spend["day"] != today:
@@ -119,6 +123,14 @@ def _quota_ok():
         _spend["count"] = 0
     if _spend["count"] >= _DAILY_MAX:
         return False
+    # Self-heal: periodically let ONE call through to re-learn the live quota,
+    # even if our last snapshot said we were out. Without this, a stale
+    # remaining=0 (e.g. carried over from before a monthly plan reset) deadlocks
+    # fetching forever — a blocked call never hits the API, so the snapshot is
+    # never refreshed and the governor never notices the credits came back.
+    if time.time() - _last_probe["ts"] > _QUOTA_STALE:
+        _last_probe["ts"] = time.time()
+        return True
     rem = _quota.get("remaining")
     try:
         if rem is not None and int(rem) <= _MIN_REMAINING:
