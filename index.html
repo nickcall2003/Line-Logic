@@ -4140,10 +4140,13 @@ async function renderWinTotals(){
   }).join("");
   var head='<div class="wt-head">'+
     '<div class="wt-title">Season Win Totals</div>'+
-    '<div class="wt-sub">Model-projected wins, every game on the schedule walked one by one. '+
-    'Where a book posts a season win-total line we show the over/under and the model\u2019s lean \u2014 '+
-    'ranked by where we most disagree with the book.</div>'+
-    '<div class="wt-chips">'+chips+'</div></div>';
+    '<div class="wt-sub">Model-projected wins, every game on the schedule walked one by one, '+
+    'ranked highest to lowest. Where a book posts a season win-total line we show the over/under '+
+    'and the model\u2019s lean.</div>'+
+    '<div class="wt-chips">'+chips+'</div>'+
+    '<input id="wt-search" class="wt-search" type="search" autocomplete="off" '+
+    'placeholder="Search teams\u2026" oninput="wtFilter(this.value)">'+
+    '</div>';
   list.innerHTML=head+'<div id="wt-body">'+sportLoader(_wtSport,"Projecting the season")+'</div>';
   var body=document.getElementById("wt-body");
   var reqSport=_wtSport;
@@ -4162,21 +4165,37 @@ async function renderWinTotals(){
     return;
   }
   var teams=d.teams.slice();
+  // Always highest projected wins down, every sport.
+  teams.sort(function(a,b){return (b.expected_wins||0)-(a.expected_wins||0);});
   var anyPlayed=teams.some(function(t){return (t.games_played||0)>0;});
-  var banner="";
+  _wtBanner="";
   if(!anyPlayed){
-    // Preseason: ratings are last season's and the order is schedule-driven, so a
-    // projected-wins sort reads like a power ranking when it isn't. Sort A-Z
-    // instead (a neutral lookup) and say plainly what the numbers are.
-    teams.sort(function(a,b){return (a.team||"").localeCompare(b.team||"");});
-    banner='<div style="background:rgba(224,138,60,0.08);border:1px solid rgba(224,138,60,0.28);'+
+    // Preseason: ratings are last season's and the order is schedule-driven, so
+    // say plainly the numbers aren't a power ranking.
+    _wtBanner='<div style="background:rgba(224,138,60,0.08);border:1px solid rgba(224,138,60,0.28);'+
       'border-radius:12px;padding:12px 14px;margin:0 0 14px;color:#a9b7cc;font-size:13px;line-height:1.45;">'+
       '<b style="color:#e08a3c;">Preseason projection.</b> Based on last season\u2019s ratings and each '+
       'team\u2019s schedule strength \u2014 <b>not a power ranking</b>. A team with an easy schedule projects '+
       'more wins than a stronger team in a tougher one, and roster/coaching changes aren\u2019t reflected until '+
-      '2026 games are played. Listed A\u2013Z; the numbers sharpen as the season starts.</div>';
+      'games are played. The numbers sharpen as the season starts.</div>';
   }
-  body.innerHTML=banner+teams.map(wtTeamCard).join("");
+  _wtTeams=teams;
+  wtFilter(document.getElementById("wt-search") ? document.getElementById("wt-search").value : "");
+}
+
+var _wtTeams=[], _wtBanner="";
+function wtFilter(q){
+  var body=document.getElementById("wt-body");
+  if(!body)return;
+  var ql=(q||"").toLowerCase().trim();
+  var rows=_wtTeams.filter(function(t){
+    return !ql || (t.team||"").toLowerCase().indexOf(ql)>=0;
+  });
+  if(!rows.length){
+    body.innerHTML=_wtBanner+'<div class="empty">No team matches \u201c'+esc2(q)+'\u201d.</div>';
+    return;
+  }
+  body.innerHTML=_wtBanner+rows.map(wtTeamCard).join("");
 }
 
 function wtTeamCard(t){

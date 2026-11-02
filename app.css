@@ -1836,6 +1836,11 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .wt-chip{padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:transparent;
   color:var(--muted);font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit}
 .wt-chip.active{background:var(--accent);border-color:var(--accent);color:#0b0d10}
+.wt-search{width:100%;margin:12px 0 2px;padding:11px 13px;border-radius:11px;
+  border:1px solid var(--line);background:var(--panel-2);color:var(--text);
+  font-size:14px;font-family:inherit;box-sizing:border-box}
+.wt-search:focus{border-color:var(--gold-soft);outline:none}
+.wt-search::placeholder{color:var(--muted-2)}
 .wt-card{border:1px solid var(--line);border-radius:13px;margin-bottom:10px;background:var(--panel-2);overflow:hidden}
 .wt-cardhead{width:100%;display:flex;align-items:center;gap:12px;background:transparent;border:none;
   cursor:pointer;padding:13px 15px;text-align:left;font-family:inherit;color:var(--ink)}

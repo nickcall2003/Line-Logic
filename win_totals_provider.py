@@ -452,12 +452,8 @@ def project_league(sport, teams=None, lines=None):
                           line=lines.get(tid), season=t.get("season"))
         if pr:
             out.append(pr)
-    if any(p.get("edge_wins") is not None for p in out):
-        # lines present -> rank by disagreement with the book
-        out.sort(key=lambda p: abs(p["edge_wins"]) if p.get("edge_wins") is not None else -1,
-                 reverse=True)
-    else:
-        # projection-only -> rank by projected wins, best season first
-        out.sort(key=lambda p: p["expected_wins"], reverse=True)
+    # Always rank by projected wins, highest first (the book lean still shows
+    # per team, but the board reads as a straight win-total ranking).
+    out.sort(key=lambda p: p["expected_wins"], reverse=True)
     return {"sport": sport, "count": len(out), "teams": out,
             "has_lines": any(p.get("line") is not None for p in out)}
