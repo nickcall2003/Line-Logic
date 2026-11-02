@@ -153,20 +153,26 @@ def _best_table(html):
 
 
 def _build(sport):
+    """Try every candidate URL and keep the most COMPLETE board that passes the
+    line-quality bar (win totals end in .5). Different sports' good page lives at
+    a different slug — NFL's real board is /futures/, MLB's fullest is the plain
+    page — so don't stop at the first hit; pick the biggest clean table."""
     urls = _SOURCES.get(sport) or []
     last = None
+    best, best_url, best_n = {}, (urls[0] if urls else None), 0
     for u in urls:
         try:
             html = _fetch(u)
             tbl = _best_table(html)
-            # require it to actually look like lines (win totals end in .5),
-            # else it's a records/projection table -> leave projection-only
+            # require it to actually look like lines, else it's a records/
+            # projection table -> ignore (leave projection-only)
             if len(tbl) >= 8 and _halves(tbl) >= max(4, len(tbl) // 2):
-                return tbl, u, None
+                if len(tbl) > best_n:
+                    best, best_url, best_n = tbl, u, len(tbl)
         except Exception as e:
             last = f"{type(e).__name__}: {str(e)[:120]}"
             continue
-    return {}, (urls[0] if urls else None), last
+    return best, best_url, (None if best else last)
 
 
 def lines(sport):

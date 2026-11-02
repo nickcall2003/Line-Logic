@@ -4141,7 +4141,8 @@ async function renderWinTotals(){
   var head='<div class="wt-head">'+
     '<div class="wt-title">Season Win Totals</div>'+
     '<div class="wt-sub">Model-projected wins, every game on the schedule walked one by one. '+
-    'Book lines coming soon \u2014 for now this is the pure projection.</div>'+
+    'Where a book posts a season win-total line we show the over/under and the model\u2019s lean \u2014 '+
+    'ranked by where we most disagree with the book.</div>'+
     '<div class="wt-chips">'+chips+'</div></div>';
   list.innerHTML=head+'<div id="wt-body">'+sportLoader(_wtSport,"Projecting the season")+'</div>';
   var body=document.getElementById("wt-body");
