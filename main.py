@@ -577,6 +577,61 @@ async def lifespan(app: FastAPI):
                 _t.sleep(max(300, _WT_TTL - 300))   # refresh a bit before TTL
         _thr.Thread(target=_warm_wintotals, daemon=True).start()
 
+        # TEMP: why does the CFB board cap near 25 games? Probe each ESPN
+        # scoreboard param combo + CFBD for an upcoming Saturday, print once.
+        def _cfb_probe():
+            import time as _t, json as _json, datetime as _dt
+            _t.sleep(40)
+            try:
+                import espn_provider as EP
+                SB = EP.SCOREBOARD["ncaaf"]
+                today = _dt.date.today()
+                sat = today + _dt.timedelta((5 - today.weekday()) % 7 or 7)
+                date = sat.strftime("%Y%m%d")
+                out = {"date": date, "espn": {}}
+
+                def _n(params):
+                    try:
+                        d = EP._get(SB, params)
+                        return len(d.get("events") or [])
+                    except Exception as e:
+                        return f"{type(e).__name__}: {str(e)[:60]}"
+                out["espn"]["dates+groups80+limit900"] = _n({"dates": date, "groups": "80", "limit": "900"})
+                out["espn"]["dates+groups80"] = _n({"dates": date, "groups": "80"})
+                out["espn"]["dates_only"] = _n({"dates": date})
+                try:
+                    d = EP._get(SB, {"dates": date, "groups": "80", "limit": "900"})
+                    cal = ((d.get("leagues") or [{}])[0].get("calendar")) or []
+                    wk = None
+                    for blk in cal:
+                        for e in (blk.get("entries") or []):
+                            sd = (e.get("startDate") or "")[:10].replace("-", "")
+                            ed = (e.get("endDate") or "")[:10].replace("-", "")
+                            if sd <= date <= ed:
+                                wk = e.get("value")
+                    out["espn"]["week"] = wk
+                    if wk:
+                        out["espn"]["week+groups80+limit900"] = _n(
+                            {"seasontype": 2, "week": wk, "groups": "80",
+                             "limit": "900", "year": date[:4]})
+                except Exception as e:
+                    out["espn"]["week_err"] = str(e)[:60]
+                try:
+                    import cfb_portal as CP
+                    key = CP._key()
+                    games = CP._get_safe("/games", key,
+                                         {"year": int(date[:4]), "seasonType": "regular"}) or []
+                    iso = f"{date[:4]}-{date[4:6]}-{date[6:8]}"
+                    on_date = sum(1 for g in games
+                                  if (g.get("startDate") or g.get("start_date") or "")[:10] == iso)
+                    out["cfbd"] = {"total_year": len(games), "on_date": on_date, "have_key": bool(key)}
+                except Exception as e:
+                    out["cfbd"] = f"{type(e).__name__}: {str(e)[:80]}"
+                print("[cfb-probe] === " + _json.dumps(out)[:1500])
+            except Exception as e:
+                print(f"[cfb-probe] failed: {e}")
+        _thr.Thread(target=_cfb_probe, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy
@@ -4953,64 +5008,6 @@ def soccer_boxscore(game_id: str, date: str | None = None, league: str | None = 
     target = dt.date.fromisoformat(date) if date else dt.date.today()
     lg = league or soccer_provider.DEFAULT_LEAGUE
     return soccer_provider.get_boxscore(target, game_id, lg)
-
-
-@app.get("/api/_cfbprobe")
-def _cfbprobe(date: str = "20261107"):
-    """TEMP: why does the CFB board show ~25 games? Try each ESPN scoreboard
-    param combo + CFBD /games for a given date and report how many events each
-    returns. Open /api/_cfbprobe?date=20261107 and read the counts."""
-    import espn_provider as EP
-    SB = EP.SCOREBOARD["ncaaf"]
-    out = {"date": date, "espn": {}}
-
-    def _n(params):
-        try:
-            d = EP._get(SB, params)
-            evs = d.get("events") or []
-            return len(evs)
-        except Exception as e:
-            return f"{type(e).__name__}: {str(e)[:80]}"
-
-    out["espn"]["dates+groups80+limit900"] = _n({"dates": date, "groups": "80", "limit": "900"})
-    out["espn"]["dates+groups80"] = _n({"dates": date, "groups": "80"})
-    out["espn"]["dates_only"] = _n({"dates": date})
-    out["espn"]["dates+limit900"] = _n({"dates": date, "limit": "900"})
-    # week-based (compute week from ESPN calendar if present)
-    try:
-        d = EP._get(SB, {"dates": date, "groups": "80", "limit": "900"})
-        cal = ((d.get("leagues") or [{}])[0].get("calendar")) or []
-        wk = None
-        want = date
-        for season_blk in cal:
-            for entry in (season_blk.get("entries") or []):
-                sd = (entry.get("startDate") or "")[:10].replace("-", "")
-                ed = (entry.get("endDate") or "")[:10].replace("-", "")
-                if sd <= want <= ed:
-                    wk = entry.get("value")
-        out["espn"]["detected_week"] = wk
-        if wk:
-            out["espn"]["week+groups80+limit900"] = _n(
-                {"seasontype": 2, "week": wk, "groups": "80", "limit": "900",
-                 "year": date[:4]})
-    except Exception as e:
-        out["espn"]["week_err"] = f"{type(e).__name__}: {str(e)[:80]}"
-    # CFBD full slate for that date
-    try:
-        import cfb_portal as CP
-        key = CP._key()
-        yr = int(date[:4])
-        games = CP._get_safe("/games", key, {"year": yr, "seasonType": "regular"}) or []
-        iso = f"{date[:4]}-{date[4:6]}-{date[6:8]}"
-        on_date = 0
-        for gm in games:
-            sd = (gm.get("startDate") or gm.get("start_date") or "")[:10]
-            if sd == iso:
-                on_date += 1
-        out["cfbd"] = {"total_year": len(games), "on_date": on_date, "have_key": bool(key)}
-    except Exception as e:
-        out["cfbd"] = f"{type(e).__name__}: {str(e)[:100]}"
-    return JSONResponse(out, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/{sport}/games")
