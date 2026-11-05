@@ -599,6 +599,17 @@ async def lifespan(app: FastAPI):
                 out["espn"]["dates+groups80+limit900"] = _n({"dates": date, "groups": "80", "limit": "900"})
                 out["espn"]["dates+groups80"] = _n({"dates": date, "groups": "80"})
                 out["espn"]["dates_only"] = _n({"dates": date})
+                # CBB same-endpoint check (today, since CBB plays most nights)
+                try:
+                    CB = EP.SCOREBOARD["ncaab"]
+                    cbd = today.strftime("%Y%m%d")
+                    out["ncaab"] = {
+                        "date": cbd,
+                        "groups50+limit900": len((EP._get(CB, {"dates": cbd, "groups": "50", "limit": "900"}) or {}).get("events") or []),
+                        "groups50": len((EP._get(CB, {"dates": cbd, "groups": "50"}) or {}).get("events") or []),
+                    }
+                except Exception as e:
+                    out["ncaab"] = str(e)[:60]
                 try:
                     d = EP._get(SB, {"dates": date, "groups": "80", "limit": "900"})
                     cal = ((d.get("leagues") or [{}])[0].get("calendar")) or []

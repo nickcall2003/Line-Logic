@@ -41,14 +41,16 @@ _cache = {}          # (sport,date) -> (ts, [games])
 _DAY_TTL = 6 * 3600
 _LIVE_TTL = 8
 
-# Extra scoreboard params per sport. ESPN's college scoreboards return only a
-# featured handful unless the division group + a high limit are passed, so the
-# full D1 board (100+ CBB games a night) comes back. 50 = D1 basketball,
-# 80 = FBS football.
+# Extra scoreboard params per sport. Pass the division group so the full D1
+# board comes back (50 = D1 basketball, 80 = FBS football). Do NOT pass a
+# `limit`: counter-intuitively, ESPN's scoreboard treats `limit` as a request
+# for its ~25 FEATURED games and caps the response there, so a date that has 51
+# FBS games returns only 25 with limit=900 but all 51 without it (verified live
+# Nov 2026). The group filter alone returns the complete slate.
 _SB_EXTRA = {
-    "ncaab":  {"groups": "50", "limit": "900"},
-    "wncaab": {"groups": "50", "limit": "900"},
-    "ncaaf":  {"groups": "80", "limit": "900"},
+    "ncaab":  {"groups": "50"},
+    "wncaab": {"groups": "50"},
+    "ncaaf":  {"groups": "80"},
 }
 
 
