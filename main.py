@@ -491,6 +491,15 @@ async def lifespan(app: FastAPI):
                     print(f"[migrate] added odds_snapshot.{_col}")
                 except Exception:
                     _mdb.rollback()
+            # ats_results gained team-name columns for the public results log.
+            for _col in ("home_name", "away_name"):
+                try:
+                    _mdb.execute(_sqltext(
+                        f"ALTER TABLE ats_results ADD COLUMN {_col} VARCHAR(80)"))
+                    _mdb.commit()
+                    print(f"[migrate] added ats_results.{_col}")
+                except Exception:
+                    _mdb.rollback()
     except Exception as e:
         print(f"[migrate] odds_snapshot check skipped: {e}")
 
@@ -2603,9 +2612,15 @@ def _grade_ats(db, sport, g):
     model_margin = g.get("exp_margin")
     if model_margin is None:
         return None
+    try:
+        hn = (g.get("home") or {}).get("name")
+        an = (g.get("away") or {}).get("name")
+    except Exception:
+        hn = an = None
     return ats.record_ats(db, sport, ref, float(snap.open_spread),
                           float(model_margin), float(hs) - float(as_),
-                          subcat=getattr(snap, "subcat", None))
+                          subcat=getattr(snap, "subcat", None),
+                          home_name=hn, away_name=an)
 
 
 def _is_soccer_push(r):
@@ -6232,6 +6247,22 @@ def ats_record(sport: str | None = None, days: int = 0):
             return ats.record(db, sport=sport or None, days=(days or None))
     except Exception as e:
         return {"error": str(e), "by_sport": {}, "overall": {}}
+
+
+@app.get("/api/ats/log")
+def ats_log(sport: str | None = None, days: int = 0, limit: int = 200,
+            result: str | None = None):
+    """Public game-by-game ATS history, newest first: matchup, the side the model
+    took, that side's number, final margin and cover/no/push. The scrollable
+    proof behind the ATS record. ?sport=, ?days=, ?result=cover|no|push, ?limit=."""
+    import ats
+    try:
+        with SessionLocal() as db:
+            rows = ats.log(db, sport=sport or None, days=(days or None),
+                           limit=limit, result=result or None)
+            return {"count": len(rows), "rows": rows}
+    except Exception as e:
+        return {"error": str(e), "count": 0, "rows": []}
 
 
 @app.get("/api/clv")

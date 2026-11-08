@@ -152,6 +152,8 @@ class ATSResult(Base):
     pick_side: Mapped[str] = mapped_column(String(8))        # 'home'/'away' the model took ATS
     result: Mapped[str] = mapped_column(String(8))           # 'cover'/'no'/'push'
     covered: Mapped[bool] = mapped_column()                  # True only on a cover (push=False)
+    home_name: Mapped[str | None] = mapped_column(String(80), nullable=True)   # for the public log
+    away_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
     __table_args__ = (UniqueConstraint("sport", "ref", name="uq_ats_sport_ref"),)
 

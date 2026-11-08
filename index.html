@@ -562,6 +562,7 @@ font-family:var(--body);color:var(--fg)}
           <div class="menu-item" data-view="statsheets">&#128203; Stat Sheets</div>
           <div class="menu-item" data-view="moves">&#128260; Roster Moves</div>
           <div class="menu-item" data-view="record">&#128202; Track Record</div>
+          <div class="menu-item" data-view="atslog">&#127919; ATS Results</div>
           <div class="menu-item" data-view="results">&#128203; Recent Results</div>
           </div>
 
@@ -1141,7 +1142,7 @@ function sportLoader(sp,msg){
   }
   const ic=icons[sp]||"\u{1F3BE}";
   return '<div class="sload"><div class="sload-track"><span class="sload-ball s-'+(sp||"tennis")+'">'+ic+'</span></div><div class="sload-msg">'+(msg||"Loading")+'</div></div>';}
-async function reload(){if(detailId)return;if(view==="free"||view==="best"||view==="parlays"||view==="news"||view==="home"||view==="help"||view==="record"||view==="statsheets"||view==="moves"||view==="bets"||view==="auth"||view==="calibration"||view==="transparency"||view==="simulator"||view==="value"||view==="ladder")return;const tok=++loadToken;const mySport=sport;
+async function reload(){if(detailId)return;if(view==="free"||view==="best"||view==="parlays"||view==="news"||view==="home"||view==="help"||view==="record"||view==="atslog"||view==="statsheets"||view==="moves"||view==="bets"||view==="auth"||view==="calibration"||view==="transparency"||view==="simulator"||view==="value"||view==="ladder")return;const tok=++loadToken;const mySport=sport;
   renderDatebar();document.getElementById("list").innerHTML=sportLoader(mySport,'Loading &middot; first load after idle can take ~30s');
   if(mySport==="soccer"){await loadSoccer();if(tok!==loadToken||sport!=="soccer"||view!=="sport")return;renderSoccer();}
   else if(mySport==="ufc"){await loadUFC();if(tok!==loadToken||sport!=="ufc"||view!=="sport")return;renderUFC();}
@@ -1199,6 +1200,7 @@ function selectMenu(el){
   else if(el.dataset.view==="home"){openHome();}
   else if(el.dataset.view==="news"){openNews();}
   else if(el.dataset.view==="record"){openRecord();}
+  else if(el.dataset.view==="atslog"){openATSLog();}
   else if(el.dataset.view==="statsheets"){openStatSheets();}
   else if(el.dataset.view==="moves"){openMoves();}
   else if(el.dataset.view==="results"){openResults();}
@@ -3172,7 +3174,78 @@ function atsSectionHTML(ats){
     '<div class="clv-sub">'+(ov.ats_pct!=null?ov.ats_pct+'% cover':'')+(ov.record?' · '+ov.record+' ATS':'')+' vs the opening line</div>'+
     rows+
     '<div class="chart-foot">The model’s side graded cover / no-cover against the <b>opening</b> spread (pushes excluded from the %). Units assume a flat 1u on every lean at −110 — a what-if, separate from the +EV moneyline units above, which are real recommended plays.</div>'+
+    '<button class="ats-all-btn" onclick="openATSLog()">View every graded pick &rarr;</button>'+
     '</div>';
+}
+
+// ===== Public ATS results log — the scrollable proof-of-work feed =====
+var ATSLOG_SPORTS=[["","All"],["nfl","NFL"],["ncaaf","CFB"],["nba","NBA"],["ncaab","CBB"],["nhl","NHL"],["mlb","MLB"]];
+var _atsLogSport="",_atsLogResult="";
+function openATSLog(){view="atslog";if(detailId)closeDetail();
+  document.getElementById("home").classList.remove("show");
+  document.getElementById("main").style.display="";toTop();
+  document.getElementById("detail").style.display="none";
+  document.getElementById("sport-tag").textContent="ATS Results";
+  document.querySelectorAll(".menu-item").forEach(function(it){it.classList.toggle("active",it.dataset.view==="atslog");});
+  var _ab=document.getElementById("acc-badge");if(_ab)_ab.style.display="none";
+  var _tb=document.getElementById("today-badge");if(_tb)_tb.style.display="none";
+  document.getElementById("side").style.display="none";
+  document.querySelector(".shell").style.gridTemplateColumns="1fr";
+  document.getElementById("tabs").innerHTML="";document.getElementById("bubbles").innerHTML="";
+  var _db=document.getElementById("datebar");if(_db)_db.innerHTML="";
+  toggleMenu(false);renderATSLog();}
+function setAtsLogSport(s){_atsLogSport=s;renderATSLog();}
+function setAtsLogResult(r){_atsLogResult=r;renderATSLog();}
+async function renderATSLog(){
+  var list=document.getElementById("list");
+  var chips=ATSLOG_SPORTS.map(function(s){
+    return '<button class="wt-chip'+(_atsLogSport===s[0]?" active":"")+'" onclick="setAtsLogSport(\''+s[0]+'\')">'+s[1]+'</button>';
+  }).join("");
+  var rfilt=[["","All"],["cover","Covers"],["no","Losses"],["push","Pushes"]].map(function(r){
+    return '<button class="atsl-fchip'+(_atsLogResult===r[0]?" active":"")+'" onclick="setAtsLogResult(\''+r[0]+'\')">'+r[1]+'</button>';
+  }).join("");
+  var head='<div class="wt-head">'+
+    '<div class="wt-title">Against the Spread &middot; Every Pick</div>'+
+    '<div class="wt-sub">Every game the model graded against the <b>opening</b> number &mdash; the side it took, the line, and how it landed. Nothing hidden.</div>'+
+    '<div class="wt-chips">'+chips+'</div>'+
+    '<div class="atsl-filters">'+rfilt+'</div>'+
+    '</div>';
+  list.innerHTML=head+'<div id="atsl-body">'+sportLoader(_atsLogSport||"all","Pulling the results")+'</div>';
+  var body=document.getElementById("atsl-body");
+  var reqS=_atsLogSport,reqR=_atsLogResult;
+  var url="/api/ats/log?limit=300"+(reqS?"&sport="+reqS:"")+(reqR?"&result="+reqR:"");
+  var d;try{d=await getJSON(url);}catch(e){d=null;}
+  if(!body||!body.isConnected||reqS!==_atsLogSport||reqR!==_atsLogResult)return;
+  if(!d||d.error||!d.rows||!d.rows.length){
+    body.innerHTML='<div class="empty">No graded ATS results'+(reqS?' for '+reqS.toUpperCase():'')+' yet — they post here as games finish.</div>';
+    return;
+  }
+  var cov=0,no=0,push=0;
+  d.rows.forEach(function(r){if(r.result==="cover")cov++;else if(r.result==="no")no++;else if(r.result==="push")push++;});
+  var graded=cov+no,pct=graded?Math.round(1000*cov/graded)/10:null;
+  var summary='<div class="atsl-summary"><span class="atsl-sum-rec">'+cov+'-'+no+(push?'-'+push:'')+' ATS</span>'+
+    (pct!=null?'<span class="atsl-sum-pct">'+pct+'% cover</span>':'')+
+    '<span class="atsl-sum-n">'+graded+' graded</span></div>';
+  var rowsHTML=d.rows.map(function(r){
+    var cls=r.result==="cover"?"cov":(r.result==="no"?"no":"push");
+    var badge=r.result==="cover"?"COVER":(r.result==="no"?"MISS":"PUSH");
+    var lab=(typeof SPORT_LABEL!=="undefined"&&SPORT_LABEL[r.sport])||(r.sport||"").toUpperCase();
+    var mu=r.matchup||((r.away||"")+" @ "+(r.home||""))||"—";
+    var fm=(r.final_margin>0?"+":"")+r.final_margin;
+    return '<div class="atsl-row '+cls+'">'+
+      '<div class="atsl-main">'+
+        '<div class="atsl-pick">'+(r.pick||"—")+'</div>'+
+        '<div class="atsl-mu">'+esc2(mu)+'</div>'+
+      '</div>'+
+      '<div class="atsl-meta">'+
+        '<span class="atsl-badge '+cls+'">'+badge+'</span>'+
+        '<span class="atsl-sub">'+lab+' &middot; '+(r.date||"")+'</span>'+
+        '<span class="atsl-sub">final '+fm+'</span>'+
+      '</div>'+
+    '</div>';
+  }).join("");
+  body.innerHTML=summary+'<div class="atsl-list">'+rowsHTML+'</div>'+
+    '<div class="chart-foot" style="margin-top:14px;">Graded vs the first spread we recorded for each game (our opening line). “Final” is the picked team’s actual margin. Pushes excluded from the cover %.</div>';
 }
 // Prop-model accuracy — separate from the betting record (it never touches
 // units/ROI). Pure "how often does our projection land on the right side of the
