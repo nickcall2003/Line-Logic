@@ -4853,15 +4853,17 @@ function homeHeroHTML(ov){
   var ats=(_atsData&&_atsData.overall)||null;
   var atsRec=(ats&&ats.record)?String(ats.record).replace(/-/g,"–"):null;
   var atsPct=(ats&&ats.ats_pct!=null)?ats.ats_pct:null;
+  var atsU=(ats&&ats.covers!=null&&ats.no_covers!=null)?Math.round((ats.covers*0.909-ats.no_covers)*100)/100:null;
   function drow(k,v,vcls,sub){return '<div class="hh-drow"><span class="hh-dk">'+k+'</span>'+
     '<span class="hh-dv'+(vcls?' '+vcls:'')+'">'+v+'</span>'+
     '<span class="hh-ds">'+(sub||'')+'</span></div>';}
+  var atsSub=(atsPct!=null?atsPct+'% cover':'')+(atsU!=null?' · '+((atsU>=0?'+':'')+atsU+'u'):'');
   var diff='<div class="hh-diff">'+
     drow('Moneyline', aw.toLocaleString()+'–'+al.toLocaleString(), (aw>=al?'pos':''),
          pct+'% win'+(oU!=null?' · '+((oU>=0?'+':'')+oU+'u'):''))+
-    (atsRec?drow('ATS', atsRec, (atsPct!=null&&atsPct>=50?'pos':''),
-         (atsPct!=null?atsPct+'% cover':'')+' vs the open'):'')+
-    '</div>';
+    (atsRec?drow('ATS', atsRec, (atsU!=null?(atsU>=0?'pos':'neg'):''), atsSub):'')+
+    '</div>'+
+    '<a class="hh-atsbtn" onclick="openATSLog()">Take me to all graded picks &rsaquo;</a>';
   function cell(v,k,cls,key){return '<div class="hh-stat'+(key?' key':'')+'"><div class="hh-v'+(cls?' '+cls:'')+'">'+v+'</div><div class="hh-k">'+k+'</div></div>';}
   var cells=cell(oU!=null?((oU>=0?'+':'')+oU+'u'):'—','Net units','gold')+
     (clv!=null?cell(clv+'%','Beat the close','',true):cell(String(SPORTS_META.filter(function(s){return s.active!==false;}).length),'Sports',''))+

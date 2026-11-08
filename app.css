@@ -1666,6 +1666,10 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .hh-dv{font-family:"Archivo",sans-serif;font-weight:900;font-size:21px;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
 .hh-dv.pos{color:var(--win)}
 .hh-ds{font-size:11px;color:var(--muted);font-weight:600;text-align:right}
+.hh-atsbtn{display:block;text-align:center;margin-top:10px;padding:11px;border-radius:12px;
+  border:1px solid rgba(230,178,74,.4);background:rgba(230,178,74,.08);color:var(--clay);
+  font-weight:800;font-size:13px;letter-spacing:.02em;cursor:pointer;text-decoration:none}
+.hh-atsbtn:active{background:rgba(230,178,74,.16)}
 .hh-stats{display:flex;gap:7px;margin-top:12px}
 .hh-stat{flex:1;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:12px;padding:11px 4px;text-align:center}
 .hh-stat.key{border-color:rgba(232,176,75,.5);background:rgba(232,176,75,.09)}

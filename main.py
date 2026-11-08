@@ -586,6 +586,40 @@ async def lifespan(app: FastAPI):
                 _t.sleep(max(300, _WT_TTL - 300))   # refresh a bit before TTL
         _thr.Thread(target=_warm_wintotals, daemon=True).start()
 
+        # One-time backfill: older ATS rows were graded before we captured team
+        # names. Fill them from the game cache (keyed by sport+ref) so the public
+        # log shows matchups instead of blanks.
+        def _ats_name_backfill():
+            import time as _t, json as _json
+            _t.sleep(55)
+            try:
+                from models import ATSResult, GameCache
+                with SessionLocal() as db:
+                    rows = db.query(ATSResult).filter(ATSResult.home_name.is_(None)).all()
+                    if not rows:
+                        return
+                    filled = 0
+                    for r in rows:
+                        gc = db.query(GameCache).filter_by(sport=r.sport, ref=str(r.ref)).first()
+                        if not gc or not gc.payload:
+                            continue
+                        try:
+                            g = _json.loads(gc.payload)
+                        except Exception:
+                            continue
+                        hn = (g.get("home") or {}).get("name")
+                        an = (g.get("away") or {}).get("name")
+                        if hn:
+                            r.home_name = hn[:80]
+                            r.away_name = (an or "")[:80]
+                            filled += 1
+                    if filled:
+                        db.commit()
+                    print(f"[ats] name backfill filled {filled}/{len(rows)}")
+            except Exception as e:
+                print(f"[ats] name backfill skipped: {e}")
+        _thr.Thread(target=_ats_name_backfill, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy
@@ -5286,7 +5320,12 @@ def nhl_slate(date: str | None = None, debug: int = 0):
                 schedule.game_adjust("nhl", g, target)
     except Exception as e:
         print(f"[nhl] injuries skipped: {e}")
-    # settle finished games for accuracy
+    # attach odds so the puck-line spread gets snapshotted (opening line for ATS)
+    try:
+        games = _attach_odds("nhl", games)
+    except Exception as e:
+        print(f"[nhl] odds attach skipped: {e}")
+    # settle finished games for accuracy + ATS (vs the opening puck line)
     try:
         with SessionLocal() as db:
             wrote = False
@@ -5295,6 +5334,10 @@ def nhl_slate(date: str | None = None, debug: int = 0):
                     predicted = "home" if g["prob_home"] >= 0.5 else "away"
                     _record_result(db, "nhl", g["id"], predicted, g["winner"])
                     wrote = True
+                    try:
+                        _grade_ats(db, "nhl", g)
+                    except Exception as _e:
+                        print(f"[ats] nhl/{g.get('id')} skipped: {_e}")
             if wrote:
                 db.commit()
     except Exception as e:
