@@ -3193,10 +3193,11 @@ function openATSLog(){view="atslog";if(detailId)closeDetail();
   document.querySelector(".shell").style.gridTemplateColumns="1fr";
   document.getElementById("tabs").innerHTML="";document.getElementById("bubbles").innerHTML="";
   var _db=document.getElementById("datebar");if(_db)_db.innerHTML="";
-  toggleMenu(false);renderATSLog();}
+  toggleMenu(false);renderATSLog();startAtsPoll();}
 function setAtsLogSport(s){_atsLogSport=s;renderATSLog();}
 function setAtsLogResult(r){_atsLogResult=r;renderATSLog();}
-async function renderATSLog(){
+async function renderATSLog(silent){
+  var _y=silent?(window.scrollY||0):0;
   var list=document.getElementById("list");
   var chips=ATSLOG_SPORTS.map(function(s){
     return '<button class="wt-chip'+(_atsLogSport===s[0]?" active":"")+'" onclick="setAtsLogSport(\''+s[0]+'\')">'+s[1]+'</button>';
@@ -3210,8 +3211,9 @@ async function renderATSLog(){
     '<div class="wt-chips">'+chips+'</div>'+
     '<div class="atsl-filters">'+rfilt+'</div>'+
     '</div>';
-  list.innerHTML=head+'<div id="atsl-body">'+sportLoader(_atsLogSport||"all","Pulling the results")+'</div>';
+  if(!silent)list.innerHTML=head+'<div id="atsl-body">'+sportLoader(_atsLogSport||"all","Pulling the results")+'</div>';
   var body=document.getElementById("atsl-body");
+  if(!body){list.innerHTML=head+'<div id="atsl-body"></div>';body=document.getElementById("atsl-body");}
   var reqS=_atsLogSport,reqR=_atsLogResult;
   var url="/api/ats/log?limit=300"+(reqS?"&sport="+reqS:"")+(reqR?"&result="+reqR:"");
   var recUrl="/api/ats"+(reqS?"?sport="+reqS:"");
@@ -3233,6 +3235,30 @@ async function renderATSLog(){
   var summary='<div class="atsl-summary"><span class="atsl-sum-rec">'+recStr+'</span>'+
     (pct!=null?'<span class="atsl-sum-pct">'+pct+'% cover</span>':'')+
     '<span class="atsl-sum-n">'+graded+' graded'+(reqR?' &middot; showing '+d.rows.length+' '+rlabel:'')+'</span></div>';
+  // remember the live total so the poller only re-renders when a result changes
+  _atsLastGraded=(rd&&rd.overall&&rd.overall.graded!=null)?rd.overall.graded:_atsLastGraded;
+  // Per-sport breakdown, best first — the same shape as the moneyline record.
+  // Each row is also a filter: tap it to narrow the list below.
+  function _U(b){return (b.covers||0)*0.909-(b.no_covers||0);}   // flat 1u @ -110
+  function _sg(u){return (u>=0?'+':'')+u.toFixed(2)+'u';}
+  var bs=(rd&&rd.by_sport)||{};
+  var skeys=Object.keys(bs).filter(function(k){return (bs[k].graded||0)>=10;})
+                 .sort(function(a,b){return _U(bs[b])-_U(bs[a]);});
+  function srow(key,label,b,isAll){
+    var u=_U(b),ucl=u>=0?'pos':'neg';
+    return '<button class="atsl-srow'+(isAll?' all':'')+(_atsLogSport===key?' sel':'')+'" onclick="setAtsLogSport(\''+key+'\')">'+
+      '<span class="atsl-sname">'+label+'</span>'+
+      '<span class="atsl-srec">'+(b.record||'—')+'</span>'+
+      '<span class="atsl-spct">'+(b.ats_pct!=null?b.ats_pct+'%':'')+'</span>'+
+      '<span class="atsl-su '+ucl+'">'+_sg(u)+'</span></button>';
+  }
+  var sportsBlock='';
+  if(rd&&rd.overall){
+    sportsBlock='<div class="atsl-sports"><div class="atsl-sports-h">By sport &middot; flat 1u at −110, best first</div>'+
+      srow('','All',rd.overall,true)+
+      skeys.map(function(k){return srow(k,(typeof SPORT_LABEL!=="undefined"&&SPORT_LABEL[k])||k.toUpperCase(),bs[k]);}).join('')+
+      '</div>';
+  }
   var rowsHTML=d.rows.map(function(r){
     var cls=r.result==="cover"?"cov":(r.result==="no"?"no":"push");
     var badge=r.result==="cover"?"COVER":(r.result==="no"?"MISS":"PUSH");
@@ -3251,8 +3277,20 @@ async function renderATSLog(){
       '</div>'+
     '</div>';
   }).join("");
-  body.innerHTML=summary+'<div class="atsl-list">'+rowsHTML+'</div>'+
-    '<div class="chart-foot" style="margin-top:14px;">Graded vs the first spread we recorded for each game (our opening line). “Final” is the picked team’s actual margin. Pushes excluded from the cover %.</div>';
+  body.innerHTML=summary+sportsBlock+'<div class="atsl-list">'+rowsHTML+'</div>'+
+    '<div class="chart-foot" style="margin-top:14px;">Graded vs the first spread we recorded for each game (our opening line). “Final” is the picked team’s actual margin. Pushes excluded from the cover %. Updates on its own as games finish.</div>';
+  if(silent)window.scrollTo(0,_y);
+}
+// Live poll: while on the ATS page, re-check the record every 45s and re-render
+// only when a new game has been graded (win/loss settled) — no manual refresh.
+var _atsPoll=null,_atsLastGraded=null;
+function startAtsPoll(){if(_atsPoll)clearInterval(_atsPoll);_atsPoll=setInterval(atsPollTick,45000);}
+async function atsPollTick(){
+  if(view!=="atslog"){if(_atsPoll){clearInterval(_atsPoll);_atsPoll=null;}return;}
+  try{var r=await getJSON("/api/ats");
+    var g=r&&r.overall&&r.overall.graded;
+    if(g!=null&&g!==_atsLastGraded)renderATSLog(true);
+  }catch(e){}
 }
 // Prop-model accuracy — separate from the betting record (it never touches
 // units/ROI). Pure "how often does our projection land on the right side of the
