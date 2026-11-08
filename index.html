@@ -3202,39 +3202,33 @@ async function renderATSLog(silent){
   var chips=ATSLOG_SPORTS.map(function(s){
     return '<button class="wt-chip'+(_atsLogSport===s[0]?" active":"")+'" onclick="setAtsLogSport(\''+s[0]+'\')">'+s[1]+'</button>';
   }).join("");
-  var rfilt=[["","All"],["cover","Covers"],["no","Losses"],["push","Pushes"]].map(function(r){
-    return '<button class="atsl-fchip'+(_atsLogResult===r[0]?" active":"")+'" onclick="setAtsLogResult(\''+r[0]+'\')">'+r[1]+'</button>';
-  }).join("");
   var head='<div class="wt-head">'+
     '<div class="wt-title">Against the Spread &middot; Every Pick</div>'+
-    '<div class="wt-sub">Every game the model graded against the <b>opening</b> number &mdash; the side it took, the line, and how it landed. Nothing hidden.</div>'+
+    '<div class="wt-sub">Every game the model graded against the <b>opening</b> number &mdash; the side it took, the line, and how it landed. Wins and losses, nothing hidden.</div>'+
     '<div class="wt-chips">'+chips+'</div>'+
-    '<div class="atsl-filters">'+rfilt+'</div>'+
     '</div>';
   if(!silent)list.innerHTML=head+'<div id="atsl-body">'+sportLoader(_atsLogSport||"all","Pulling the results")+'</div>';
   var body=document.getElementById("atsl-body");
   if(!body){list.innerHTML=head+'<div id="atsl-body"></div>';body=document.getElementById("atsl-body");}
-  var reqS=_atsLogSport,reqR=_atsLogResult;
-  var url="/api/ats/log?limit=300"+(reqS?"&sport="+reqS:"")+(reqR?"&result="+reqR:"");
+  var reqS=_atsLogSport;
+  var url="/api/ats/log?limit=500"+(reqS?"&sport="+reqS:"");
   var recUrl="/api/ats"+(reqS?"?sport="+reqS:"");
   var d,rd;
   try{d=await getJSON(url);}catch(e){d=null;}
   try{rd=await getJSON(recUrl);}catch(e){rd=null;}
-  if(!body||!body.isConnected||reqS!==_atsLogSport||reqR!==_atsLogResult)return;
+  if(!body||!body.isConnected||reqS!==_atsLogSport)return;
   if(!d||d.error||!d.rows||!d.rows.length){
-    body.innerHTML='<div class="empty">No graded ATS results'+(reqS?' for '+reqS.toUpperCase():'')+(reqR?' in that filter':'')+' yet — they post here as games finish.</div>';
+    body.innerHTML='<div class="empty">No graded ATS results'+(reqS?' for '+reqS.toUpperCase():'')+' yet — they post here as games finish.</div>';
     return;
   }
-  // The headline is the TRUE record (covers-losses-pushes) from /api/ats, NOT a
-  // count of the displayed rows — otherwise a "Covers" filter reads as X-0.
+  // The headline is the TRUE record from /api/ats (covers-losses-pushes).
   var rec=rd?(reqS?((rd.by_sport||{})[reqS]):rd.overall):null;
   var recStr=(rec&&rec.record)?rec.record+' ATS':(d.count+' shown');
   var pct=(rec&&rec.ats_pct!=null)?rec.ats_pct:null;
   var graded=(rec&&rec.graded!=null)?rec.graded:d.rows.length;
-  var rlabel={cover:'covers',no:'losses',push:'pushes'}[reqR]||'';
   var summary='<div class="atsl-summary"><span class="atsl-sum-rec">'+recStr+'</span>'+
     (pct!=null?'<span class="atsl-sum-pct">'+pct+'% cover</span>':'')+
-    '<span class="atsl-sum-n">'+graded+' graded'+(reqR?' &middot; showing '+d.rows.length+' '+rlabel:'')+'</span></div>';
+    '<span class="atsl-sum-n">'+graded+' graded</span></div>';
   // remember the live total so the poller only re-renders when a result changes
   _atsLastGraded=(rd&&rd.overall&&rd.overall.graded!=null)?rd.overall.graded:_atsLastGraded;
   // Per-sport breakdown, best first — the same shape as the moneyline record.

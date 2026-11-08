@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v102";   // bumped: home ATS units+button, NHL ATS, name backfill
+const CACHE = "ll-shell-v103";   // bumped: ATS log always shows mixed (removed result filter)
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));
