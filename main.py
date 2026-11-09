@@ -627,20 +627,25 @@ async def lifespan(app: FastAPI):
             try:
                 import espn_provider as EP
                 today = _dt.date.today()
+                dates = [today, today - _dt.timedelta(days=1), today - _dt.timedelta(days=2)]
                 out = {}
                 for sp in ("nba", "ncaab", "nhl", "nfl", "ncaaf", "mlb"):
                     try:
-                        gs = EP.get_games(sp, today) or []
-                        live = [g for g in gs if g.get("status") in ("live", "finished")]
-                        pick = (live or gs)
-                        if not pick:
-                            out[sp] = {"games": 0}
+                        # find a finished game (keeps full play-by-play) to probe
+                        gid = None; ng = 0
+                        for dd in dates:
+                            gs = EP.get_games(sp, dd) or []
+                            ng = ng or len(gs)
+                            fin = [g for g in gs if g.get("status") == "finished"]
+                            pick = fin or [g for g in gs if g.get("status") == "live"]
+                            if pick:
+                                gid = pick[0].get("id"); break
+                        if not gid:
+                            out[sp] = {"games": ng, "finished": 0}
                             continue
-                        gid = pick[0].get("id")
                         pr = EP.get_plays(sp, gid)
                         samp = (pr.get("plays") or [])[:1]
-                        out[sp] = {"games": len(gs), "gid": gid,
-                                   "plays": pr.get("count"),
+                        out[sp] = {"gid": gid, "plays": pr.get("count"),
                                    "sample": (samp[0].get("text", "")[:70] if samp else None)}
                     except Exception as e:
                         out[sp] = {"err": str(e)[:60]}
