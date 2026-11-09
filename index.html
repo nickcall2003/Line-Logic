@@ -2100,6 +2100,43 @@ function heroStatHTML(g,sp){
   }
   return "";
 }
+// Per-sport final-margin standard deviation (points; goals for NHL, runs MLB).
+function marginSigma(sp){return {nba:11.5,wnba:11.0,ncaab:12.0,wncaab:12.0,nfl:13.0,ncaaf:16.0,nhl:1.9,mlb:4.2}[sp]||12.0;}
+// P(home team covers the MARKET spread): home_margin ~ N(exp_margin, sigma),
+// home covers when home_margin > -spread_home.
+function coverProbHome(g,sp){
+  if(!g||!g.odds||g.odds.spread_home==null||g.exp_margin==null)return null;
+  return normCDF((g.exp_margin + g.odds.spread_home)/marginSigma(sp));
+}
+// Three distinct answers so a 98% WIN never reads as a 98% BET:
+// who wins, who beats the spread, and whether the price is worth it.
+function threeIndicatorsHTML(g,sp){
+  if(!g||g.prob_home==null)return "";
+  var ph=Math.round(g.prob_home*100);
+  var winTeam=g.prob_home>=0.5?g.home:g.away, winP=Math.max(ph,100-ph);
+  var win='<div class="ind"><div class="ind-k">Win probability</div><div class="ind-v">'+winP+'%</div><div class="ind-s">'+(winTeam.abbr||winTeam.name)+' to win</div></div>';
+  var cover;
+  var cp=coverProbHome(g,sp);
+  if(cp!=null){
+    var homeCovers=cp>=0.5;
+    var cTeam=homeCovers?g.home:g.away, cProb=Math.round((homeCovers?cp:1-cp)*100);
+    var cLine=homeCovers?g.odds.spread_home:-g.odds.spread_home;
+    var cLineStr=(cLine>0?"+":"")+(Math.round(cLine*10)/10);
+    cover='<div class="ind"><div class="ind-k">Cover probability</div><div class="ind-v">'+cProb+'%</div><div class="ind-s">'+(cTeam.abbr||cTeam.name)+' '+cLineStr+'</div></div>';
+  }else{
+    cover='<div class="ind dim"><div class="ind-k">Cover probability</div><div class="ind-v">—</div><div class="ind-s">no market line</div></div>';
+  }
+  var edge=(g.edge_pct!=null&&!isNaN(g.edge_pct))?g.edge_pct:null, bet;
+  if(edge!=null){
+    var ec=edge>=3?"pos":(edge<=0?"neg":""), verdict=edge>=3?"value":(edge<=0?"no value":"thin");
+    bet='<div class="ind"><div class="ind-k">Betting edge</div><div class="ind-v '+ec+'">'+(edge>=0?"+":"")+edge.toFixed(1)+'%</div><div class="ind-s">'+verdict+'</div></div>';
+  }else{
+    bet='<div class="ind dim"><div class="ind-k">Betting edge</div><div class="ind-v">—</div><div class="ind-s">no price</div></div>';
+  }
+  return '<div class="ll-intel"><div class="ll-intel-h"><span class="pip"></span>Line Logic model · three reads</div>'+
+    '<div class="ind-row">'+win+cover+bet+'</div>'+
+    '<div class="ind-note">A team can be a lock to <b>win</b> and still be a bad <b>bet</b> at its price. These answer three different questions.</div></div>';
+}
 function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status==="live";const ph=Math.round(g.prob_home*100),pa=100-ph;
   const sa=g.score&&g.score.away!=null?g.score.away:"",sh=g.score&&g.score.home!=null?g.score.home:"";
   let statTxt=live?'<span class="live-tag"><span class="pulse"></span>'+((g.score&&g.score.detail)||"Live")+'</span>':fin?"Final":(g.event_time||(g.score&&g.score.detail)||"Scheduled");
@@ -2121,7 +2158,7 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
   else if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
   else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div class="panel">'+gameScriptHTML(g)+'<div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
   else{const mp=writeupHTML(g.analysis);
-    body='<div class="panel">'+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
+    body='<div class="panel">'+threeIndicatorsHTML(g,sp)+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
     teamFactorsHTML(g,sp)+
     injuryPanelHTML(g)+
     teamLinesHTML(g)+

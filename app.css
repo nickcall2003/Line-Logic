@@ -1915,6 +1915,18 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .pbp-row.score{background:rgba(63,217,138,.08);border-radius:8px;border-bottom-color:transparent}
 .pbp-row.score .pbp-score{color:#3fd98a}
 .pbp-row.score .pbp-txt{font-weight:700}
+/* Line Logic intelligence — three distinct reads (win / cover / edge) */
+.ll-intel{background:linear-gradient(180deg,rgba(240,185,78,.05),transparent);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:16px}
+.ll-intel-h{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--clay-bright,#e0a83c);font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:12px}
+.ind-row{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.ind{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:11px 8px;text-align:center;min-width:0}
+.ind.dim{opacity:.55}
+.ind-k{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);font-weight:700;margin-bottom:5px}
+.ind-v{font-family:"Archivo",sans-serif;font-size:23px;font-weight:900;color:var(--ink);line-height:1;font-variant-numeric:tabular-nums}
+.ind-v.pos{color:#3fd98a}.ind-v.neg{color:#e2574f}
+.ind-s{font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ind-note{font-size:11px;color:var(--muted-2);margin-top:11px;line-height:1.4;text-align:center}
+.ind-note b{color:var(--muted)}
 .wt-card{border:1px solid var(--line);border-radius:13px;margin-bottom:10px;background:var(--panel-2);overflow:hidden}
 .wt-cardhead{width:100%;display:flex;align-items:center;gap:12px;background:transparent;border:none;
   cursor:pointer;padding:13px 15px;text-align:left;font-family:inherit;color:var(--ink)}
