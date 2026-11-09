@@ -1395,10 +1395,27 @@ def get_plays(sport, game_id, limit=120):
         print(f"[{sport}] plays fetch failed: {e}")
         return {"supported": True, "plays": [], "count": 0}
     raw = data.get("plays") or []
+    if not raw:
+        # Football has no top-level plays array — they live under drives.
+        dr = data.get("drives") or {}
+        buckets = []
+        for d in (dr.get("previous") or []):
+            tm = str((d.get("team") or {}).get("id") or "") or None
+            for pl in (d.get("plays") or []):
+                pl["_team_id"] = tm
+                buckets.append(pl)
+        cur = dr.get("current") or {}
+        if cur:
+            tmc = str((cur.get("team") or {}).get("id") or "") or None
+            for pl in (cur.get("plays") or []):
+                pl["_team_id"] = tmc
+                buckets.append(pl)
+        raw = buckets
     out = []
     for p in raw:
         per = p.get("period") or {}
         clk = p.get("clock") or {}
+        tid = (p.get("team") or {}).get("id") or (p.get("start") or {}).get("team", {}).get("id") or p.get("_team_id")
         out.append({
             "id": p.get("id"),
             "text": p.get("text") or (p.get("type") or {}).get("text") or "",
@@ -1408,7 +1425,7 @@ def get_plays(sport, game_id, limit=120):
             "home_score": p.get("homeScore"),
             "away_score": p.get("awayScore"),
             "scoring": bool(p.get("scoringPlay")),
-            "team_id": str((p.get("team") or {}).get("id") or "") or None,
+            "team_id": str(tid) if tid else None,
         })
     out.reverse()   # ESPN lists oldest-first; newest at top for a live feed
     if limit:
