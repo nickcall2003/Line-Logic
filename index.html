@@ -702,6 +702,14 @@ function prefSet(k,v){
   try{localStorage.setItem("ll_"+k,v);}catch(e){}
 }
 let tabMode="all",tFilter=null,current=[];let sortMode=prefGet("sort","featured");
+// Watchlist — star a game to follow it; persisted per-browser.
+var WATCH=(function(){try{return new Set(JSON.parse(localStorage.getItem("ll_watch")||"[]"));}catch(e){return new Set();}})();
+function saveWatch(){try{localStorage.setItem("ll_watch",JSON.stringify(Array.from(WATCH)));}catch(e){}}
+function isWatched(id){return WATCH.has(String(id));}
+function watchBtnHTML(id){return '<button class="watch-btn'+(isWatched(id)?" on":"")+'" onclick="toggleWatch(\''+id+'\',event)" aria-label="Save game">★</button>';}
+function toggleWatch(id,ev){if(ev){ev.stopPropagation();ev.preventDefault();}id=String(id);var on;if(WATCH.has(id)){WATCH.delete(id);on=false;}else{WATCH.add(id);on=true;}saveWatch();
+  var btn=ev&&ev.currentTarget;if(btn)btn.classList.toggle("on",on);
+  if(!on&&tabMode==="saved"&&view==="sport"){try{renderTeam();}catch(e){}}}
 const byId={};
 let detailId=null,detailTab="analysis",detailTimer=null;
 // Tracks whether the last data fetch failed, so the UI can tell the difference
@@ -1301,7 +1309,7 @@ async function loadTeam(sp){
   window._lastTeamLoad={sport:sp,date:ymd(selected),count:(teamGames||[]).length};
   for(const k in byId)delete byId[k];
   (teamGames||[]).forEach(g=>byId[sp+g.id]=g);}
-function teamFiltered(){return teamGames.filter(g=>tabMode!=="live"||g.status==="live");}
+function teamFiltered(){return teamGames.filter(g=>{if(tabMode==="live")return g.status==="live";if(tabMode==="saved")return isWatched(g.id);return true;});}
 function teamDayStats(list){let p=0,c=0;list.forEach(g=>{if(g.winner){p++;const pick=g.prob_home>=0.5?"home":"away";if(pick===g.winner)c++;}});return{p:p,c:c,acc:p?Math.round(c/p*100):0};}
 const TIER_COLOR={mlb:"#3f7fc4",nba:"#c8612f",nfl:"#4f9d6a",ncaabb:"#7b9e3a",nhl:"#5a6b8c",soccer:"#2f9e6f"};
 function teamColHTML(side,win){const sp=side.starter||{};
@@ -1649,12 +1657,12 @@ function teamCardHTML(g){const fin=g.status==="finished",live=g.status==="live";
   else if(g.exp_margin!=null){const fav=g.prob_home>=0.5?g.home.abbr:g.away.abbr;proj='<div class="proj-line">proj margin <span class="pr"><b>'+fav+" -"+Math.abs(g.exp_margin)+'</b></span></div>';}
   // model price always; market + edge + book count when a line exists
   const edgeLine=edgeLineHTML(g,g.prob_home);
-  return '<div class="card-top"><span class="tier" style="background:'+(TIER_COLOR[sport]||"#3f7fc4")+'">'+SPORT_LABEL[sport]+'</span><span class="tourn">'+(g.venue||"")+'</span>'+lc+wagerChipC(g.confidence,g.edge_pct)+'<span class="status">'+mark+'</span></div>'+
+  return '<div class="card-top"><span class="tier" style="background:'+(TIER_COLOR[sport]||"#3f7fc4")+'">'+SPORT_LABEL[sport]+'</span><span class="tourn">'+(g.venue||"")+'</span>'+lc+wagerChipC(g.confidence,g.edge_pct)+watchBtnHTML(g.id)+'<span class="status">'+mark+'</span></div>'+
     '<div class="mlb-card">'+teamColHTML(g.away,winAway)+mid+teamColHTML(g.home,winHome)+'</div>'+proj+edgeLine+whyChipsHTML(g)+injuryNoteHTML(g)+
     '<div style="margin-top:11px">'+predBarHTML(g.away.abbr,pa,g.home.abbr,ph,g.status)+'</div>'+
     shareRowHTML(gameCardUrl(g,sport),gameShareText(g,sport));}
-function renderTabsTeam(){const liveCount=teamGames.filter(g=>g.status==="live").length;const el=document.getElementById("tabs");el.innerHTML="";
-  [["all","All games"],["live","Live "+(liveCount?'<span class="lv">('+liveCount+')</span>':"")]].forEach(p=>{
+function renderTabsTeam(){const liveCount=teamGames.filter(g=>g.status==="live").length;const savedCount=teamGames.filter(g=>isWatched(g.id)).length;const el=document.getElementById("tabs");el.innerHTML="";
+  [["all","All games"],["live","Live "+(liveCount?'<span class="lv">('+liveCount+')</span>':"")],["saved","★ Saved"+(savedCount?' <span class="lv">('+savedCount+')</span>':"")]].forEach(p=>{
     const b=document.createElement("button");b.className="tab"+(tabMode===p[0]?" active":"");b.innerHTML=p[1];b.onclick=()=>{tabMode=p[0];renderTeam();};el.appendChild(b);});appendSortToggle(el);}
 function renderTeam(){renderDatebar();renderTabsTeam();
   const s=teamDayStats(teamFiltered());
@@ -1663,6 +1671,7 @@ function renderTeam(){renderDatebar();renderTabsTeam();
     '<div class="bubble acc"><div class="num">'+(s.p?s.acc+"%":"\u2014")+'</div><div class="lab">Day accuracy</div></div>';
   const list=document.getElementById("list");const shown=teamFiltered();
   if(!shown.length){
+    if(tabMode==="saved"){list.innerHTML='<div class="empty">No saved games yet — tap the ★ on any game to follow its projection and line.</div>';return;}
     let diag="";
     if(window._ncaaDiag){const d=window._ncaaDiag;
       if(d.stale_backend)diag="\u26a0 BACKEND IS STALE \u2014 main.py did not redeploy (got array, not debug obj). Check Render deploy/logs.";

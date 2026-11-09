@@ -58,14 +58,20 @@
   .bubble .num{font-family:"Archivo",sans-serif;font-weight:900;font-size:clamp(22px,5vw,32px);line-height:1}
   .bubble .lab{font-family:"Space Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:6px}
   .bubble.won .num{color:var(--win)} .bubble.acc .num{color:var(--clay-bright)}
+  .bubble.won{border-color:rgba(63,217,138,.42);background:linear-gradient(180deg,rgba(63,217,138,.09),var(--panel-2))}
+  .bubble.acc{border-color:rgba(240,185,78,.42);background:linear-gradient(180deg,rgba(240,185,78,.08),var(--panel-2))}
+  #bubbles .bubble:first-child{border-color:rgba(132,156,190,.34);background:linear-gradient(180deg,rgba(132,156,190,.07),var(--panel-2))}
+  #bubbles .bubble:first-child .num{color:#a9c0de}
   .section-h{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
     color:var(--muted-2);margin:22px 0 10px}
   .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);
     border-radius:13px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s}
   .card:hover{border-color:#4a3b29}
   .card.correct{border-left:3px solid var(--win)} .card.wrong{border-left:3px solid var(--loss)} .card.live{border-left:3px solid var(--live)}
-  .card.gcard{position:relative}
-  .card.gcard:not(.correct):not(.wrong):not(.live)::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;
+  .card.gcard{position:relative;
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    background:radial-gradient(130% 75% at 94% -14%, color-mix(in srgb, var(--homeC, transparent) 9%, transparent), transparent 56%),linear-gradient(180deg,var(--panel),var(--panel-2))}
+  .card.gcard:not(.correct):not(.wrong):not(.live)::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;
     border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--awayC,transparent),var(--homeC,transparent))}
   .card.big{background:linear-gradient(180deg,#221a11,#1b1610)}
   .card-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
@@ -1949,6 +1955,12 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .mm-k{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted-2);font-weight:700;margin-bottom:5px}
 .mm-v{font-family:"Archivo",sans-serif;font-weight:900;font-size:15.5px;color:var(--ink);font-variant-numeric:tabular-nums}
 .mm-v.pos{color:#3fd98a}.mm-v.neg{color:#e2574f}
+/* watchlist star */
+.watch-btn{background:none;border:none;cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;margin-left:2px;
+  color:var(--muted-2);transition:color .12s,transform .12s}
+.watch-btn:hover{color:var(--muted)}
+.watch-btn.on{color:var(--clay-bright,#e0a83c);text-shadow:0 0 10px rgba(240,185,78,.5)}
+.watch-btn:active{transform:scale(1.25)}
 .wt-card{border:1px solid var(--line);border-radius:13px;margin-bottom:10px;background:var(--panel-2);overflow:hidden}
 .wt-cardhead{width:100%;display:flex;align-items:center;gap:12px;background:transparent;border:none;
   cursor:pointer;padding:13px 15px;text-align:left;font-family:inherit;color:var(--ink)}
