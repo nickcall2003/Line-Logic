@@ -1205,7 +1205,8 @@ let golfBoard=null,golfTour="pga",golfById={},golfView="board",golfProj=null,gol
 let golfMatchSel=[],golfMatchScope="tournament",golfMatchResult=null,golfMatchQuery="",golfMatchLoading=false,golfMatchBoard=null,golfMatchMode="offered";
 let golfWeather=null,golfWeatherReq=false,golfMatchExpanded={},golfBoardSearch="";
 const GOLF_TOURS=[["pga","PGA"],["eur","DP World"],["lpga","LPGA"],["champions-tour","Champions"],["liv","LIV"]];
-let teamProps=null,teamBox=null,teamDetailTab="prediction",teamGame=null;
+let teamProps=null,teamBox=null,teamDetailTab="prediction",teamGame=null,teamPlays=null;
+var PBP_SPORTS=["nba","wnba","ncaab","wncaab","nfl","ncaaf","nhl"];
 let view="sport";  // "sport" | "free" | "best"
 function selectMenu(el){
   if(el.dataset.sport){view="sport";setSport(el.dataset.sport);}
@@ -1907,7 +1908,7 @@ function renderMLBDetail(g){const fin=g.status==="finished",live=g.status==="liv
   if(mlbDetailTab==="prediction")setTimeout(function(){try{loadGameImpact(g.id,"mlb","");}catch(e){}},20);
   if(mlbDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id);}catch(e){}},20);}
 // ===== NBA / NFL DETAIL =====
-async function openTeamDetail(id){detailId=sport+id;teamDetailTab="prediction";teamProps=null;teamBox=null;showView(true);
+async function openTeamDetail(id){detailId=sport+id;teamDetailTab="prediction";teamProps=null;teamBox=null;teamPlays=null;showView(true);
   document.getElementById("detail").innerHTML='<div class="skel-wrap"><div class="skel-card" style="height:130px"></div><div class="skel-card"></div><div class="skel-card"></div></div>';await refreshTeamDetail(id,sport);
   if(detailTimer)clearInterval(detailTimer);const sp=sport;
   detailTimer=setInterval(()=>{
@@ -1916,10 +1917,34 @@ async function openTeamDetail(id){detailId=sport+id;teamDetailTab="prediction";t
     const cur=byId[sp+id];
     if(cur&&cur.status==="live")refreshTeamDetail(id,sp);
   },10000);}
-async function refreshTeamDetail(id,sp){let g;try{g=await getJSON("/api/"+sp+"/game/"+id+"?date="+ymd(selected));}catch(e){return;}if(detailId!==sp+id||g.error)return;teamGame=g;teamGame._sp=sp;renderTeamDetail(g,sp);if(teamDetailTab==="box"&&teamBox&&teamBox!=="loading")loadTeamBox(id,sp,true);}
+async function refreshTeamDetail(id,sp){let g;try{g=await getJSON("/api/"+sp+"/game/"+id+"?date="+ymd(selected));}catch(e){return;}if(detailId!==sp+id||g.error)return;teamGame=g;teamGame._sp=sp;renderTeamDetail(g,sp);if(teamDetailTab==="box"&&teamBox&&teamBox!=="loading")loadTeamBox(id,sp,true);if(teamDetailTab==="plays")loadTeamPlays(id,sp,true);}
 function setTeamTab(t){teamDetailTab=t;renderTeamDetail(teamGame,teamGame._sp);
   if(t==="props"&&teamProps===null)loadTeamProps(teamGame.id,teamGame._sp);
-  if(t==="box"&&teamBox===null)loadTeamBox(teamGame.id,teamGame._sp);}
+  if(t==="box"&&teamBox===null)loadTeamBox(teamGame.id,teamGame._sp);
+  if(t==="plays"&&(teamPlays===null||teamPlays==="loading"))loadTeamPlays(teamGame.id,teamGame._sp);}
+async function loadTeamPlays(id,sp,silent){if(!silent&&teamPlays===null){teamPlays="loading";renderTeamDetail(teamGame,sp);}
+  let d;try{d=await getJSON("/api/"+sp+"/plays/"+id);}catch(e){d={supported:true,plays:[]};}
+  if(detailId!==sp+id)return;teamPlays=d;if(teamDetailTab==="plays")renderTeamDetail(teamGame,sp);}
+function playsHTML(data,g,sp){
+  if(data==="loading"||data==null)return '<div class="panel"><div class="skel-card" style="height:60px"></div><div class="skel-card" style="height:60px"></div></div>';
+  if(!data.supported)return '<div class="panel"><div class="empty">Play-by-play isn’t available for this sport.</div></div>';
+  var plays=data.plays||[];
+  if(!plays.length)return '<div class="panel"><div class="empty">No plays yet — this fills in once the game tips off.</div></div>';
+  var homeId=(g.home&&g.home.team_id!=null)?String(g.home.team_id):null;
+  var awayId=(g.away&&g.away.team_id!=null)?String(g.away.team_id):null;
+  var homeAb=(g.home&&g.home.abbr)||"",awayAb=(g.away&&g.away.abbr)||"";
+  var rows=plays.map(function(p){
+    var side=(p.team_id&&homeId&&p.team_id===homeId)?"home":((p.team_id&&awayId&&p.team_id===awayId)?"away":"");
+    var ab=side==="home"?homeAb:side==="away"?awayAb:"";
+    var per=p.period_txt||(p.period!=null?("P"+p.period):"");
+    var when=esc2(per)+(p.clock?' <span class="pbp-clk">'+esc2(p.clock)+'</span>':"");
+    var sc=(p.away_score!=null&&p.home_score!=null)?('<span class="pbp-score">'+p.away_score+'–'+p.home_score+'</span>'):"";
+    return '<div class="pbp-row'+(p.scoring?" score":"")+(side?" "+side:"")+'">'+
+      '<div class="pbp-when">'+when+'</div>'+
+      '<div class="pbp-txt">'+(ab?'<b class="pbp-ab">'+esc2(ab)+'</b> ':"")+esc2(p.text||"")+'</div>'+
+      sc+'</div>';
+  }).join("");
+  return '<div class="panel"><div class="pbp-list">'+rows+'</div></div>';}
 async function loadTeamProps(id,sp){teamProps="loading";renderTeamDetail(teamGame,sp);
   let p;try{p=await getJSON("/api/"+sp+"/props/"+id+"?date="+ymd(selected));}catch(e){p={props:[]};}
   if(detailId!==sp+id)return;teamProps=p;propsCurrent=p.props||[];propsSport=sp;propsGameId=id;renderTeamDetail(teamGame,sp);}
@@ -2055,10 +2080,12 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
     heroStatHTML(g,sp)+
     ((g.status==="live"&&sp==="ncaabb")?ncaabbLiveBarHTML(g):(g.status==="live"&&(sp==="nfl"||sp==="ncaaf"))?nflLiveBarHTML(g):(g.status==="live"&&sp==="nba")?nbaLiveBarHTML(g):(g.status==="live"&&sp==="nhl")?nhlLiveBarHTML(g):(g.status==="live"&&sp==="ncaab")?ncaabLiveBarHTML(g):(g.status==="live"&&sp==="wncaab")?wncaabLiveBarHTML(g):g.status==="live"?predBarHTML(g.away.abbr,pa,g.home.abbr,ph,g.status):dPredBar(g.away.abbr,pa,g.home.abbr,ph))+((g.status==="live"&&(sp==="nfl"||sp==="ncaaf"))?nflFieldHTML(g):(g.status==="live"&&sp==="ncaabb")?mlbSituationHTML(g):"")+'</div>';
   const propsTab=(sp==="nba"||sp==="wnba"||sp==="nfl"||sp==="nhl")?'<button class="d-tab '+(teamDetailTab==="props"?"active":"")+'" onclick="setTeamTab(\'props\')">Props</button>':'';
-  const tabs='<div class="d-tabs"><button class="d-tab '+(teamDetailTab==="prediction"?"active":"")+'" onclick="setTeamTab(\'prediction\')">Game Analysis</button>'+propsTab+
+  const playsTab=(PBP_SPORTS.indexOf(sp)>=0)?'<button class="d-tab '+(teamDetailTab==="plays"?"active":"")+'" onclick="setTeamTab(\'plays\')">Plays</button>':'';
+  const tabs='<div class="d-tabs"><button class="d-tab '+(teamDetailTab==="prediction"?"active":"")+'" onclick="setTeamTab(\'prediction\')">Game Analysis</button>'+propsTab+playsTab+
     '<button class="d-tab '+(teamDetailTab==="box"?"active":"")+'" onclick="setTeamTab(\'box\')">Live Stats</button></div>';
   let body;
-  if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
+  if(teamDetailTab==="plays"){body=playsHTML(teamPlays,g,sp);}
+  else if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
   else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div class="panel">'+gameScriptHTML(g)+'<div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
   else{const mp=writeupHTML(g.analysis);
     body='<div class="panel">'+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+

@@ -1892,6 +1892,18 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .atsl-su{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;min-width:62px;text-align:right}
 .atsl-su.pos{color:#3fd98a}.atsl-su.neg{color:#e2574f}
 @media (max-width:420px){.atsl-spct{display:none}}
+/* play-by-play feed */
+.pbp-list{display:flex;flex-direction:column}
+.pbp-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;padding:9px 6px;border-bottom:1px solid var(--line)}
+.pbp-row:last-child{border-bottom:none}
+.pbp-when{font-size:11px;color:var(--muted-2);font-variant-numeric:tabular-nums;white-space:nowrap;min-width:30px}
+.pbp-clk{color:var(--muted)}
+.pbp-txt{font-size:13.5px;color:var(--text);line-height:1.42;min-width:0;word-wrap:break-word}
+.pbp-ab{color:var(--accent);font-weight:800;font-size:12px}
+.pbp-score{font-size:12.5px;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pbp-row.score{background:rgba(63,217,138,.08);border-radius:8px;border-bottom-color:transparent}
+.pbp-row.score .pbp-score{color:#3fd98a}
+.pbp-row.score .pbp-txt{font-weight:700}
 .wt-card{border:1px solid var(--line);border-radius:13px;margin-bottom:10px;background:var(--panel-2);overflow:hidden}
 .wt-cardhead{width:100%;display:flex;align-items:center;gap:12px;background:transparent;border:none;
   cursor:pointer;padding:13px 15px;text-align:left;font-family:inherit;color:var(--ink)}
