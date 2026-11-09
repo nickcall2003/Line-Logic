@@ -1961,6 +1961,27 @@ body:has(.sk-app) #ll-chat-pop{display:none !important;}
 .watch-btn:hover{color:var(--muted)}
 .watch-btn.on{color:var(--clay-bright,#e0a83c);text-shadow:0 0 10px rgba(240,185,78,.5)}
 .watch-btn:active{transform:scale(1.25)}
+/* edge alert badge */
+.edge-alert{font-size:9px;font-weight:900;letter-spacing:.06em;padding:3px 7px;border-radius:5px;margin-left:2px;
+  background:rgba(240,185,78,.18);color:var(--clay-bright,#e0a83c);border:1px solid rgba(240,185,78,.42);white-space:nowrap}
+/* model vs market */
+.mvm{background:linear-gradient(180deg,rgba(240,185,78,.045),transparent);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:16px}
+.mvm-h{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--clay-bright,#e0a83c);font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:12px}
+.mvm-row{padding:9px 0;border-top:1px solid var(--line)}
+.mvm-row:first-of-type{border-top:none;padding-top:0}
+.mvm-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.mvm-k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.mvm-edge{font-size:11px;font-weight:800;color:var(--muted-2)}
+.mvm-edge.pos{color:#3fd98a}.mvm-edge.neg{color:#e2574f}.mvm-edge.dim{opacity:.6}
+.mvm-cmp{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-family:"Space Mono",monospace;margin-bottom:7px}
+.mvm-model{color:var(--ink);font-weight:700}
+.mvm-mkt{color:var(--muted)}
+.mvm-gap{font-size:10px;color:var(--muted-2);padding:2px 7px;border:1px solid var(--line);border-radius:999px;white-space:nowrap}
+.mvm-meter{height:6px;border-radius:999px;background:var(--panel);overflow:hidden}
+.mvm-meter-fill{height:100%;border-radius:999px}
+.mvm-meter-fill.pos{background:linear-gradient(90deg,#3fd98a,#8bf0c2)}
+.mvm-meter-fill.mid{background:linear-gradient(90deg,var(--clay-bright,#e0a83c),#f2cf86)}
+.mvm-meter-fill.dim{background:rgba(255,255,255,.14)}
 .wt-card{border:1px solid var(--line);border-radius:13px;margin-bottom:10px;background:var(--panel-2);overflow:hidden}
 .wt-cardhead{width:100%;display:flex;align-items:center;gap:12px;background:transparent;border:none;
   cursor:pointer;padding:13px 15px;text-align:left;font-family:inherit;color:var(--ink)}

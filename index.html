@@ -707,6 +707,14 @@ var WATCH=(function(){try{return new Set(JSON.parse(localStorage.getItem("ll_wat
 function saveWatch(){try{localStorage.setItem("ll_watch",JSON.stringify(Array.from(WATCH)));}catch(e){}}
 function isWatched(id){return WATCH.has(String(id));}
 function watchBtnHTML(id){return '<button class="watch-btn'+(isWatched(id)?" on":"")+'" onclick="toggleWatch(\''+id+'\',event)" aria-label="Save game">★</button>';}
+// Edge alert — flag games where the model disagrees hard with the book.
+function isEdgeAlert(g){
+  if(!g||!g.odds)return false;
+  if(g.edge_pct!=null&&!isNaN(g.edge_pct)&&g.edge_pct>=5)return true;
+  if(g.odds.spread_home!=null&&g.exp_margin!=null&&Math.abs(g.exp_margin-(-g.odds.spread_home))>=4)return true;
+  return false;
+}
+function alertBadgeHTML(g){return isEdgeAlert(g)?'<span class="edge-alert">⚡ EDGE</span>':"";}
 function toggleWatch(id,ev){if(ev){ev.stopPropagation();ev.preventDefault();}id=String(id);var on;if(WATCH.has(id)){WATCH.delete(id);on=false;}else{WATCH.add(id);on=true;}saveWatch();
   var btn=ev&&ev.currentTarget;if(btn)btn.classList.toggle("on",on);
   if(!on&&tabMode==="saved"&&view==="sport"){try{renderTeam();}catch(e){}}}
@@ -1657,7 +1665,7 @@ function teamCardHTML(g){const fin=g.status==="finished",live=g.status==="live";
   else if(g.exp_margin!=null){const fav=g.prob_home>=0.5?g.home.abbr:g.away.abbr;proj='<div class="proj-line">proj margin <span class="pr"><b>'+fav+" -"+Math.abs(g.exp_margin)+'</b></span></div>';}
   // model price always; market + edge + book count when a line exists
   const edgeLine=edgeLineHTML(g,g.prob_home);
-  return '<div class="card-top"><span class="tier" style="background:'+(TIER_COLOR[sport]||"#3f7fc4")+'">'+SPORT_LABEL[sport]+'</span><span class="tourn">'+(g.venue||"")+'</span>'+lc+wagerChipC(g.confidence,g.edge_pct)+watchBtnHTML(g.id)+'<span class="status">'+mark+'</span></div>'+
+  return '<div class="card-top"><span class="tier" style="background:'+(TIER_COLOR[sport]||"#3f7fc4")+'">'+SPORT_LABEL[sport]+'</span><span class="tourn">'+(g.venue||"")+'</span>'+lc+wagerChipC(g.confidence,g.edge_pct)+alertBadgeHTML(g)+watchBtnHTML(g.id)+'<span class="status">'+mark+'</span></div>'+
     '<div class="mlb-card">'+teamColHTML(g.away,winAway)+mid+teamColHTML(g.home,winHome)+'</div>'+proj+edgeLine+whyChipsHTML(g)+injuryNoteHTML(g)+
     '<div style="margin-top:11px">'+predBarHTML(g.away.abbr,pa,g.home.abbr,ph,g.status)+'</div>'+
     shareRowHTML(gameCardUrl(g,sport),gameShareText(g,sport));}
@@ -2146,6 +2154,44 @@ function threeIndicatorsHTML(g,sp){
     '<div class="ind-row">'+win+cover+bet+'</div>'+
     '<div class="ind-note">A team can be a lock to <b>win</b> and still be a bad <b>bet</b> at its price. These answer three different questions.</div></div>';
 }
+// Model vs market — a visual read on where the model's fair line sits against
+// the book's line, per market, with the disagreement sized as a bar.
+function _dmeter(gap,maxGap){
+  var mag=Math.min(Math.abs(gap),maxGap)/maxGap*100;
+  var cls=Math.abs(gap)>=3?"pos":(Math.abs(gap)>=1?"mid":"dim");
+  return '<div class="mvm-meter"><div class="mvm-meter-fill '+cls+'" style="width:'+Math.max(4,mag).toFixed(0)+'%"></div></div>';
+}
+function modelVsMarketHTML(g,sp){
+  var odds=g.odds||{};
+  var H=g.home,A=g.away,nm=function(t){return (t&&(t.abbr||t.name))||"";};
+  var rows="";
+  if(odds.spread_home!=null&&g.exp_margin!=null){
+    var modelHome=g.exp_margin,marketHome=-odds.spread_home,gap=modelHome-marketHome;
+    var favM=g.exp_margin>=0?H:A,favMn=Math.abs(g.exp_margin);
+    var favB=odds.spread_home<0?H:A,favBn=Math.abs(odds.spread_home);
+    var vteam=gap>0?H:A,hasE=Math.abs(gap)>=1;
+    rows+='<div class="mvm-row"><div class="mvm-top"><span class="mvm-k">Spread</span>'+
+      (hasE?'<span class="mvm-edge '+(Math.abs(gap)>=3?"pos":"")+'">value '+nm(vteam)+'</span>':'<span class="mvm-edge dim">in line</span>')+'</div>'+
+      '<div class="mvm-cmp"><span class="mvm-model">model '+nm(favM)+' -'+favMn.toFixed(1)+'</span>'+
+      '<span class="mvm-gap">'+(Math.abs(gap)>=0.5?Math.abs(gap).toFixed(1)+' pt':'≈')+'</span>'+
+      '<span class="mvm-mkt">book '+nm(favB)+' -'+favBn.toFixed(1)+'</span></div>'+_dmeter(gap,10)+'</div>';
+  }
+  if(odds.total!=null&&g.avg_total!=null){
+    var tg=g.avg_total-odds.total,lean=tg>0?"Over":"Under";
+    rows+='<div class="mvm-row"><div class="mvm-top"><span class="mvm-k">Total</span>'+
+      (Math.abs(tg)>=1?'<span class="mvm-edge '+(Math.abs(tg)>=3?"pos":"")+'">lean '+lean+'</span>':'<span class="mvm-edge dim">in line</span>')+'</div>'+
+      '<div class="mvm-cmp"><span class="mvm-model">model '+g.avg_total.toFixed(0)+'</span>'+
+      '<span class="mvm-gap">'+(Math.abs(tg)>=0.5?Math.abs(tg).toFixed(1):'≈')+'</span>'+
+      '<span class="mvm-mkt">book '+odds.total.toFixed(1)+'</span></div>'+_dmeter(tg,8)+'</div>';
+  }
+  var edge=(g.edge_pct!=null&&!isNaN(g.edge_pct))?g.edge_pct:null;
+  if(edge!=null&&(odds.ml_home!=null||odds.ml_away!=null)){
+    rows+='<div class="mvm-row"><div class="mvm-top"><span class="mvm-k">Moneyline</span>'+
+      '<span class="mvm-edge '+(edge>=3?"pos":(edge<=0?"neg":""))+'">'+(edge>=0?"+":"")+edge.toFixed(1)+'% edge</span></div>'+_dmeter(edge,10)+'</div>';
+  }
+  if(!rows)return "";
+  return '<div class="mvm"><div class="mvm-h"><span class="pip"></span>Model vs market</div>'+rows+'</div>';
+}
 // Model movement — how the projection has shifted from pregame to right now.
 // Uses the live projected margin (current score + time left) vs the pregame
 // number. Live games only.
@@ -2227,7 +2273,7 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
   else if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
   else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div class="panel">'+gameScriptHTML(g)+'<div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
   else{const mp=writeupHTML(g.analysis);
-    body='<div class="panel">'+threeIndicatorsHTML(g,sp)+modelMovementHTML(g,sp)+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+insideTheModelHTML(g,sp)+'<details class="itm"><summary><span class="itm-n">¶</span><span class="itm-t">Full write-up</span><span class="itm-tag">Prose</span></summary><div class="itm-body wu">'+mp+'</div></details>'+
+    body='<div class="panel">'+threeIndicatorsHTML(g,sp)+modelVsMarketHTML(g,sp)+modelMovementHTML(g,sp)+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+insideTheModelHTML(g,sp)+'<details class="itm"><summary><span class="itm-n">¶</span><span class="itm-t">Full write-up</span><span class="itm-tag">Prose</span></summary><div class="itm-body wu">'+mp+'</div></details>'+
     teamFactorsHTML(g,sp)+
     injuryPanelHTML(g)+
     teamLinesHTML(g)+
