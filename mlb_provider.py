@@ -1552,3 +1552,49 @@ def prop_context_map(date, game_id):
             out[k] = (ctx, why)
     _ctx_map_cache[key] = (time.time(), out)
     return out
+
+
+_plays_cache = {}
+def get_plays(game_id, limit=150):
+    """Play-by-play for one MLB game from the official stats API
+    (/game/{gamePk}/playByPlay). Normalized to the same shape the UI's play
+    feed uses, newest at-bat first. Cached ~8s for live games."""
+    import time as _t
+    ck = str(game_id)
+    c = _plays_cache.get(ck)
+    if c and _t.time() - c[0] < 8:
+        return c[1]
+    try:
+        data = _get(f"https://statsapi.mlb.com/api/v1/game/{game_id}/playByPlay")
+    except Exception as e:
+        print(f"[mlb] plays fetch failed: {e}")
+        return {"supported": True, "plays": [], "count": 0}
+    allp = data.get("allPlays") or []
+    out = []
+    for p in allp:
+        res = p.get("result") or {}
+        ab = p.get("about") or {}
+        desc = (res.get("description") or res.get("event") or "").strip()
+        if not desc:
+            continue
+        half = ab.get("halfInning")           # 'top' / 'bottom'
+        inning = ab.get("inning")
+        side = "away" if half == "top" else ("home" if half == "bottom" else "")
+        arrow = "▲" if half == "top" else ("▼" if half == "bottom" else "")
+        out.append({
+            "text": desc,
+            "period": inning,
+            "period_txt": (arrow + " " if arrow else "") + str(inning or ""),
+            "clock": None,
+            "home_score": res.get("homeScore"),
+            "away_score": res.get("awayScore"),
+            "scoring": bool(ab.get("isScoringPlay")),
+            "side": side,
+            "team_id": None,
+        })
+    out.reverse()                             # newest half-inning first
+    if limit:
+        out = out[:limit]
+    res = {"supported": True, "plays": out, "count": len(out)}
+    _plays_cache[ck] = (_t.time(), res)
+    return res

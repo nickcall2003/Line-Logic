@@ -1198,7 +1198,7 @@ function connectWS(){const proto=location.protocol==="https:"?"wss":"ws";let ws;
     if(msg.score.status==="finished"&&m.predicted_winner&&(msg.score.winner==="a"||msg.score.winner==="b"))m.correct=(m.predicted_winner===msg.score.winner);
     if(!detailId&&sport==="tennis"&&view==="sport")render();};}
 // ===== SPORTS STATE =====
-let sport=prefGet("sport","mlb"),teamGames=[],mlbDetailTab="prediction",mlbMatchups=null,mlbInjuries=null,mlbProps=null,mlbBox=null,mlbGame=null;
+let sport=prefGet("sport","mlb"),teamGames=[],mlbDetailTab="prediction",mlbMatchups=null,mlbInjuries=null,mlbProps=null,mlbBox=null,mlbGame=null,mlbPlays=null;
 let soccerGames=[],soccerLeague="all",soccerLeagues=[],soccerGame=null,soccerDetailTab="prediction",soccerBox=null,soccerProps=null,soccerDetailLeague="all";
 let ufcGames=[],ufcEvent="UFC",ufcGame=null;
 let golfBoard=null,golfTour="pga",golfById={},golfView="board",golfProj=null,golfEdge=null,golfProjModel="baseline";
@@ -1686,15 +1686,19 @@ function renderTeam(){renderDatebar();renderTabsTeam();
   // land straight on a sport (e.g. from /nfl-predictions -> /#nfl).
   try{var _dc=discordCtaHTML();if(_dc){var _dcw=document.createElement("div");_dcw.innerHTML=_dc;if(_dcw.firstChild)list.appendChild(_dcw.firstChild);}}catch(e){}
 }
-async function openMLBDetail(id){detailId="mlb"+id;mlbDetailTab="prediction";mlbMatchups=null;mlbInjuries=null;mlbProps=null;mlbBox=null;showView(true);
+async function openMLBDetail(id){detailId="mlb"+id;mlbDetailTab="prediction";mlbMatchups=null;mlbInjuries=null;mlbProps=null;mlbBox=null;mlbPlays=null;showView(true);
   document.getElementById("detail").innerHTML='<div class="skel-wrap"><div class="skel-card" style="height:130px"></div><div class="skel-card"></div><div class="skel-card"></div></div>';await refreshMLBDetail(id);
   if(detailTimer)clearInterval(detailTimer);detailTimer=setInterval(()=>{if(detailId==="mlb"+id)refreshMLBDetail(id);},10000);}
-async function refreshMLBDetail(id){let g;try{g=await getJSON("/api/mlb/game/"+id+"?date="+ymd(selected));}catch(e){return;}if(detailId!=="mlb"+id||g.error)return;mlbGame=g;renderMLBDetail(g);if(mlbDetailTab==="box"&&mlbBox&&mlbBox!=="loading")loadMLBBox(id,true);}
+async function refreshMLBDetail(id){let g;try{g=await getJSON("/api/mlb/game/"+id+"?date="+ymd(selected));}catch(e){return;}if(detailId!=="mlb"+id||g.error)return;mlbGame=g;renderMLBDetail(g);if(mlbDetailTab==="box"&&mlbBox&&mlbBox!=="loading")loadMLBBox(id,true);if(mlbDetailTab==="plays")loadMLBPlays(id,true);}
 function setMLBTab(t){mlbDetailTab=t;renderMLBDetail(mlbGame);
   if(t==="matchups"&&mlbMatchups===null)loadMatchups(mlbGame.id);
   if(t==="injuries"&&mlbInjuries===null)loadInjuries(mlbGame.id);
   if(t==="props"&&mlbProps===null)loadMLBProps(mlbGame.id);
-  if(t==="box"&&mlbBox===null)loadMLBBox(mlbGame.id);}
+  if(t==="box"&&mlbBox===null)loadMLBBox(mlbGame.id);
+  if(t==="plays"&&(mlbPlays===null||mlbPlays==="loading"))loadMLBPlays(mlbGame.id);}
+async function loadMLBPlays(id,silent){if(!silent&&mlbPlays===null){mlbPlays="loading";renderMLBDetail(mlbGame);}
+  let d;try{d=await getJSON("/api/mlb/plays/"+id);}catch(e){d={supported:true,plays:[]};}
+  if(detailId!=="mlb"+id)return;mlbPlays=d;if(mlbDetailTab==="plays")renderMLBDetail(mlbGame);}
 async function loadMLBBox(id,silent){if(!silent){mlbBox="loading";renderMLBDetail(mlbGame);}
   let b;try{b=await getJSON("/api/mlb/boxscore/"+id+"?date="+ymd(selected));}catch(e){return;}
   if(detailId!=="mlb"+id)return;mlbBox=b;renderMLBDetail(mlbGame);}
@@ -1881,9 +1885,11 @@ function renderMLBDetail(g){const fin=g.status==="finished",live=g.status==="liv
     '<button class="d-tab '+(mlbDetailTab==="props"?"active":"")+'" onclick="setMLBTab(\'props\')">Props</button>'+
     '<button class="d-tab '+(mlbDetailTab==="matchups"?"active":"")+'" onclick="setMLBTab(\'matchups\')">Matchups</button>'+
     '<button class="d-tab '+(mlbDetailTab==="injuries"?"active":"")+'" onclick="setMLBTab(\'injuries\')">Injuries</button>'+
+    '<button class="d-tab '+(mlbDetailTab==="plays"?"active":"")+'" onclick="setMLBTab(\'plays\')">Plays</button>'+
     '<button class="d-tab '+(mlbDetailTab==="box"?"active":"")+'" onclick="setMLBTab(\'box\')">Live Stats</button></div>';
   let body;
-  if(mlbDetailTab==="box"){body=boxscoreHTML(mlbBox);}
+  if(mlbDetailTab==="plays"){body=playsHTML(mlbPlays,g,"mlb");}
+  else if(mlbDetailTab==="box"){body=boxscoreHTML(mlbBox);}
   else if(mlbDetailTab==="matchups"){body=matchupsHTML();}
   else if(mlbDetailTab==="injuries"){body=injuriesHTML();}
   else if(mlbDetailTab==="props"){body='<div class="panel"><div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>';}
@@ -1934,7 +1940,7 @@ function playsHTML(data,g,sp){
   var awayId=(g.away&&g.away.team_id!=null)?String(g.away.team_id):null;
   var homeAb=(g.home&&g.home.abbr)||"",awayAb=(g.away&&g.away.abbr)||"";
   var rows=plays.map(function(p){
-    var side=(p.team_id&&homeId&&p.team_id===homeId)?"home":((p.team_id&&awayId&&p.team_id===awayId)?"away":"");
+    var side=p.side||((p.team_id&&homeId&&p.team_id===homeId)?"home":((p.team_id&&awayId&&p.team_id===awayId)?"away":""));
     var ab=side==="home"?homeAb:side==="away"?awayAb:"";
     var per=p.period_txt||(p.period!=null?("P"+p.period):"");
     var when=esc2(per)+(p.clock?' <span class="pbp-clk">'+esc2(p.clock)+'</span>':"");

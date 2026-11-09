@@ -5006,10 +5006,15 @@ def soccer_boxscore(game_id: str, date: str | None = None, league: str | None = 
 
 @app.get("/api/{sport}/plays/{game_id}")
 def game_plays(sport: str, game_id: str):
-    """Live play-by-play for one game (ESPN summary `plays`)."""
-    import espn_provider as EP
+    """Live play-by-play for one game. MLB uses the official stats API (its ids
+    aren't ESPN ids); everything else uses the ESPN summary `plays` feed."""
+    sport = sport.lower()
     try:
-        return EP.get_plays(sport.lower(), game_id)
+        if sport == "mlb":
+            import mlb_provider as MP
+            return MP.get_plays(game_id)
+        import espn_provider as EP
+        return EP.get_plays(sport, game_id)
     except Exception as e:
         return {"supported": True, "plays": [], "count": 0, "error": str(e)[:120]}
 
