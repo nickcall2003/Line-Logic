@@ -671,9 +671,11 @@
   .fac .vb{text-align:left;font-weight:600;font-variant-numeric:tabular-nums}
   .proj-runs{margin-top:4px;font-family:"Archivo",sans-serif;font-weight:900;font-size:24px;color:var(--clay-bright);line-height:1}
   .proj-runs span{display:block;font-family:"Space Mono",monospace;font-size:8.5px;font-weight:400;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px}
-  .proj-line{display:flex;align-items:center;justify-content:center;gap:12px;margin:12px 0 2px;
+  .proj-line{display:flex;align-items:center;justify-content:center;gap:12px;margin:12px 0 2px;flex-wrap:wrap;
     font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   .proj-line .pr{color:var(--ink)}.proj-line .pr b{font-family:"Archivo",sans-serif;font-size:21px;color:var(--clay-bright);font-weight:900;vertical-align:middle;margin:0 2px}
+  .proj-line .pl-live{color:#3fd98a;font-weight:800;font-size:10px;letter-spacing:.1em}
+  .proj-line .pl-pre{flex-basis:100%;width:100%;text-align:center;color:var(--muted-2);font-size:9.5px;letter-spacing:.04em;margin-top:1px}
   .mu-side{margin-bottom:22px}
   .inj-note{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 2px 0;padding-top:7px;
     border-top:1px dashed var(--line);font-size:10.5px;line-height:1.5;color:var(--muted)}

@@ -1333,7 +1333,7 @@ function mlbLivePred(g){
   var sigma=4.0*Math.sqrt(frac)+0.4;             // remaining-run uncertainty -> 0 late
   var scoreWP=normCDF(projMargin/sigma);
   var homeWP=frac*g.prob_home+(1-frac)*scoreWP;   // pregame early -> score late
-  return {homeWP:Math.max(0.01,Math.min(0.99,homeWP)), frac:frac};
+  return {homeWP:Math.max(0.01,Math.min(0.99,homeWP)), frac:frac, projMargin:projMargin};
 }
 function ncaabbLivePred(g){
   if(!g||!g.score||g.score.home==null||g.score.away==null) return null;
@@ -1349,7 +1349,7 @@ function ncaabbLivePred(g){
   var projMargin=curMargin+expMargin*frac, sigma=4.0*Math.sqrt(frac)+0.4;
   var scoreWP=normCDF(projMargin/sigma);
   var homeWP=frac*g.prob_home+(1-frac)*scoreWP;
-  return {homeWP:Math.max(0.01,Math.min(0.99,homeWP)), frac:frac};
+  return {homeWP:Math.max(0.01,Math.min(0.99,homeWP)), frac:frac, projMargin:projMargin};
 }
 function ncaabbLiveBarHTML(g){
   var lp=ncaabbLivePred(g);
@@ -1380,7 +1380,7 @@ function nflLivePred(g){
   var projMargin=curMargin+expMargin*frac, sigma=13.5*Math.sqrt(frac)+0.6;
   var scoreWP=normCDF(projMargin/sigma);
   var homeWP=frac*g.prob_home+(1-frac)*scoreWP;
-  return {homeWP:Math.max(0.01,Math.min(0.99,homeWP)), frac:frac};
+  return {homeWP:Math.max(0.01,Math.min(0.99,homeWP)), frac:frac, projMargin:projMargin};
 }
 function nflLiveBarHTML(g){
   var lp=nflLivePred(g);
@@ -1440,7 +1440,7 @@ function _clockWP(g, regPeriods, periodSec, sigmaFull){
   var projMargin=curMargin+expMargin*frac, sigma=sigmaFull*Math.sqrt(frac)+0.5;
   var scoreWP=normCDF(projMargin/sigma);
   var homeWP=frac*g.prob_home+(1-frac)*scoreWP;
-  return {homeWP:Math.max(0.01,Math.min(0.99,homeWP)), frac:frac};
+  return {homeWP:Math.max(0.01,Math.min(0.99,homeWP)), frac:frac, projMargin:projMargin};
 }
 function nbaLivePred(g){ return _clockWP(g,4,720,11.5); }   // 4x12min, ~11.5 pt SD
 function nhlLivePred(g){ return _clockWP(g,3,1200,2.2); }   // 3x20min, ~2.2 goal SD
@@ -2040,6 +2040,16 @@ function teamFactorsHTML(g,sp){
 // One memorable number per sport, in the same visual slot, using the projection
 // that sport actually produces — margin for team sports, goals for soccer,
 // win probability where that's genuinely all the model has (UFC).
+function livePredFor(g,sp){
+  try{
+    if(sp==="nba")return nbaLivePred(g);
+    if(sp==="nhl")return nhlLivePred(g);
+    if(sp==="ncaab")return ncaabLivePred(g);
+    if(sp==="wncaab")return wncaabLivePred(g);
+    if(sp==="nfl"||sp==="ncaaf")return nflLivePred(g);
+  }catch(e){}
+  return null;
+}
 function heroStatHTML(g,sp){
   if(!g)return "";
   var A=(g.away&&(g.away.abbr||g.away.name))||"Away";
@@ -2061,9 +2071,21 @@ function heroStatHTML(g,sp){
       var _ms=g.odds.spread_home, _mfav=(_ms<0)?H:A, _mn=Math.abs(_ms);
       mktBit=' <span class="pl-note">\u00b7 market '+_mfav+' -'+(Math.round(_mn*10)/10)+'</span>';
     }
+    var totalBit=(g.avg_total!=null?' <span class="pl-note">\u00b7 total '+g.avg_total+'</span>':'');
+    // Live: recompute the projected final margin from the current score + time
+    // left (current margin + pregame margin \u00d7 fraction remaining), so a run
+    // moves the number. Pregame number kept as a subline.
+    if(g.status==="live"){
+      var lp=livePredFor(g,sp);
+      if(lp&&lp.projMargin!=null&&isFinite(lp.projMargin)){
+        var lm=Math.abs(lp.projMargin), lfav=(lp.projMargin>=0)?H:A;
+        var liveStr=(lm<0.5)?'<b>even</b>':(lfav+' by <b>'+lm.toFixed(1)+'</b>');
+        return '<div class="proj-line"><span class="pl-live">\u25cf LIVE</span> projected margin <span class="pr">'+liveStr+'</span>'+mktBit+totalBit+
+          '<div class="pl-pre">pregame '+fav+' by '+m.toFixed(1)+'</div></div>';
+      }
+    }
     return '<div class="proj-line">projected margin <span class="pr">'+fav+
-      ' by <b>'+m.toFixed(1)+'</b></span>'+mktBit+
-      (g.avg_total!=null?' <span class="pl-note">\u00b7 total '+g.avg_total+'</span>':'')+'</div>';
+      ' by <b>'+m.toFixed(1)+'</b></span>'+mktBit+totalBit+'</div>';
   }
   // last resort — a win probability is still one number worth leading with
   if(g.prob_home!=null){
