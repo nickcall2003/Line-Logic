@@ -1629,6 +1629,9 @@ function injuryPanelHTML(g){if(!g||!g.injuries)return"";
     return '<div class="injp-col"><div class="injp-team">'+abbr+'</div>'+rows+'</div>';};
   return '<div class="injp"><div class="injp-h"><span class="inj-ico">\u2695</span> Injuries factored into this prediction</div>'+
     '<div class="injp-cols">'+col(g.away.abbr,ia)+col(g.home.abbr,ih)+'</div></div>';}
+function _paintGameCard(el,g){el.classList.add("gcard");
+  el.style.setProperty("--awayC",(g.away&&g.away.color)||"#c8612f");
+  el.style.setProperty("--homeC",(g.home&&g.home.color)||"#e0a83c");}
 function teamCardHTML(g){const fin=g.status==="finished",live=g.status==="live";const ph=Math.round(g.prob_home*100),pa=100-ph;
   const sa=g.score&&g.score.away!=null?g.score.away:"",sh=g.score&&g.score.home!=null?g.score.home:"";
   let mid;
@@ -1677,11 +1680,11 @@ function renderTeam(){renderDatebar();renderTabsTeam();
   if(sortMode==="time")ordered=shown.slice().sort(_byTime);
   if(sortMode==="featured"&&tabMode==="all"){const big=shown.filter(g=>g.status!=="finished").slice().sort((a,b)=>b.prominence-a.prominence).slice(0,3);
     if(big.length){const h=document.createElement("div");h.className="section-h";h.textContent="\u2605 Biggest games today";list.appendChild(h);
-      big.forEach(g=>{const el=document.createElement("div");el.className="card big"+(g.status==="live"?" live":"");el.innerHTML=teamCardHTML(g);el.onclick=()=>openFn(g.id);list.appendChild(el);});
+      big.forEach(g=>{const el=document.createElement("div");el.className="card big"+(g.status==="live"?" live":"");el.innerHTML=teamCardHTML(g);_paintGameCard(el,g);el.onclick=()=>openFn(g.id);list.appendChild(el);});
       const h2=document.createElement("div");h2.className="section-h";h2.textContent="All games";list.appendChild(h2);}}
   ordered.forEach(g=>{const el=document.createElement("div");const fin=g.status==="finished";
     let cls="card";if(fin&&g.winner){const pick=g.prob_home>=0.5?"home":"away";cls+=pick===g.winner?" correct":" wrong";}else if(g.status==="live")cls+=" live";
-    el.className=cls;el.innerHTML=teamCardHTML(g);el.onclick=()=>openFn(g.id);list.appendChild(el);});
+    el.className=cls;el.innerHTML=teamCardHTML(g);_paintGameCard(el,g);el.onclick=()=>openFn(g.id);list.appendChild(el);});
   // Contextual Discord CTA at the bottom of the board — catches visitors who
   // land straight on a sport (e.g. from /nfl-predictions -> /#nfl).
   try{var _dc=discordCtaHTML();if(_dc){var _dcw=document.createElement("div");_dcw.innerHTML=_dc;if(_dcw.firstChild)list.appendChild(_dcw.firstChild);}}catch(e){}

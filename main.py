@@ -4579,42 +4579,86 @@ def best_bets(date: str | None = None, sport: str | None = None,
     return {"date": target.isoformat(), "count": len(out), "picks": out}
 
 
+_HC_DEFAULT = {"nba": 2.5, "wnba": 2.5, "nfl": 2.0, "ncaaf": 2.5,
+               "ncaab": 3.5, "wncaab": 3.0}
+
 def _team_writeup(g, sport):
     league = sport.upper()
-    fav = g["home"] if g["prob_home"] >= 0.5 else g["away"]
-    dog = g["away"] if g["prob_home"] >= 0.5 else g["home"]
-    favp = round((g["prob_home"] if g["prob_home"] >= 0.5 else 1 - g["prob_home"]) * 100)
-    margin = abs(g["exp_margin"])
-    home_side = "at home" if g["prob_home"] >= 0.5 else "on the road"
+    H, A = g["home"], g["away"]
+    favHome = g["prob_home"] >= 0.5
+    fav = H if favHome else A
+    dog = A if favHome else H
+    favp = round((g["prob_home"] if favHome else 1 - g["prob_home"]) * 100)
+    margin = abs(g.get("exp_margin") or 0)
+    home_side = "at home" if favHome else "on the road"
     paras = []
 
-    # Paragraph 1: the pick and the edge
+    # P1 — the pick, the records, and the raw rating gap (the "spreadsheet")
     p1 = [f"The model makes {fav['name']} the {league} pick at {favp}% to win, playing {home_side}."]
-    if fav["record"] and dog["record"]:
-        p1.append(f"On the season, {fav['name']} sit at {fav['record']} against "
-                  f"{dog['name']}'s {dog['record']}, and the rating model weighs that body of "
-                  f"work along with the quality of opponents each has faced.")
+    if fav.get("record") and dog.get("record"):
+        p1.append(f"They come in {fav['record']} to {dog['name']}'s {dog['record']}.")
+    hr, ar = g.get("home_rating"), g.get("away_rating")
+    if hr is not None and ar is not None:
+        fr, dr = (hr, ar) if favHome else (ar, hr)
+        p1.append(f"On raw team strength the rating model has {fav['name']} at {fr:.0f} and "
+                  f"{dog['name']} at {dr:.0f} — a {abs(hr - ar):.0f}-point gap before any "
+                  f"game-specific adjustment.")
     paras.append(" ".join(p1))
 
-    # Paragraph 2: the margin and what drives it
-    p2 = [f"Projected scoring margin is about {margin:.0f} point{'s' if margin != 1 else ''} in "
-          f"{fav['name']}'s favor."]
-    p2.append("That number comes from an Elo rating seeded by each team's record and adjusted "
-              "for home-court advantage — " + ("a meaningful edge in the NBA, worth roughly "
-              "two to three points a night." if sport == "nba" else
-              "worth roughly two to three points for the home side in the NFL."))
-    if favp >= 65:
-        p2.append("The gap here is wide enough that the model treats it as a clear lean rather "
-                  "than a coin-flip.")
-    elif favp <= 56:
-        p2.append("This is a close matchup, so the edge is slim and the pick is low-conviction.")
+    # P2 — model line vs market line: where the model disagrees (the edge)
+    p2 = [f"Its projected final margin is {fav['name']} by {margin:.0f}."]
+    odds = g.get("odds") or {}
+    sph = odds.get("spread_home")
+    if sph is not None:
+        model_home = g.get("exp_margin") or 0      # model home-relative margin
+        market_home = -sph                          # market home-relative margin
+        diff = model_home - market_home
+        mfav = H if sph < 0 else A
+        if abs(diff) >= 0.5:
+            vteam = H if diff > 0 else A
+            p2.append(f"The market has {mfav['name']} laying {abs(sph):.1f}; the model's fair "
+                      f"number is {fav['name']} -{margin:.1f}. That's a {abs(diff):.1f}-point "
+                      f"disagreement, and the value lands on {vteam['name']} against the market line.")
+        else:
+            p2.append(f"The market has {mfav['name']} -{abs(sph):.1f}, essentially in line with "
+                      f"the model — little betting edge here even though there's a clear favorite.")
+    else:
+        p2.append("No market spread is posted yet, so this is the model's standalone projection.")
+    mt, at = odds.get("total"), g.get("avg_total")
+    if at is not None and mt is not None:
+        p2.append(f"On the total, the model projects {at:.0f} to the market's {mt:.1f}.")
+    elif at is not None:
+        p2.append(f"Projected combined total is about {at:.0f}.")
     paras.append(" ".join(p2))
 
-    # Paragraph 3: honest limitations
-    paras.append("One caveat worth your own check: this model is built on team strength, record, "
-                 "and home advantage. It does not yet account for injuries, rest, back-to-backs, "
-                 "or late lineup news — so confirm availability of key players before relying on it. "
-                 f"Model confidence on this game: {g['confidence']}.")
+    # P3 — the situational adjustments actually applied (home court, rest, injuries)
+    p3 = []
+    hc = g.get("home_edge_pts")
+    if sport == "nhl":
+        p3.append(f"Home ice is worth about {(hc if hc is not None else 0.15):.2f} goals to {H['name']} in the model.")
+    else:
+        hcpts = hc if hc is not None else _HC_DEFAULT.get(sport, 2.5)
+        p3.append(f"{H['name']} get about {abs(hcpts):.1f} points of home-court edge baked in.")
+    rest = g.get("rest") or {}
+    hd, ad = rest.get("home_days"), rest.get("away_days")
+    if hd is not None and ad is not None and hd != ad:
+        fresher = H if hd > ad else A
+        p3.append(f"On rest, {fresher['name']} are fresher ({hd} days to {ad}) and the model leans that way.")
+    inj = g.get("injuries") or {}
+    net = inj.get("net_pts")
+    nplayers = len(inj.get("home") or []) + len(inj.get("away") or [])
+    if net and abs(net) >= 0.5 and nplayers:
+        iside = H if net > 0 else A
+        p3.append(f"Injuries are priced in: the current report shifts the line about {abs(net):.1f} "
+                  f"points toward {iside['name']} ({nplayers} player{'s' if nplayers != 1 else ''} accounted for).")
+    if p3:
+        paras.append(" ".join(p3))
+
+    # P4 — confidence + an accurate caveat
+    paras.append(f"Model confidence on this game: {g.get('confidence','')}. It blends team "
+                 f"ratings, home court, rest, and the injuries posted at the last data sync — but "
+                 f"it can't see news that breaks after that, so confirm late lineup and availability "
+                 f"before you bet.")
     return "\n\n".join(paras)
 
 
@@ -4704,21 +4748,11 @@ def _nhl_writeup(g):
 
 
 def _team_analysis(g, sport):
-    base = _team_writeup(g, sport)
-    if LLM_COMPLETE is None:
-        return base
-    import json as _j
-    facts = {
-        "league": sport.upper(), "home": g["home"]["name"], "away": g["away"]["name"],
-        "home_record": g["home"]["record"], "away_record": g["away"]["record"],
-        "home_win_pct": round(g["prob_home"] * 100), "exp_margin": g["exp_margin"],
-        "venue": g.get("venue"), "confidence": g["confidence"],
-    }
-    try:
-        return LLM_COMPLETE(_TEAM_AI_PROMPT.format(league=sport.upper(),
-                                                   facts=_j.dumps(facts, indent=2))).strip() or base
-    except Exception:
-        return base
+    # The deterministic writeup pulls the model line, market line, ratings, rest
+    # and injuries into one accurate preview — richer and safer than the old AI
+    # prompt (which saw only records + margin and could drift off the real
+    # inputs), and it doesn't depend on LLM credits. So it's the source of truth.
+    return _team_writeup(g, sport)
 
 
 # Active months per sport (1-12). Out-of-season sports are hidden from the home

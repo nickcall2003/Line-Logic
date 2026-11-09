@@ -64,6 +64,9 @@
     border-radius:13px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s}
   .card:hover{border-color:#4a3b29}
   .card.correct{border-left:3px solid var(--win)} .card.wrong{border-left:3px solid var(--loss)} .card.live{border-left:3px solid var(--live)}
+  .card.gcard{position:relative}
+  .card.gcard:not(.correct):not(.wrong):not(.live)::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;
+    border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--awayC,transparent),var(--homeC,transparent))}
   .card.big{background:linear-gradient(180deg,#221a11,#1b1610)}
   .card-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
   .tier{font-family:"Space Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;padding:3px 6px;border-radius:5px;color:#0e1014;background:var(--clay)}
