@@ -2137,6 +2137,66 @@ function threeIndicatorsHTML(g,sp){
     '<div class="ind-row">'+win+cover+bet+'</div>'+
     '<div class="ind-note">A team can be a lock to <b>win</b> and still be a bad <b>bet</b> at its price. These answer three different questions.</div></div>';
 }
+// Model movement — how the projection has shifted from pregame to right now.
+// Uses the live projected margin (current score + time left) vs the pregame
+// number. Live games only.
+function modelMovementHTML(g,sp){
+  if(!g||g.status!=="live"||g.exp_margin==null)return "";
+  var lp=livePredFor(g,sp);
+  if(!lp||lp.projMargin==null||!isFinite(lp.projMargin))return "";
+  var nm=function(t){return (t&&(t.abbr||t.name))||"";};
+  var favHome=g.exp_margin>=0, fav=favHome?g.home:g.away;
+  var pre=Math.abs(g.exp_margin);
+  var cur=favHome?lp.projMargin:-lp.projMargin;        // fav's current projected margin
+  var mv=cur-pre;                                       // + = favorite pulling away
+  var curStr=cur>=0?(nm(fav)+' by '+cur.toFixed(1)):(nm(favHome?g.away:g.home)+' by '+Math.abs(cur).toFixed(1));
+  return '<div class="mm"><div class="mm-h"><span class="pulse"></span>Model movement · live</div>'+
+    '<div class="mm-row">'+
+      '<div class="mm-cell"><div class="mm-k">Pregame</div><div class="mm-v">'+nm(fav)+' by '+pre.toFixed(1)+'</div></div>'+
+      '<div class="mm-cell"><div class="mm-k">Current</div><div class="mm-v">'+curStr+'</div></div>'+
+      '<div class="mm-cell"><div class="mm-k">Movement</div><div class="mm-v '+(mv>=0?"pos":"neg")+'">'+(mv>=0?"+":"")+mv.toFixed(1)+'</div></div>'+
+    '</div></div>';
+}
+// "Inside the model" — the text-heavy analysis broken into scannable,
+// expandable sections, each tied to a real model input.
+function insideTheModelHTML(g,sp){
+  if(!g)return "";
+  var H=g.home,A=g.away,favHome=g.prob_home>=0.5,fav=favHome?H:A,dog=favHome?A:H;
+  var nm=function(t){return t.abbr||t.name||"";};
+  var secs=[];
+  // Team strength
+  var hr=g.home_rating,ar=g.away_rating,ts;
+  if(hr!=null&&ar!=null){var fr=favHome?hr:ar,dr=favHome?ar:hr;
+    ts='The rating model has '+nm(fav)+' at <b>'+Math.round(fr)+'</b> and '+nm(dog)+' at <b>'+Math.round(dr)+'</b> — a <b>'+Math.round(Math.abs(hr-ar))+'-point</b> strength gap. Ratings are opponent-adjusted, so wins over tough schedules count more than padded ones.';
+  }else ts='Model rating is unavailable for this matchup, so the projection leans on record and home court.';
+  secs.push(['01','Team strength','Analyzed',ts]);
+  // Home court
+  var hc=g.home_edge_pts,hcpts=(hc!=null?hc:({nba:2.5,wnba:2.5,nfl:2.0,ncaaf:2.5,ncaab:3.5,wncaab:3.0,nhl:0.15}[sp]||2.5));
+  var hcTxt=sp==="nhl"?('About <b>'+Math.abs(hcpts).toFixed(2)+' goals</b> of home-ice edge goes to '+nm(H)+'.'):('<b>'+Math.abs(hcpts).toFixed(1)+' points</b> of home-court edge goes to '+nm(H)+' — the actual value the model applied, not a generic constant.');
+  secs.push(['02','Home court','Analyzed',hcTxt]);
+  // Rest & schedule
+  var rest=g.rest||{},hd=rest.home_days,ad=rest.away_days,rTxt,rTag;
+  if(hd!=null&&ad!=null&&hd!==ad){var fresher=hd>ad?H:A;rTxt=nm(fresher)+' are fresher (<b>'+hd+'</b> days to <b>'+ad+'</b>), and the model nudges the line toward the rested side.';rTag='Edge';}
+  else if(hd!=null&&ad!=null){rTxt='Both teams on comparable rest ('+hd+' vs '+ad+' days) — no scheduling edge applied.';rTag='Neutral';}
+  else {rTxt='No rest or back-to-back edge detected for this game.';rTag='Neutral';}
+  secs.push(['03','Rest & schedule',rTag,rTxt]);
+  // Injuries (only when something's priced in)
+  var inj=g.injuries||{},net=inj.net_pts,np=(inj.home||[]).length+(inj.away||[]).length,hasInj=(net&&Math.abs(net)>=0.5&&np);
+  if(hasInj){var iside=net>0?H:A;secs.push(['04','Injuries','Priced in','The current report shifts the line about <b>'+Math.abs(net).toFixed(1)+' points</b> toward '+nm(iside)+' ('+np+' player'+(np!==1?'s':'')+' accounted for). Confirm late scratches before betting.']);}
+  // Market disagreement (the key insight)
+  var mdTxt,mdTag='Analyzed';
+  if(g.odds&&g.odds.spread_home!=null&&g.exp_margin!=null){
+    var diff=g.exp_margin-(-g.odds.spread_home),mfav=g.odds.spread_home<0?H:A;
+    if(Math.abs(diff)>=0.5){var vteam=diff>0?H:A;mdTag='Key insight';
+      mdTxt='The market has '+nm(mfav)+' laying <b>'+Math.abs(g.odds.spread_home).toFixed(1)+'</b>; the model’s fair line is '+nm(fav)+' <b>-'+Math.abs(g.exp_margin).toFixed(1)+'</b>. A <b>'+Math.abs(diff).toFixed(1)+'-point</b> disagreement — the model sees the value on <b>'+nm(vteam)+'</b> against this number.';}
+    else mdTxt='The model’s fair line matches the market within a point — clear favorite, but no spread value to exploit.';
+  }else mdTxt='No market spread posted yet, so there’s nothing to disagree with — this is the standalone projection.';
+  secs.push([hasInj?'05':'04','Market disagreement',mdTag,mdTxt]);
+  var html='<div class="stat-sec">Inside the model</div><div class="itm-wrap">';
+  secs.forEach(function(s){var open=s[2]==="Key insight"?" open":"";var tc=s[2]==="Key insight"?"key":(s[2]==="Neutral"?"neutral":"");
+    html+='<details class="itm"'+open+'><summary><span class="itm-n">'+s[0]+'</span><span class="itm-t">'+s[1]+'</span><span class="itm-tag '+tc+'">'+s[2]+'</span></summary><div class="itm-body">'+s[3]+'</div></details>';});
+  return html+'</div>';
+}
 function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status==="live";const ph=Math.round(g.prob_home*100),pa=100-ph;
   const sa=g.score&&g.score.away!=null?g.score.away:"",sh=g.score&&g.score.home!=null?g.score.home:"";
   let statTxt=live?'<span class="live-tag"><span class="pulse"></span>'+((g.score&&g.score.detail)||"Live")+'</span>':fin?"Final":(g.event_time||(g.score&&g.score.detail)||"Scheduled");
@@ -2158,7 +2218,7 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
   else if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
   else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div class="panel">'+gameScriptHTML(g)+'<div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
   else{const mp=writeupHTML(g.analysis);
-    body='<div class="panel">'+threeIndicatorsHTML(g,sp)+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+'<div style="font-family:Archivo,sans-serif;font-size:16px;line-height:1.6;color:#eef1f5;margin:14px 0 18px">'+mp+'</div>'+
+    body='<div class="panel">'+threeIndicatorsHTML(g,sp)+modelMovementHTML(g,sp)+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+insideTheModelHTML(g,sp)+'<details class="itm"><summary><span class="itm-n">¶</span><span class="itm-t">Full write-up</span><span class="itm-tag">Prose</span></summary><div class="itm-body wu">'+mp+'</div></details>'+
     teamFactorsHTML(g,sp)+
     injuryPanelHTML(g)+
     teamLinesHTML(g)+
