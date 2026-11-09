@@ -1875,7 +1875,8 @@ function facRow(lab,a,b){return '<div class="fac"><span class="va">'+a+'</span><
 function renderMLBDetail(g){const fin=g.status==="finished",live=g.status==="live";const ph=Math.round(g.prob_home*100),pa=100-ph,f=g.factors||{};
   const sH=g.home.starter||{},sA=g.away.starter||{};
   let statTxt=live?'<span class="live-tag"><span class="pulse"></span>Live</span>':fin?"Final":(g.event_time||"");
-  const head='<div class="d-head"><div class="d-meta"><span class="tier" style="background:#3f7fc4">MLB</span><span class="tourn">'+(g.venue||"")+'</span><span class="status" style="margin-left:auto">'+statTxt+'</span></div>'+
+  const _awayC=(g.away&&g.away.color)||"#c8612f",_homeC=(g.home&&g.home.color)||"#e0a83c";
+  const head='<div class="d-head" style="--awayC:'+_awayC+';--homeC:'+_homeC+'"><div class="d-meta"><span class="tier" style="background:#3f7fc4">MLB</span><span class="tourn">'+(g.venue||"")+'</span><span class="status" style="margin-left:auto">'+statTxt+'</span></div>'+
     '<div class="d-logos"><img src="'+(g.away.logo||"")+'" onerror="this.style.visibility=\'hidden\'">'+
     '<div class="mlb-vs">'+((fin||live)?'<div class="rs">'+g.score.away+" - "+g.score.home+'</div>':"@")+(live?'<div class="inn">'+(g.score.state||"")+" "+(g.score.inning||"")+'</div>':"")+'</div>'+
     '<img src="'+(g.home.logo||"")+'" onerror="this.style.visibility=\'hidden\'"></div>'+
@@ -2099,7 +2100,8 @@ function heroStatHTML(g,sp){
 function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status==="live";const ph=Math.round(g.prob_home*100),pa=100-ph;
   const sa=g.score&&g.score.away!=null?g.score.away:"",sh=g.score&&g.score.home!=null?g.score.home:"";
   let statTxt=live?'<span class="live-tag"><span class="pulse"></span>'+((g.score&&g.score.detail)||"Live")+'</span>':fin?"Final":(g.event_time||(g.score&&g.score.detail)||"Scheduled");
-  const head='<div class="d-head"><div class="d-meta"><span class="tier" style="background:'+(TIER_COLOR[sp]||"#3f7fc4")+'">'+SPORT_LABEL[sp]+'</span><span class="tourn">'+(g.venue||"")+'</span><span class="status" style="margin-left:auto">'+statTxt+'</span></div>'+
+  const _awayC=(g.away&&g.away.color)||"#c8612f",_homeC=(g.home&&g.home.color)||"#e0a83c";
+  const head='<div class="d-head" style="--awayC:'+_awayC+';--homeC:'+_homeC+'"><div class="d-meta"><span class="tier" style="background:'+(TIER_COLOR[sp]||"#3f7fc4")+'">'+SPORT_LABEL[sp]+'</span><span class="tourn">'+(g.venue||"")+'</span><span class="status" style="margin-left:auto">'+statTxt+'</span></div>'+
     '<div class="d-logos"><img src="'+(g.away.logo||"")+'" onerror="this.style.visibility=\'hidden\'">'+
     '<div class="mlb-vs">'+((fin||live)?'<div class="rs">'+sa+" - "+sh+'</div>':"@")+'</div>'+
     '<img src="'+(g.home.logo||"")+'" onerror="this.style.visibility=\'hidden\'"></div>'+
@@ -2768,7 +2770,8 @@ function renderSoccerDetail(g){
   const fin=g.status==="finished",live=g.status==="live";
   const sa=g.score&&g.score.away!=null?g.score.away:"",sh=g.score&&g.score.home!=null?g.score.home:"";
   const statTxt=live?'<span class="live-tag"><span class="pulse"></span>'+(g.clock||"Live")+'</span>':fin?"Full time":(g.event_time||"Scheduled");
-  const head='<div class="d-head"><div class="d-meta"><span class="tier" style="background:'+(TIER_COLOR.soccer||"#2f9e6f")+'">'+(g.league_label||"Soccer")+'</span><span class="tourn">'+(g.venue||"")+'</span><span class="status" style="margin-left:auto">'+statTxt+'</span></div>'+
+  const _awayC=(g.away&&g.away.color)||"#c8612f",_homeC=(g.home&&g.home.color)||"#e0a83c";
+  const head='<div class="d-head" style="--awayC:'+_awayC+';--homeC:'+_homeC+'"><div class="d-meta"><span class="tier" style="background:'+(TIER_COLOR.soccer||"#2f9e6f")+'">'+(g.league_label||"Soccer")+'</span><span class="tourn">'+(g.venue||"")+'</span><span class="status" style="margin-left:auto">'+statTxt+'</span></div>'+
     '<div class="d-logos"><img src="'+(g.away.logo||"")+'" onerror="this.style.visibility=\'hidden\'">'+
     '<div class="mlb-vs">'+((fin||live)?'<div class="rs">'+sa+" - "+sh+'</div>':"@")+'</div>'+
     '<img src="'+(g.home.logo||"")+'" onerror="this.style.visibility=\'hidden\'"></div>'+

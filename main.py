@@ -620,43 +620,6 @@ async def lifespan(app: FastAPI):
                 print(f"[ats] name backfill skipped: {e}")
         _thr.Thread(target=_ats_name_backfill, daemon=True).start()
 
-        # TEMP: does ESPN tennis summary carry any game/point data we could show?
-        def _tennis_pbp_diag():
-            import time as _t, json as _json, datetime as _dt
-            _t.sleep(45)
-            try:
-                import espntennis as ET
-                out = {}
-                for lg in ("atp", "wta"):
-                    try:
-                        found = None
-                        for off in (0, 1, 2):
-                            d = (_dt.date.today() - _dt.timedelta(days=off)).strftime("%Y%m%d")
-                            sb = ET._http_get(ET._SCOREBOARD.format(lg=lg, d=d)) or {}
-                            evs = sb.get("events") or []
-                            if evs:
-                                comp = ((evs[0].get("competitions") or [{}])[0])
-                                found = comp.get("id") or evs[0].get("id")
-                                if found:
-                                    break
-                        if not found:
-                            out[lg] = {"events": 0}
-                            continue
-                        summ = ET._http_get(ET._SUMMARY.format(lg=lg, eid=found)) or {}
-                        pbp = summ.get("playByPlay") or summ.get("plays")
-                        rec = {"eid": found, "top_keys": sorted(list(summ.keys()))[:16],
-                               "has_pbp": bool(pbp)}
-                        if isinstance(pbp, list) and pbp:
-                            rec["pbp_len"] = len(pbp)
-                            rec["pbp_sample_keys"] = sorted(list((pbp[0] or {}).keys()))[:12]
-                        out[lg] = rec
-                    except Exception as e:
-                        out[lg] = {"err": str(e)[:70]}
-                print("[tennis-pbp] === " + _json.dumps(out)[:1800])
-            except Exception as e:
-                print(f"[tennis-pbp] failed: {e}")
-        _thr.Thread(target=_tennis_pbp_diag, daemon=True).start()
-
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy

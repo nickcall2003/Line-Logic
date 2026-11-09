@@ -255,10 +255,14 @@ def _side(competitor):
     if not logo:
         logos = t.get("logos") or []
         logo = logos[0]["href"] if logos else None
+    def _hex(c):
+        c = (c or "").strip().lstrip("#")
+        return ("#" + c) if len(c) in (3, 6) else None
     return {
         "team_id": t.get("id"), "name": t.get("displayName", "Team"),
         "location": t.get("location", ""), "short": t.get("shortDisplayName", ""),
         "abbr": t.get("abbreviation", ""), "logo": logo,
+        "color": _hex(t.get("color")), "alt_color": _hex(t.get("alternateColor")),
         "record": rec, "win_pct": wp,
         "score": _to_int(competitor.get("score")),
     }
