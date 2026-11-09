@@ -1159,12 +1159,24 @@ async function silentReload(){
   else{await loadDay();if(tok!==loadToken||sport!=="tennis"||view!=="sport")return;render();}
   loadAccuracy();   // refresh today/30d W-L as live games settle
 }
+// A game should be polled if it's live OR it's past its scheduled start but not
+// finished — otherwise a board loaded before tipoff never refreshes to notice
+// games going live (it just sits on "pending").
+function gameDue(g){
+  if(!g)return false;
+  if(g.status==="live")return true;
+  if(g.status==="finished")return false;
+  var ts=g.start_ts||g.start||g.date||(g.score&&g.score.start);
+  if(ts){var t=Date.parse(ts);
+    if(!isNaN(t)&&t<=Date.now()+120000&&t>=Date.now()-6*3600*1000)return true;}
+  return false;
+}
 function hasLiveOnBoard(){try{
-  if(sport==="soccer")return (soccerGames||[]).some(g=>g.status==="live");
-  if(sport==="ufc")return (ufcGames||[]).some(g=>g.status==="live");
+  if(sport==="soccer")return (soccerGames||[]).some(gameDue);
+  if(sport==="ufc")return (ufcGames||[]).some(gameDue);
   if(sport==="golf")return !!(golfBoard&&golfBoard.event&&golfBoard.event.is_live);
-  if(isTeam(sport))return (teamGames||[]).some(g=>g.status==="live");
-  return (current||[]).some(m=>m.status==="live");
+  if(isTeam(sport))return (teamGames||[]).some(gameDue);
+  return (current||[]).some(gameDue);
 }catch(e){return false;}}
 setInterval(()=>{if(!detailId&&view==="sport"&&hasLiveOnBoard())silentReload();},15000);
 // ---- history-driven back button (works on iOS Safari) ----
