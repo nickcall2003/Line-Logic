@@ -620,6 +620,35 @@ async def lifespan(app: FastAPI):
                 print(f"[ats] name backfill skipped: {e}")
         _thr.Thread(target=_ats_name_backfill, daemon=True).start()
 
+        # TEMP: confirm ESPN play-by-play shape for live games across sports.
+        def _pbp_diag():
+            import time as _t, json as _json, datetime as _dt
+            _t.sleep(50)
+            try:
+                import espn_provider as EP
+                today = _dt.date.today()
+                out = {}
+                for sp in ("nba", "ncaab", "nhl", "nfl", "ncaaf", "mlb"):
+                    try:
+                        gs = EP.get_games(sp, today) or []
+                        live = [g for g in gs if g.get("status") in ("live", "finished")]
+                        pick = (live or gs)
+                        if not pick:
+                            out[sp] = {"games": 0}
+                            continue
+                        gid = pick[0].get("id")
+                        pr = EP.get_plays(sp, gid)
+                        samp = (pr.get("plays") or [])[:1]
+                        out[sp] = {"games": len(gs), "gid": gid,
+                                   "plays": pr.get("count"),
+                                   "sample": (samp[0].get("text", "")[:70] if samp else None)}
+                    except Exception as e:
+                        out[sp] = {"err": str(e)[:60]}
+                print("[pbp-diag] === " + _json.dumps(out)[:1500])
+            except Exception as e:
+                print(f"[pbp-diag] failed: {e}")
+        _thr.Thread(target=_pbp_diag, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy
@@ -5002,6 +5031,16 @@ def soccer_boxscore(game_id: str, date: str | None = None, league: str | None = 
     target = dt.date.fromisoformat(date) if date else dt.date.today()
     lg = league or soccer_provider.DEFAULT_LEAGUE
     return soccer_provider.get_boxscore(target, game_id, lg)
+
+
+@app.get("/api/{sport}/plays/{game_id}")
+def game_plays(sport: str, game_id: str):
+    """Live play-by-play for one game (ESPN summary `plays`)."""
+    import espn_provider as EP
+    try:
+        return EP.get_plays(sport.lower(), game_id)
+    except Exception as e:
+        return {"supported": True, "plays": [], "count": 0, "error": str(e)[:120]}
 
 
 @app.get("/api/{sport}/games")

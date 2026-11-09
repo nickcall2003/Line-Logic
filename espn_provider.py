@@ -1375,6 +1375,49 @@ def get_boxscore(sport, date, game_id):
     return out
 
 
+_plays_cache = {}
+def get_plays(sport, game_id, limit=120):
+    """Live play-by-play for one game from the ESPN summary `plays` feed.
+    Returns newest-first plays normalized to {text, period, clock, home_score,
+    away_score, scoring, team_id}. Cached ~8s so a live board stays fresh
+    without hammering ESPN. supported=False when the sport/feed has no plays."""
+    import time as _t
+    url = SUMMARY.get(sport)
+    if not url:
+        return {"supported": False, "plays": [], "count": 0}
+    ck = (sport, str(game_id))
+    c = _plays_cache.get(ck)
+    if c and _t.time() - c[0] < 8:
+        return c[1]
+    try:
+        data = _get(url, {"event": str(game_id)})
+    except Exception as e:
+        print(f"[{sport}] plays fetch failed: {e}")
+        return {"supported": True, "plays": [], "count": 0}
+    raw = data.get("plays") or []
+    out = []
+    for p in raw:
+        per = p.get("period") or {}
+        clk = p.get("clock") or {}
+        out.append({
+            "id": p.get("id"),
+            "text": p.get("text") or (p.get("type") or {}).get("text") or "",
+            "period": per.get("number"),
+            "period_txt": per.get("displayValue"),
+            "clock": clk.get("displayValue"),
+            "home_score": p.get("homeScore"),
+            "away_score": p.get("awayScore"),
+            "scoring": bool(p.get("scoringPlay")),
+            "team_id": str((p.get("team") or {}).get("id") or "") or None,
+        })
+    out.reverse()   # ESPN lists oldest-first; newest at top for a live feed
+    if limit:
+        out = out[:limit]
+    res = {"supported": True, "plays": out, "count": len(out)}
+    _plays_cache[ck] = (_t.time(), res)
+    return res
+
+
 _officials_cache = {}
 def get_officials(sport, game_id):
     """Referee crew from the ESPN summary (gameInfo.officials). Best-effort:
