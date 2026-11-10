@@ -24,8 +24,9 @@ import os
 
 from PIL import Image, ImageDraw, ImageFont
 
-# Opt-in full-bleed action photos (Wikipedia). Default OFF: clean ESPN headshot.
-_WIKI_PHOTOS = os.environ.get("WIKI_PHOTOS", "0") == "1"
+# Full-bleed action photos (Wikipedia) ON by default; WIKI_PHOTOS=0 forces the
+# clean ESPN headshot fallback instead.
+_WIKI_PHOTOS = os.environ.get("WIKI_PHOTOS", "1") == "1"
 
 # ── brand ──────────────────────────────────────────────────────────────────
 SS = 2                       # supersample factor (render 2x, downscale -> crisp)
@@ -609,9 +610,8 @@ def render_prop_card(d: dict) -> bytes:
     reserve = (182 if style == "spotlight" else 360) * SS
     hy1 = (H - 104) * SS - reserve
     hero_w, hero_h = hx1 - hx0, hy1 - hy0
-    # 1) Opt-in: a safety-filtered Wikipedia photo, full-bleed (action-shot look).
-    #    Default OFF -> the clean ESPN "picture-day" headshot on the spotlight is
-    #    the consistent default. Flip WIKI_PHOTOS=1 to use action photos again.
+    # 1) Preferred: a safety-filtered Wikipedia photo, full-bleed (action-shot
+    #    look). Set WIKI_PHOTOS=0 only to force the clean ESPN headshot fallback.
     _used_photo = False
     if _WIKI_PHOTOS:
         try:
