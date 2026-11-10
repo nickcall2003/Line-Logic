@@ -556,6 +556,8 @@ def _team_athlete_avgs(sport, team_id, season=None):
                         pass
         if vals:
             vals["_pos"] = ((ath.get("position") or {}) or {}).get("abbreviation") or ""
+            if ath.get("id"):
+                vals["_id"] = str(ath.get("id"))   # exact ESPN id → reliable headshot
             out[nm] = vals
     return out
 

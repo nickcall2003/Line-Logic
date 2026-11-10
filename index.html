@@ -5804,11 +5804,23 @@ function matchShareText(m){
   return ["🎾 TENNIS — "+(favA?m.player_a:m.player_b),
     m.player_a+" vs "+m.player_b,"Model "+pct+"%","","Every pick graded, win or lose.","thelinelogic.com"].join("\n");
 }
-function propShareText(c,sp,prop){
+function propShareText(c,sp,prop,props){
   var label=(typeof PE_PROJ_LABEL!=="undefined"&&PE_PROJ_LABEL[prop])||prop||"";
-  var proj=(c.projections&&c.projections[prop]!=null)?Number(c.projections[prop]).toFixed(1):"";
-  return ["📊 "+((SPORT_LABEL[sp]||sp).toUpperCase())+" — "+c.player,
-    (c.team||"")+(c.opp?" vs "+c.opp:""),label+" projection: "+proj,"","thelinelogic.com"].join("\n");
+  var proj=(c.projections&&c.projections[prop]!=null)?Number(c.projections[prop]):null;
+  var lo=(props&&typeof peFindLine==="function")?peFindLine(props,c.player,prop):null;
+  var line=(lo&&lo.line!=null)?Number(lo.line):null;
+  var L=["📊 "+c.player+" — "+label,(c.team||"")+(c.opp?" vs "+c.opp:"")];
+  if(proj!=null&&line!=null){
+    var op=peOverProb(proj,line),over=op>=0.5,v=(typeof peVerdict==="function")?peVerdict(op):{k:""};
+    L.push("Line Logic model: "+proj.toFixed(1)+"  (vs "+(over?"o":"u")+line+
+      (c.edge_pct!=null?(" · "+(c.edge_pct>=0?"+":"")+Number(c.edge_pct).toFixed(1)+"% edge"):"")+")");
+    L.push((v.k?v.k+"  ·  ":"")+Math.round((over?op:1-op)*100)+"% to hit");
+  } else if(proj!=null){
+    L.push("Line Logic model projection: "+proj.toFixed(1));
+  }
+  L.push("");
+  L.push("Every prop graded, win or lose → thelinelogic.com");
+  return L.join("\n");
 }
 function sharePayload(p){
   var L=[];
@@ -7201,7 +7213,7 @@ function peBlueprint(c){
 // in index.html (same runtime scope as this concatenated bundle).
 function peShareRow(c,props,sport,prop){
   if(!prop||typeof shareBtnHTML!=="function"||typeof peCardUrl!=="function")return "";
-  var txt=(typeof propShareText==="function")?propShareText(c,sport,prop):"";
+  var txt=(typeof propShareText==="function")?propShareText(c,sport,prop,props):"";
   return '<div class="cardshare-row pe-share2">'+
     shareBtnHTML(peCardUrl(c,props,sport,prop,"spotlight"),txt,"⤴ Spotlight")+
     shareBtnHTML(peCardUrl(c,props,sport,prop,"full"),txt,"⤴ Full analysis")+
