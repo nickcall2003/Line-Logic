@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v124";   // bumped: TheSportsDB cutouts + cleaner share draft
+const CACHE = "ll-shell-v125";   // bumped: share cache-bust so re-shared cards render fresh
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));

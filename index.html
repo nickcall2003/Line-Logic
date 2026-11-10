@@ -5846,6 +5846,9 @@ function sharePayload(p){
 async function sharePick(ev,el){
   if(ev){ev.stopPropagation();ev.preventDefault();}
   var url=el.getAttribute("data-card")||"";
+  // Rotating cache-bust (2-min buckets): a re-shared card can't serve a stale
+  // render from a CDN/edge cache, while rapid re-shares still hit one render.
+  if(url)url+=(url.indexOf("?")>=0?"&":"?")+"cb="+Math.floor(Date.now()/120000);
   var txt=el.getAttribute("data-share")||"";
   var abs=url?(location.origin+url):"";
   var old=el.innerHTML;
