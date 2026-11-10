@@ -230,8 +230,18 @@ def match_depth(sport, home_name, away_name, league=None):
 def diag(sport, league=None):
     table = _standings(sport, league)
     first = list(table.values())[0] if table else None
+    # Full name->value map for the sample team so we can see exactly what
+    # names ESPN uses (college feeds differ from pro) and whether they're 0.
+    sample_vals = {}
+    if first:
+        for k, v in first["stats"].items():
+            if k.endswith("__d"):
+                continue
+            sample_vals[k] = v
     return {"enabled": enabled(), "sport": sport, "league": league,
             "teams": len(table),
             "sample_team": first["name"] if first else None,
-            "sample_stats": sorted(list(first["stats"].keys()))[:30] if first else [],
+            "sample_record": (_bio(first) if first else []),
+            "sample_stats": sample_vals,
+            "all_team_names": sorted(list(table.keys()))[:40],
             "fetch": _last}
