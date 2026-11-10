@@ -415,6 +415,54 @@ def _grad_panel(img, box, radius, top, bot, outline=None, width=2):
                                               outline=outline, width=int(width))
 
 
+def _sport_bg(sport):
+    """Dark, on-brand gradient colors per sport for the hero stage."""
+    sp = (sport or "").lower()
+    if sp in ("nfl", "ncaaf"):
+        return (17, 35, 23), (8, 16, 11)          # field green, deep
+    if sp in ("nba", "wnba", "ncaab", "ncaabb", "wncaab"):
+        return (38, 29, 19), (14, 12, 9)          # hardwood amber, deep
+    if sp == "nhl":
+        return (20, 29, 40), (9, 14, 20)          # rink ice-blue, deep
+    if sp == "mlb":
+        return (31, 25, 17), (12, 11, 8)          # infield clay, deep
+    return (30, 31, 36), (13, 14, 12)
+
+
+def _sport_lines(draw, box, sport):
+    """Subtle court/field line art so the player sits on their surface, not on
+    black. Kept low-contrast; the player photo is pasted on top."""
+    x0, y0, x1, y1 = [int(v) for v in box]
+    w, h = x1 - x0, y1 - y0
+    cx = (x0 + x1) // 2
+    sp = (sport or "").lower()
+    if sp in ("nfl", "ncaaf"):
+        col = (34, 60, 42)
+        for i in range(1, 7):
+            yy = y0 + int(h * i / 7)
+            draw.line((x0 + 36 * SS, yy, x1 - 36 * SS, yy), fill=col, width=2 * SS)
+            for hx in (cx - 10 * SS, cx + 10 * SS):
+                draw.line((hx, yy - 7 * SS, hx, yy + 7 * SS), fill=col, width=2 * SS)
+    elif sp in ("nba", "wnba", "ncaab", "ncaabb", "wncaab"):
+        col = (72, 55, 33)
+        r = int(w * 0.17)
+        draw.arc((cx - r, y0 + 40 * SS - r, cx + r, y0 + 40 * SS + r), 0, 360, fill=col, width=3 * SS)
+        r2 = int(w * 0.30)
+        draw.arc((cx - r2, y1 - 30 * SS - r2, cx + r2, y1 - 30 * SS + r2), 180, 360, fill=col, width=3 * SS)
+        draw.line((cx - int(w * 0.22), y1 - 30 * SS, cx + int(w * 0.22), y1 - 30 * SS), fill=col, width=3 * SS)
+    elif sp == "nhl":
+        col = (44, 60, 82)
+        draw.ellipse((cx - 78 * SS, (y0 + y1) // 2 - 78 * SS, cx + 78 * SS, (y0 + y1) // 2 + 78 * SS),
+                     outline=col, width=3 * SS)
+        draw.line((cx, y0 + 24 * SS, cx, y1 - 24 * SS), fill=col, width=2 * SS)
+    elif sp == "mlb":
+        col = (66, 50, 34)
+        d0 = int(w * 0.20)
+        by = y1 - 54 * SS
+        draw.line([(cx, by - d0), (cx + d0, by), (cx, by + d0), (cx - d0, by), (cx, by - d0)],
+                  fill=col, width=3 * SS)
+
+
 def _fetch_photo(url):
     """Fetch a player headshot PNG (transparent) for compositing. None on failure
     (e.g. a thin roster id); the card falls back to an initials medallion."""
@@ -476,8 +524,10 @@ def render_prop_card(d: dict) -> bytes:
     reserve = (182 if style == "spotlight" else 360) * SS
     hy1 = (H - 104) * SS - reserve
     hero_w, hero_h = hx1 - hx0, hy1 - hy0
-    _grad_panel(img, (hx0, hy0, hx1, hy1), 30 * SS, (30, 31, 36), (13, 14, 12),
+    _bg_top, _bg_bot = _sport_bg(d.get("sport"))
+    _grad_panel(img, (hx0, hy0, hx1, hy1), 30 * SS, _bg_top, _bg_bot,
                 outline=(74, 63, 40), width=2 * SS)
+    _sport_lines(draw, (hx0, hy0, hx1, hy1), d.get("sport"))
 
     photo = _fetch_photo(d.get("img"))
     if photo is not None:

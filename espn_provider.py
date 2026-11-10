@@ -926,14 +926,41 @@ def _team_roster_ids(sport, team_id):
             if k and k not in ids:
                 ids[k] = str(aid)
 
-    # Source 1: athlete statistics endpoint.
+    # Source 1: athlete statistics endpoint. ESPN moved players under
+    # results[<cat>].leaders[] (old shape was athletes[]); parse both, and walk
+    # back seasons like _team_athlete_avgs so early-season (no games yet) still
+    # resolves ids — otherwise every headshot is null in the first weeks.
     try:
         url = _ATHLETE_STATS.get(sport)
         if url and team_id:
-            data = _get(url.format(team=team_id), {"region": "us"})
-            for entry in (data.get("athletes") or []):
-                ath = entry.get("athlete", {}) or {}
-                _add(ath.get("displayName"), ath.get("id"))
+            import datetime as _dt
+            yr = _dt.date.today().year
+            for _season in (None, yr, yr - 1, yr - 2):
+                params = {"region": "us"}
+                if _season:
+                    params["season"] = str(_season)
+                try:
+                    data = _get(url.format(team=team_id), params) or {}
+                except Exception:
+                    continue
+                entries = []
+                results = data.get("results")
+                if isinstance(results, list):
+                    for cat in results:
+                        leaders = (cat or {}).get("leaders") if isinstance(cat, dict) else None
+                        if leaders:
+                            entries = leaders
+                            break
+                if not entries:
+                    entries = data.get("athletes") or []
+                got = 0
+                for entry in entries:
+                    ath = entry.get("athlete", {}) or {}
+                    if ath.get("displayName") and ath.get("id"):
+                        _add(ath.get("displayName"), ath.get("id"))
+                        got += 1
+                if got:
+                    break
     except Exception:
         pass
     # Source 2: dedicated roster endpoint (different shape: athletes[].items[]) —
