@@ -631,7 +631,7 @@ async def lifespan(app: FastAPI):
         def _depth_probe():
             import time as _t, json as _json
             _t.sleep(30)
-            if os.environ.get("DEPTH_PROBE", "1") != "1":
+            if os.environ.get("DEPTH_PROBE", "0") != "1":
                 return
             try:
                 import httpx
@@ -793,7 +793,7 @@ async def lifespan(app: FastAPI):
         def _sportsdb_probe():
             import time as _t
             _t.sleep(35)
-            if os.environ.get("SPORTSDB_PROBE", "1") != "1":
+            if os.environ.get("SPORTSDB_PROBE", "0") != "1":
                 return
             try:
                 import sportsdb
@@ -835,7 +835,7 @@ async def lifespan(app: FastAPI):
         def _wiki_probe():
             import time as _t
             _t.sleep(40)
-            if os.environ.get("WIKI_PROBE", "1") != "1":
+            if os.environ.get("WIKI_PROBE", "0") != "1":
                 return
             try:
                 import wikiphoto

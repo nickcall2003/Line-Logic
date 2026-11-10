@@ -493,6 +493,40 @@ def _venue_backdrop(img, box, radius, bgimg):
         return False
 
 
+def _photo_hero(img, box, radius, ph):
+    """Full-bleed player photo filling the hero (cover-fit, cropped toward the
+    top to keep the face), darkened top and bottom so the overlays stay legible."""
+    try:
+        from PIL import ImageChops
+        x0, y0, x1, y1 = [int(v) for v in box]
+        w, h = x1 - x0, y1 - y0
+        bw, bh = ph.size
+        if w <= 0 or h <= 0 or bw <= 0 or bh <= 0:
+            return False
+        scale = max(w / bw, h / bh)
+        nb = ph.convert("RGB").resize((max(1, int(bw * scale)), max(1, int(bh * scale))), Image.LANCZOS)
+        cxl = (nb.width - w) // 2
+        cyl = max(0, min(nb.height - h, int((nb.height - h) * 0.15)))
+        nb = nb.crop((cxl, cyl, cxl + w, cyl + h))
+        gr = Image.new("L", (1, h))
+        for yy in range(h):
+            f = yy / max(1, h - 1)
+            v = 255
+            if f < 0.28:
+                v = int(255 * (1 - (0.28 - f) / 0.28 * 0.66))
+            elif f > 0.48:
+                v = int(255 * (1 - (f - 0.48) / 0.52 * 0.74))
+            gr.putpixel((0, yy), max(0, min(255, v)))
+        gr = gr.resize((w, h))
+        nb = ImageChops.multiply(nb, Image.merge("RGB", (gr, gr, gr)))
+        mask = Image.new("L", (w, h), 0)
+        ImageDraw.Draw(mask).rounded_rectangle((0, 0, w - 1, h - 1), radius=int(radius), fill=255)
+        img.paste(nb, (x0, y0), mask)
+        return True
+    except Exception:
+        return False
+
+
 def _fetch_photo(url):
     """Fetch a player headshot PNG (transparent) for compositing. None on failure
     (e.g. a thin roster id); the card falls back to an initials medallion."""
@@ -554,53 +588,70 @@ def render_prop_card(d: dict) -> bytes:
     reserve = (182 if style == "spotlight" else 360) * SS
     hy1 = (H - 104) * SS - reserve
     hero_w, hero_h = hx1 - hx0, hy1 - hy0
-    # Resolve TheSportsDB assets once (player cutout + team venue/fanart).
-    _assets = {}
+    # 1) Preferred: a safety-filtered Wikipedia photo, full-bleed (Underdog look).
+    _used_photo = False
     try:
-        import sportsdb
-        _assets = sportsdb.player_assets(d.get("player"), d.get("sport")) or {}
+        import wikiphoto
+        _wurl = wikiphoto.photo(d.get("player"), d.get("sport"))
+        if _wurl:
+            _wimg = _fetch_photo(_wurl)
+            if _wimg is not None:
+                _used_photo = _photo_hero(img, (hx0, hy0, hx1, hy1), 30 * SS, _wimg)
     except Exception:
-        _assets = {}
+        _used_photo = False
 
-    # Backdrop: a real venue/fanart image where available, else the spotlight.
-    _drew_bg = False
-    _bgurl = _assets.get("fanart") or _assets.get("stadium")
-    if _bgurl:
-        _bgimg = _fetch_photo(_bgurl)
-        if _bgimg is not None:
-            _drew_bg = _venue_backdrop(img, (hx0, hy0, hx1, hy1), 30 * SS, _bgimg)
-    if not _drew_bg:
-        _base, _glow = _sport_glow(d.get("sport"))
-        _spotlight(img, (hx0, hy0, hx1, hy1), 30 * SS, _base, _glow)
-    ImageDraw.Draw(img).rounded_rectangle((hx0, hy0, hx1, hy1), radius=30 * SS,
-                                          outline=(74, 63, 40), width=2 * SS)
-
-    # Player: TheSportsDB cutout → ESPN headshot (`img`) → initials.
-    photo = None
-    _curl = _assets.get("cutout") or _assets.get("render")
-    if _curl:
-        photo = _fetch_photo(_curl)
-    if photo is None:
-        photo = _fetch_photo(d.get("img"))
-    if photo is not None:
-        target_h = int(hero_h - 96 * SS)
-        scale = target_h / photo.height
-        pw, ph = int(photo.width * scale), target_h
-        maxw = int(hero_w * 0.98)
-        if pw > maxw:
-            scale = maxw / photo.width
-            pw, ph = maxw, int(photo.height * scale)
-        photo = photo.resize((pw, ph), Image.LANCZOS)
-        img.paste(photo, (int(hx0 + (hero_w - pw) / 2), int(hy1 - ph - 6 * SS)), photo)
+    if _used_photo:
+        ImageDraw.Draw(img).rounded_rectangle((hx0, hy0, hx1, hy1), radius=30 * SS,
+                                              outline=(74, 63, 40), width=2 * SS)
+        _cf = _font("bold", 17 * SS)
+        _ct = "PHOTO: WIKIMEDIA"
+        _cw, _ = _tw(draw, _ct, _cf)
+        _text(draw, (hx1 - 20 * SS - _cw, hy1 - 28 * SS), _ct, _cf, (120, 120, 120))
     else:
-        r0 = 150 * SS
-        cx, cyc = (hx0 + hx1) // 2, (hy0 + hy1) // 2
-        draw.ellipse((cx - r0, cyc - r0, cx + r0, cyc + r0), fill=PANEL_HI,
-                     outline=GOLD, width=3 * SS)
-        ini = "".join([p[0] for p in (d.get("player") or "?").split()[:2]]).upper()
-        f0 = _font("cond", 118 * SS)
-        iw, ih = _tw(draw, ini, f0)
-        _text(draw, (cx - iw // 2, cyc - ih // 2 - 12 * SS), ini, f0, GOLD_HI)
+        # 2) Fallback: TheSportsDB (only if a paid key is set) else the spotlight,
+        #    with the ESPN headshot cutout, then an initials medallion.
+        _assets = {}
+        try:
+            import sportsdb
+            _assets = sportsdb.player_assets(d.get("player"), d.get("sport")) or {}
+        except Exception:
+            _assets = {}
+        _drew_bg = False
+        _bgurl = _assets.get("fanart") or _assets.get("stadium")
+        if _bgurl:
+            _bgimg = _fetch_photo(_bgurl)
+            if _bgimg is not None:
+                _drew_bg = _venue_backdrop(img, (hx0, hy0, hx1, hy1), 30 * SS, _bgimg)
+        if not _drew_bg:
+            _base, _glow = _sport_glow(d.get("sport"))
+            _spotlight(img, (hx0, hy0, hx1, hy1), 30 * SS, _base, _glow)
+        ImageDraw.Draw(img).rounded_rectangle((hx0, hy0, hx1, hy1), radius=30 * SS,
+                                              outline=(74, 63, 40), width=2 * SS)
+        photo = None
+        _curl = _assets.get("cutout") or _assets.get("render")
+        if _curl:
+            photo = _fetch_photo(_curl)
+        if photo is None:
+            photo = _fetch_photo(d.get("img"))
+        if photo is not None:
+            target_h = int(hero_h - 96 * SS)
+            scale = target_h / photo.height
+            pw, ph = int(photo.width * scale), target_h
+            maxw = int(hero_w * 0.98)
+            if pw > maxw:
+                scale = maxw / photo.width
+                pw, ph = maxw, int(photo.height * scale)
+            photo = photo.resize((pw, ph), Image.LANCZOS)
+            img.paste(photo, (int(hx0 + (hero_w - pw) / 2), int(hy1 - ph - 6 * SS)), photo)
+        else:
+            r0 = 150 * SS
+            cx, cyc = (hx0 + hx1) // 2, (hy0 + hy1) // 2
+            draw.ellipse((cx - r0, cyc - r0, cx + r0, cyc + r0), fill=PANEL_HI,
+                         outline=GOLD, width=3 * SS)
+            ini = "".join([p[0] for p in (d.get("player") or "?").split()[:2]]).upper()
+            f0 = _font("cond", 118 * SS)
+            iw, ih = _tw(draw, ini, f0)
+            _text(draw, (cx - iw // 2, cyc - ih // 2 - 12 * SS), ini, f0, GOLD_HI)
 
     # archetype chip — top-left of the stage
     arch = (d.get("arch") or "").strip()
