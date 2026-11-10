@@ -620,6 +620,124 @@ async def lifespan(app: FastAPI):
                 print(f"[ats] name backfill skipped: {e}")
         _thr.Thread(target=_ats_name_backfill, daemon=True).start()
 
+        # One-shot DEPTH PROBE: the Season-depth panel shows zeros for college
+        # (ncaaf/ncaab) because ESPN's old standings endpoint no longer carries
+        # points-for/against for those leagues (and may be failing outright).
+        # This tries several candidate endpoints from Railway (which CAN reach
+        # ESPN) and prints, per endpoint: HTTP status, team count, and a sample
+        # team's full stat name->value map, plus the per-team statistics feed
+        # (the real "stat sheet"). Search Railway logs for [depthprobe] and
+        # paste the output. Disable later with DEPTH_PROBE=0.
+        def _depth_probe():
+            import time as _t, json as _json
+            _t.sleep(30)
+            if os.environ.get("DEPTH_PROBE", "1") != "1":
+                return
+            try:
+                import httpx
+            except Exception as e:
+                print(f"[depthprobe] httpx missing: {e}")
+                return
+            yr = __import__("datetime").datetime.utcnow().year
+            UA = {"User-Agent": "Mozilla/5.0"}
+
+            def _grab(url):
+                try:
+                    r = httpx.get(url, timeout=18, follow_redirects=True, headers=UA)
+                    return r.status_code, r.text
+                except Exception as e:
+                    return None, f"ERR {e}"
+
+            def _collect_entries(node, acc):
+                if isinstance(node, dict):
+                    if isinstance(node.get("entries"), list):
+                        for e in node["entries"]:
+                            if isinstance(e, dict) and e.get("team"):
+                                acc.append(e)
+                    for v in node.values():
+                        _collect_entries(v, acc)
+                elif isinstance(node, list):
+                    for v in node:
+                        _collect_entries(v, acc)
+
+            def _entry_stats(e):
+                tm = e.get("team") or {}
+                nm = tm.get("displayName") or tm.get("name") or "?"
+                sv = {}
+                for s in (e.get("stats") or []):
+                    if s.get("name") is not None:
+                        sv[s["name"]] = s.get("value")
+                return str(tm.get("id") or ""), nm, sv
+
+            def _dump_standings(tag, url):
+                st, body = _grab(url)
+                if st != 200 or not isinstance(body, str) or not body.startswith(("{", "[")):
+                    print(f"[depthprobe] {tag} status={st} bytes={len(body) if body else 0} url={url} head={str(body)[:120]}")
+                    return None
+                try:
+                    data = _json.loads(body)
+                except Exception as e:
+                    print(f"[depthprobe] {tag} status=200 JSON-FAIL {e} url={url}")
+                    return None
+                acc = []
+                _collect_entries(data, acc)
+                print(f"[depthprobe] {tag} status=200 bytes={len(body)} teams={len(acc)} url={url}")
+                if acc:
+                    for e in acc[:1]:
+                        tid, nm, sv = _entry_stats(e)
+                        print(f"[depthprobe]   SAMPLE {nm} id={tid} stats={_json.dumps(sv)[:900]}")
+                return acc
+
+            def _dump_teamstats(tag, sportword, league):
+                # team list -> pick a sample id -> per-team statistics (the stat sheet)
+                st, body = _grab(f"https://site.api.espn.com/apis/site/v2/sports/{sportword}/{league}/teams")
+                tid = None; tnm = None
+                try:
+                    data = _json.loads(body)
+                    lst = (((data.get("sports") or [{}])[0].get("leagues") or [{}])[0].get("teams") or [])
+                    if lst:
+                        tid = str(((lst[0] or {}).get("team") or {}).get("id") or "")
+                        tnm = ((lst[0] or {}).get("team") or {}).get("displayName")
+                    print(f"[depthprobe] {tag} teams-list status={st} count={len(lst)} sample={tnm}#{tid}")
+                except Exception as e:
+                    print(f"[depthprobe] {tag} teams-list status={st} parse-fail {e}")
+                if not tid:
+                    return
+                st2, body2 = _grab(f"https://site.api.espn.com/apis/site/v2/sports/{sportword}/{league}/teams/{tid}/statistics")
+                if st2 != 200 or not body2.startswith("{"):
+                    print(f"[depthprobe] {tag} teamstats status={st2} bytes={len(body2) if body2 else 0} head={str(body2)[:120]}")
+                    return
+                try:
+                    d2 = _json.loads(body2)
+                    cats = (((d2.get("results") or {}).get("stats") or {}).get("categories")) or \
+                           (((d2.get("statistics") or {}).get("splits") or {}).get("categories")) or []
+                    print(f"[depthprobe] {tag} teamstats status=200 categories={[c.get('name') for c in cats][:12]}")
+                    for c in cats:
+                        if c.get("name") in ("scoring", "general", "scoringPerGame", "offense", "defensive", "defense"):
+                            pairs = {(s.get("name") or s.get("abbreviation")): (s.get("displayValue") or s.get("value"))
+                                     for s in (c.get("stats") or [])}
+                            print(f"[depthprobe]   {tag} cat={c.get('name')} {_json.dumps(pairs)[:700]}")
+                except Exception as e:
+                    print(f"[depthprobe] {tag} teamstats parse-fail {e}")
+
+            try:
+                probes = [
+                    ("ncaaf", "football", "college-football"),
+                    ("ncaab", "basketball", "mens-college-basketball"),
+                    ("nfl", "football", "nfl"),
+                ]
+                for sp, sw, lg in probes:
+                    print(f"[depthprobe] ===== {sp} =====")
+                    _dump_standings(f"{sp}/site.api.v2", f"https://site.api.espn.com/apis/v2/sports/{sw}/{lg}/standings")
+                    _dump_standings(f"{sp}/site.web.v2", f"https://site.web.api.espn.com/apis/v2/sports/{sw}/{lg}/standings?region=us&lang=en&contentorigin=espn&season={yr}&type=2&level=3")
+                    _dump_standings(f"{sp}/cdn.core", f"https://cdn.espn.com/core/{lg}/standings?xhr=1")
+                    _dump_teamstats(f"{sp}", sw, lg)
+                    _t.sleep(1)
+                print("[depthprobe] ===== done =====")
+            except Exception as e:
+                print(f"[depthprobe] setup failed: {e}")
+        _thr.Thread(target=_depth_probe, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy
