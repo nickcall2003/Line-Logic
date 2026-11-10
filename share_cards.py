@@ -550,6 +550,24 @@ def _shadow_text(draw, xy, text, font, fill, sh=3):
     draw.text((x, y), text, font=font, fill=fill)
 
 
+def _rr_scrim(img, box, radius, rgba):
+    """Paste a translucent rounded panel — gives floating text clear separation
+    from a busy photo behind it."""
+    try:
+        from PIL import ImageChops
+        x0, y0, x1, y1 = [int(v) for v in box]
+        w, h = x1 - x0, y1 - y0
+        if w <= 0 or h <= 0:
+            return
+        panel = Image.new("RGBA", (w, h), rgba)
+        mask = Image.new("L", (w, h), 0)
+        ImageDraw.Draw(mask).rounded_rectangle((0, 0, w - 1, h - 1), radius=int(radius), fill=255)
+        panel.putalpha(ImageChops.multiply(panel.split()[3], mask))
+        img.paste(panel, (x0, y0), panel)
+    except Exception:
+        pass
+
+
 def render_prop_card(d: dict) -> bytes:
     """A Player Edge prop share. d: sport, player, pos?, team?, opp?, prop (label,
     e.g. 'Rec Yds'), proj (model number), line?, side? ('over'/'under'), hit?
@@ -664,28 +682,46 @@ def render_prop_card(d: dict) -> bytes:
                outline=GOLD, width=2 * SS)
         _text(draw, (hx0 + 28 * SS + 21 * SS, hy0 + 28 * SS + 9 * SS), atxt, af, GOLD_HI)
 
-    # big projection — top-right of the stage (shadowed over the photo)
+    # projection — top-right, in its own translucent panel: label ABOVE the
+    # number (no overlap), number auto-sized so 3-digit values (249.9) still fit.
     prop = (d.get("prop") or "PROP").upper()
     ptxt = ("%.1f" % float(proj)) if proj is not None else "—"
-    pf2 = _font("cond", 128 * SS)
+    psize = 120
+    pf2 = _font("cond", psize * SS)
     pw2, ph2 = _tw(draw, ptxt, pf2)
-    prx = hx1 - 32 * SS - pw2
-    pry = hy0 + 24 * SS
-    _shadow_text(draw, (prx, pry), ptxt, pf2, TEXT)
-    lf2 = _font("bold", 30 * SS)
-    lw2, _ = _tw(draw, prop, lf2)
-    _shadow_text(draw, (hx1 - 32 * SS - lw2, pry + ph2 + 2 * SS), prop, lf2, GOLD_HI)
+    pmaxw = int(hero_w * 0.42)
+    while pw2 > pmaxw and psize > 60:
+        psize -= 6
+        pf2 = _font("cond", psize * SS)
+        pw2, ph2 = _tw(draw, ptxt, pf2)
+    lf2 = _font("bold", 25 * SS)
+    lw2, lh2 = _tw(draw, prop, lf2)
+    pad_in = 22 * SS
+    blk_w = max(pw2, lw2) + 2 * pad_in
+    blk_x1 = hx1 - 20 * SS
+    blk_x0 = blk_x1 - blk_w
+    blk_y0 = hy0 + 22 * SS
+    blk_y1 = blk_y0 + 16 * SS + lh2 + 8 * SS + ph2 + 18 * SS
+    _rr_scrim(img, (blk_x0, blk_y0, blk_x1, blk_y1), 18 * SS, (8, 9, 7, 175))
+    _text(draw, (blk_x1 - pad_in - lw2, blk_y0 + 16 * SS), prop, lf2, GOLD_HI)
+    _text(draw, (blk_x1 - pad_in - pw2, blk_y0 + 16 * SS + lh2 + 8 * SS), ptxt, pf2, (255, 255, 255))
 
-    # player name + team — bottom-left of the stage (shadowed)
+    # player name + team — bottom-left, on a translucent panel for distinction
     player = d.get("player") or "Player"
-    nf = _fit(draw, player, "cond", 72 * SS, hero_w - 64 * SS)
-    npx = hx0 + 32 * SS
-    npy = hy1 - 120 * SS
-    _shadow_text(draw, (npx, npy), player, nf, TEXT)
+    nf = _fit(draw, player, "cond", 66 * SS, hero_w - 80 * SS)
+    nw, nh = _tw(draw, player, nf)
     team, opp, pos = d.get("team") or "", d.get("opp") or "", d.get("pos") or ""
     sub = "  ·  ".join([x for x in [pos, team, ("vs " + opp if opp else "")] if x])
+    sf = _font("bold", 27 * SS)
+    sw, sh2 = _tw(draw, sub, sf) if sub else (0, 0)
+    npx = hx0 + 30 * SS
+    nby1 = hy1 - 18 * SS
+    nby0 = nby1 - (nh + (sh2 + 8 * SS if sub else 0) + 28 * SS)
+    _rr_scrim(img, (hx0 + 14 * SS, nby0, hx0 + 14 * SS + max(nw, sw) + 36 * SS, nby1),
+              16 * SS, (8, 9, 7, 150))
+    _text(draw, (npx, nby0 + 14 * SS), player, nf, (255, 255, 255))
     if sub:
-        _shadow_text(draw, (npx + 2 * SS, npy + 80 * SS), sub, _font("bold", 30 * SS), GOLD_HI)
+        _text(draw, (npx + 2 * SS, nby0 + 14 * SS + nh + 8 * SS), sub, sf, GOLD_HI)
 
     # ---- LINE + EDGE strip (what the user bets on) ----
     sy = hy1 + 26 * SS
