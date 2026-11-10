@@ -835,18 +835,17 @@ async def lifespan(app: FastAPI):
         def _wiki_probe():
             import time as _t
             _t.sleep(40)
-            if os.environ.get("WIKI_PROBE", "0") != "1":
+            if os.environ.get("WIKI_PROBE", "1") != "1":
                 return
             try:
                 import wikiphoto
+                import httpx
             except Exception as e:
                 print(f"[wikiprobe] import failed: {e}")
                 return
             print("[wikiprobe] ===== start =====")
-            for nm in ("Jalen Brunson", "Karl-Anthony Towns", "Isaiah Likely",
-                       "Patrick Mahomes", "Connor McDavid", "Aaron Judge"):
+            for nm in ("Jalen Brunson", "Patrick Mahomes", "Connor McDavid"):
                 try:
-                    import httpx
                     r = httpx.get("https://en.wikipedia.org/api/rest_v1/page/summary/"
                                   + nm.replace(" ", "_"), timeout=8, follow_redirects=True,
                                   headers={"User-Agent": wikiphoto._UA})
@@ -857,9 +856,20 @@ async def lifespan(app: FastAPI):
                               (j.get("thumbnail") or {}).get("source")
                     except Exception:
                         pass
-                    print(f"[wikiprobe] {nm} http={r.status_code} img={(img or 'NONE')[:90]}")
+                    print(f"[wikiprobe] {nm} api_http={r.status_code} img_host="
+                          + ((img or "NONE").split("/")[2] if img else "NONE"))
+                    # The IMAGE lives on upload.wikimedia.org (a different host than
+                    # the API) — fetch the bytes to confirm the CDN is reachable.
+                    if img:
+                        ir = httpx.get(img, timeout=10, follow_redirects=True,
+                                       headers={"User-Agent": wikiphoto._UA})
+                        clen = ir.headers.get("content-length") or len(ir.content or b"")
+                        print(f"[wikiprobe]   IMG_FETCH http={ir.status_code} "
+                              f"type={ir.headers.get('content-type')} bytes={clen}")
+                    # And what wikiphoto.photo resolves (after the safety filter):
+                    print(f"[wikiprobe]   resolved={bool(wikiphoto.photo(nm))}")
                 except Exception as e:
-                    print(f"[wikiprobe] {nm} ERR {str(e)[:150]}")
+                    print(f"[wikiprobe] {nm} ERR {str(e)[:170]}")
                 _t.sleep(1)
             print("[wikiprobe] ===== done =====")
         _thr.Thread(target=_wiki_probe, daemon=True).start()
