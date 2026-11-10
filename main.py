@@ -835,7 +835,7 @@ async def lifespan(app: FastAPI):
         def _wiki_probe():
             import time as _t
             _t.sleep(40)
-            if os.environ.get("WIKI_PROBE", "1") != "1":
+            if os.environ.get("WIKI_PROBE", "0") != "1":
                 return
             try:
                 import wikiphoto
@@ -6746,7 +6746,7 @@ def card_prop(sport: str = "", player: str = "", pos: str = "", team: str = "",
     except Exception as e:
         return JSONResponse({"error": str(e)[:200]}, status_code=500)
     return Response(content=png, media_type="image/png",
-                    headers={"Cache-Control": "public, max-age=300",
+                    headers={"Cache-Control": "public, max-age=60",
                              "Content-Disposition": 'inline; filename="linelogic-prop.png"'})
 
 
