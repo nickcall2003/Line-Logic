@@ -6654,6 +6654,43 @@ function peArchetypeHTML(c){var a=peArchetype(c);if(!a)return "";
   return '<div class="pe-lp"><div class="pe-lp-k">Logic Profile</div>'+
     '<div class="pe-arch '+a.tier+'"><span class="pe-arch-dot"></span>'+a.label+'</div>'+
     '<div class="pe-lp-b">'+a.blurb+'</div></div>';}
+// ── Line Finder: the model's P(over) at a ladder of numbers around the book
+// line, plus a "type your line" box — same projection distribution, any line.
+// Honest version of line shopping: you compare against whatever your book posts.
+function peLineLadder(proj,line){
+  var step=proj>=100?5:(proj>=40?2.5:(proj>=12?1:0.5));
+  var center=(line!=null)?Number(line):Math.round(proj/step)*step;
+  var rungs=[];
+  for(var k=-3;k<=3;k++){var L=Math.round((center+k*step)*100)/100;if(L<0)continue;rungs.push(L);}
+  return rungs;}
+function peLineFinderHTML(c,props,activeProp){
+  if(!c.projections)return "";
+  var projKeys=PE_PROJ_ORDER.filter(function(k){return c.projections[k]!=null;});
+  var prop=(activeProp&&c.projections[activeProp]!=null)?activeProp:projKeys[0];
+  if(!prop)return "";
+  var proj=Number(c.projections[prop]);
+  var lo=peFindLine(props,c.player,prop),line=(lo&&lo.line!=null)?Number(lo.line):null;
+  var rows=peLineLadder(proj,line).map(function(L){
+    var op=peOverProb(proj,L),pct=Math.round(op*100);
+    var posted=(line!=null&&Math.abs(L-line)<1e-6);
+    var cls=op>=0.55?"pos":(op<=0.45?"neg":"");
+    return '<div class="lf-row'+(posted?" posted":"")+'"><span class="lf-l">'+L+(posted?' <span class="lf-tag">book</span>':'')+'</span>'+
+      '<span class="lf-bar"><span class="lf-fill '+cls+'" style="width:'+pct+'%"></span></span>'+
+      '<span class="lf-p '+cls+'">'+pct+'%</span></div>';}).join("");
+  var startLine=(line!=null?line:Math.round(proj*10)/10);
+  var sop=peOverProb(proj,startLine),spct=Math.round(sop*100);
+  return '<div class="vsec"><div class="vsec-h">Line Finder · '+(PE_PROJ_LABEL[prop]||prop)+'</div>'+
+    '<div class="lf-note">Model projects <b>'+proj.toFixed(1)+'</b>. The bar is the model’s chance the <b>over</b> hits at each number — find where your book’s price beats the model.</div>'+
+    '<div class="lf">'+rows+'</div>'+
+    '<div class="lf-custom"><span class="lf-cl">Your line</span>'+
+      '<input class="lf-in" type="number" step="0.5" inputmode="decimal" value="'+startLine+'" data-proj="'+proj+'" oninput="peLF(this)">'+
+      '<span class="lf-out '+(sop>=0.55?"pos":(sop<=0.45?"neg":""))+'">'+spct+'% over · '+(100-spct)+'% under</span></div></div>';}
+function peLF(el){var v=parseFloat(el.value),proj=parseFloat(el.getAttribute("data-proj"));
+  var out=el.parentNode.querySelector(".lf-out");if(!out)return;
+  if(isNaN(v)){out.textContent="—";out.className="lf-out";return;}
+  var op=peOverProb(proj,v),pct=Math.round(op*100);
+  out.textContent=pct+"% over · "+(100-pct)+"% under";
+  out.className="lf-out "+(op>=0.55?"pos":(op<=0.45?"neg":""));}
 // ── Player Comparison: pick 2–3 players, see them side by side. Missing
 // component values stay blank (no estimates), per the design doc. ──
 var PE_CMP=[];
@@ -6713,6 +6750,59 @@ function peCmpOpen(){
     '<div class="pe-cmp-foot">Green = best in row. Blank = not published for that player (never estimated).</div></div>';
   ov.style.display="flex";}
 function peCmpCloseModal(){var ov=document.getElementById("pe-cmp-ov");if(ov)ov.style.display="none";}
+// ── Props Watchlist: save a prop (snapshot of proj/line/P-over) on this device,
+// review saved props across games, remove them. Mirrors the board watchlist. ──
+var PWATCH=(function(){try{return JSON.parse(localStorage.getItem("ll_prop_watch")||"[]")||[];}catch(e){return [];}})();
+function pwSave(){try{localStorage.setItem("ll_prop_watch",JSON.stringify(PWATCH.slice(0,200)));}catch(e){}}
+function pwHas(gid,player,prop){return PWATCH.some(function(s){return s.gid===gid&&s.player===player&&s.prop===prop;});}
+function pwRemove(gid,player,prop){PWATCH=PWATCH.filter(function(s){return !(s.gid===gid&&s.player===player&&s.prop===prop);});pwSave();}
+function pwSnap(gid,c,props,activeProp,sport){
+  var projKeys=PE_PROJ_ORDER.filter(function(k){return c.projections&&c.projections[k]!=null;});
+  var prop=(activeProp&&c.projections&&c.projections[activeProp]!=null)?activeProp:(projKeys[0]||"");
+  var proj=prop?Number(c.projections[prop]):null;
+  var lo=prop?peFindLine(props,c.player,prop):null,line=(lo&&lo.line!=null)?Number(lo.line):null;
+  var op=(proj!=null&&line!=null)?peOverProb(proj,line):null,a=peArchetype(c);
+  return {gid:gid,player:c.player,prop:prop,propLabel:prop?(PE_PROJ_LABEL[prop]||prop):"",
+    proj:proj,line:line,pct:(op!=null?Math.round(op*100):null),score:c.logic_score,
+    team:c.team||"",opp:c.opp||"",arch:(a?a.label:""),sport:sport||"",savedAt:Date.now()};}
+function pwBtnHTML(gid,c,props,activeProp){
+  var projKeys=PE_PROJ_ORDER.filter(function(k){return c.projections&&c.projections[k]!=null;});
+  var prop=(activeProp&&c.projections&&c.projections[activeProp]!=null)?activeProp:(projKeys[0]||"");
+  var on=pwHas(gid,c.player,prop);
+  return '<button class="pw-btn'+(on?" on":"")+'" data-gid="'+gid+'" data-player="'+String(c.player||"").replace(/"/g,"&quot;")+'" data-prop="'+prop+'" onclick="pwToggle(event)" title="Save this prop">'+(on?"★ Saved":"☆ Save")+'</button>';}
+function pwToggle(ev){ev.stopPropagation();var el=ev.currentTarget;
+  var gid=el.getAttribute("data-gid"),player=el.getAttribute("data-player"),prop=el.getAttribute("data-prop");
+  if(pwHas(gid,player,prop)){pwRemove(gid,player,prop);}
+  else{var d=_peData[gid],c=d&&(d.cards||[]).filter(function(x){return x.player===player;})[0];
+    if(c){PWATCH.push(pwSnap(gid,c,_peProps(gid),prop,d._sport));pwSave();}}
+  pwSync();}
+function pwSync(){
+  var btns=document.querySelectorAll(".pw-btn");
+  for(var i=0;i<btns.length;i++){var el=btns[i];
+    var on=pwHas(el.getAttribute("data-gid"),el.getAttribute("data-player"),el.getAttribute("data-prop"));
+    el.classList.toggle("on",on);el.textContent=on?"★ Saved":"☆ Save";}
+  var sb=document.querySelectorAll(".pe-saved-btn");
+  for(var j=0;j<sb.length;j++){sb[j].textContent="★ Saved ("+PWATCH.length+")";sb[j].style.display=PWATCH.length?"":"none";}}
+function pwOpen(){
+  if(!PWATCH.length)return;
+  var rows=PWATCH.slice().sort(function(a,b){return b.savedAt-a.savedAt;}).map(function(s){
+    var pj=(s.proj!=null)?Number(s.proj).toFixed(1):"—",ln=(s.line!=null)?s.line:"—";
+    var cls=(s.pct!=null)?(s.pct>=55?"pos":(s.pct<=45?"neg":"")):"";
+    return '<div class="pw-row"><div class="pw-main"><div class="pw-nm">'+s.player+(s.arch?' <span class="pw-arch">'+s.arch+'</span>':'')+'</div>'+
+      '<div class="pw-sub">'+(s.team||"")+(s.opp?" vs "+s.opp:"")+' · '+(s.propLabel||s.prop)+'</div></div>'+
+      '<div class="pw-nums"><div class="pw-proj">'+pj+'<span> vs '+ln+'</span></div>'+((s.pct!=null)?'<div class="pw-pct '+cls+'">'+s.pct+'% o</div>':'')+'</div>'+
+      '<button class="pw-del" data-gid="'+s.gid+'" data-player="'+String(s.player).replace(/"/g,"&quot;")+'" data-prop="'+s.prop+'" onclick="pwRemoveEv(event)">✕</button></div>';}).join("");
+  var ov=document.getElementById("pw-ov");
+  if(!ov){ov=document.createElement("div");ov.id="pw-ov";ov.className="pe-cmp-ov";ov.onclick=function(e){if(e.target===ov)pwClose();};document.body.appendChild(ov);}
+  ov.innerHTML='<div class="pe-cmp-modal"><div class="pe-cmp-top"><span>★ Saved Props</span><button class="pe-cmp-close" onclick="pwClose()">✕</button></div>'+
+    '<div class="pw-list">'+rows+'</div>'+
+    '<div class="pe-cmp-foot"><button class="pw-clear" onclick="pwClearAll()">Clear all</button> · Saved on this device. Lines are snapshots from when you saved.</div></div>';
+  ov.style.display="flex";}
+function pwClose(){var ov=document.getElementById("pw-ov");if(ov)ov.style.display="none";}
+function pwRemoveEv(ev){ev.stopPropagation();var el=ev.currentTarget;
+  pwRemove(el.getAttribute("data-gid"),el.getAttribute("data-player"),el.getAttribute("data-prop"));
+  pwSync();if(PWATCH.length)pwOpen();else pwClose();}
+function pwClearAll(){PWATCH=[];pwSave();pwSync();pwClose();}
 function peTagStrip(c){var t=peTags(c); if(!t.length)return "";
   return '<div class="pe-tags">'+t.map(function(x){return '<span class="pe-ptag'+(x.glow?' on':'')+'">'+String(x.t).toUpperCase()+'</span>';}).join("")+'</div>';}
 function peSortVal(c,prop,props){
@@ -6843,7 +6933,7 @@ function peCard(gid,c,i,props,sport,activeProp,view){
     '<div class="vbody" id="body'+gid+'_'+i+'">'+
       peArchetypeHTML(c)+
       peDecision(c,props,activeProp)+
-      '<div class="pe-cmp-wrap">'+peCmpBtnHTML(gid,c)+'</div>'+
+      '<div class="pe-cmp-wrap">'+pwBtnHTML(gid,c,props,activeProp)+peCmpBtnHTML(gid,c)+'</div>'+
       peTagStrip(c)+
       // ── ANALYSIS tier: Logic Profile (DNA radar), matchup & component detail ──
       ((view!=="quick")?(
@@ -6857,7 +6947,8 @@ function peCard(gid,c,i,props,sport,activeProp,view){
         peTax(c)+
         peCoverage(c)+
         peBlueprint(c)+
-        peRedZone(c)
+        peRedZone(c)+
+        peLineFinderHTML(c,props,activeProp)
       ):"")+
       (projTiles?'<div class="vsec"><div class="vsec-h">Projections · model vs line</div><div class="proj">'+projTiles+'</div></div>':"")+
       // ── DEEP RESEARCH tier: full game logs, splits, leaks, raw matchup grid ──
@@ -7126,9 +7217,10 @@ function peRender(gid,d,props){
       '<div style="font-size:10.5px;color:var(--muted-2);margin-top:8px;font-style:italic">Model estimate: early-shot volume × make rate, fair odds (no vig). Starters on the floor at tip. Not a graded market.</div></div>';
   }
   var view=peView;
+  var savedBtn=(typeof PWATCH!=="undefined"&&PWATCH.length)?'<button class="pe-saved-btn" onclick="pwOpen()">★ Saved ('+PWATCH.length+')</button>':'';
   var vtoolbar='<div class="pe-views">'+[["quick","Quick"],["analysis","Analysis"],["deep","Deep Research"]].map(function(v){
     return '<button class="pe-vbtn'+(view===v[0]?" on":"")+'" onclick="peSetView(\''+v[0]+'\')">'+v[1]+'</button>';}).join("")+
-    '<span class="pe-vhint">'+(view==="quick"?"Verdict only":view==="analysis"?"Full breakdown":"Everything + logs")+'</span></div>';
+    savedBtn+'<span class="pe-vhint">'+(view==="quick"?"Verdict only":view==="analysis"?"Full breakdown":"Everything + logs")+'</span></div>';
   var fbar=peFilterBar(cards,activeProp);
   var _sortLab={logic:"Logic Score",edge:"edge",proj:"projection",prob:"P(over)"};
   function ghBlock(sub){return '<div class="gh"><div class="gh-top"><div><div class="gh-match">'+(d.away_team||"")+'<span class="vs">@</span>'+(d.home_team||"")+'</div>'+
@@ -7190,7 +7282,7 @@ function peRefreshTipoff(key){
 function _pePaint(key){var mount=document.getElementById("pe-mount"),d=_peData[key];
   if(!mount||!d)return; window._peActiveKey=key; mount.innerHTML=peRender(key,d,_peProps(key));
   if(!d._prop){var fr=mount.querySelector(".vrow");if(fr){var m=fr.id.match(/_(\d+)$/);if(m)peToggle(key,parseInt(m[1],10));}}
-  peRefreshTipoff(key); if(typeof peCmpSync==="function")peCmpSync();}
+  peRefreshTipoff(key); if(typeof peCmpSync==="function")peCmpSync(); if(typeof pwSync==="function")pwSync();}
 /* ===== Game Analysis: impact-player strip (top Player Edge movers in the game view) ===== */
 function gaImpactCard(c){
   var u=peHeadshot(c);
