@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v117";   // bumped: Player Edge Phase 2 — Logic Profile/Archetype + Player Comparison
+const CACHE = "ll-shell-v118";   // bumped: Player Edge Phase 2 — advanced filters + two-option share cards
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));

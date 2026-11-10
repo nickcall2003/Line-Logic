@@ -6601,17 +6601,18 @@ def card_pick(sport: str = "", away: str = "", home: str = "", pick: str = "",
 def card_prop(sport: str = "", player: str = "", pos: str = "", team: str = "",
               opp: str = "", prop: str = "", proj: str = "", line: str = "",
               side: str = "", hit: str = "", book: str = "", odds: str = "",
-              score: str = ""):
+              score: str = "", arch: str = "", style: str = ""):
     """Render a branded Player-Edge PROP card as a PNG from exactly what's on the
-    expanded player tile: the model projection, the line/side, hit %, Logic Score
-    and best book. Every field optional; missing ones render as em dashes."""
+    expanded player tile: the model projection, the line/side, hit %, Logic Score,
+    best book and the player's archetype. Two styles: 'full' (default, all stats)
+    and 'spotlight' (minimal, model verdict — social-friendly). Fields optional."""
     try:
         import share_cards
         png = share_cards.render_prop_card({
             "sport": sport, "player": player, "pos": pos, "team": team,
             "opp": opp, "prop": prop, "proj": _f(proj), "line": line or None,
             "side": side, "hit": _f(hit), "book": book, "odds": _f(odds),
-            "score": _f(score),
+            "score": _f(score), "arch": arch, "style": (style or "full"),
         })
     except Exception as e:
         return JSONResponse({"error": str(e)[:200]}, status_code=500)

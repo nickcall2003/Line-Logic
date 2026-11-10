@@ -383,6 +383,19 @@ def render_pick_card(d: dict) -> bytes:
 
 
 # ── PROP CARD ────────────────────────────────────────────────────────────────
+def _prop_verdict(side, hitv):
+    """Derive a model verdict from the chosen side and its hit%."""
+    if not side or hitv is None:
+        return ("MODEL READ", GOLD_HI)
+    s = side.upper()
+    col = WIN if side == "over" else LOSS
+    if hitv >= 60:
+        return (s + " · STRONG", col)
+    if hitv >= 53:
+        return (s + " LEAN", col)
+    return ("LEAN " + s, GOLD_HI)
+
+
 def render_prop_card(d: dict) -> bytes:
     """A Player Edge prop share. d: sport, player, pos?, team?, opp?, prop (label,
     e.g. 'Rec Yds'), proj (model number), line?, side? ('over'/'under'), hit?
@@ -423,8 +436,23 @@ def render_prop_card(d: dict) -> bytes:
     if sub:
         _text(draw, (pad, ny + 132 * SS), sub, _font("bold", 32 * SS), GOLD_HI)
 
+    # archetype chip (the Logic Profile signature) between the sub and projection
+    arch = (d.get("arch") or "").strip()
+    extra = 0
+    if arch:
+        ay = ny + 182 * SS
+        atxt = "◆ " + arch.upper()
+        af = _font("bold", 26 * SS)
+        aw, _ = _tw(draw, atxt, af)
+        _panel(draw, (pad, ay, pad + aw + 44 * SS, ay + 50 * SS), radius=25 * SS,
+               fill=PANEL_HI, outline=GOLD, width=2 * SS)
+        _text(draw, (pad + 22 * SS, ay + 9 * SS), atxt, af, GOLD_HI)
+        extra = 74 * SS
+
+    style = (d.get("style") or "full").lower()
+
     # THE PROJECTION panel
-    pb_y = ny + 226 * SS
+    pb_y = ny + 226 * SS + extra
     _panel(draw, (pad, pb_y, W * SS - pad, pb_y + 256 * SS), radius=28 * SS,
            fill=PANEL, outline=(70, 60, 38), width=2 * SS)
     prop = (d.get("prop") or "PROP").upper()
@@ -459,27 +487,42 @@ def render_prop_card(d: dict) -> bytes:
         hw, _ = _tw(draw, htxt, hf2)
         _text(draw, (W * SS - pad - 34 * SS - hw, pb_y + 198 * SS), htxt, hf2, GOLD_HI)
 
-    # bottom row: LOGIC SCORE | BEST BOOK (price + chip)
+    # bottom section
     cy = pb_y + 300 * SS
-    colw = (W * SS - 2 * pad - 28 * SS) / 2
     th = 160 * SS
-    _panel(draw, (pad, cy, pad + colw, cy + th), radius=24 * SS, fill=PANEL_HI)
-    _text(draw, (pad + 28 * SS, cy + 22 * SS), "LOGIC SCORE", _font("bold", 26 * SS), MUTED)
-    sc = d.get("score")
-    sctxt = ("%.1f" % float(sc)) if sc is not None else "—"
-    _text(draw, (pad + 28 * SS, cy + 58 * SS), sctxt, _font("cond", 64 * SS), GOLD_HI)
-    mx = pad + colw + 28 * SS
-    _panel(draw, (mx, cy, mx + colw, cy + th), radius=24 * SS, fill=PANEL_HI)
-    _text(draw, (mx + 28 * SS, cy + 22 * SS), "BEST BOOK", _font("bold", 26 * SS), MUTED)
-    if d.get("book"):   # chip on the label row, never over the number
-        s, _c, _t = _book_meta(d["book"])
-        cf = _font("bold", int(40 * SS * 0.52))
-        cw, _ = _tw(draw, s, cf)
-        chw = cw + int(40 * SS * 0.9)
-        _chip(draw, mx + colw - 28 * SS - chw, cy + 16 * SS, d["book"], h=40 * SS)
-    odds = d.get("odds")
-    otxt = _am(odds) if odds is not None else "—"
-    _text(draw, (mx + 28 * SS, cy + 66 * SS), otxt, _font("mono", 56 * SS), TEXT)
+    if style == "spotlight":
+        # one clean model-verdict strip — minimal, built to be posted
+        _panel(draw, (pad, cy, W * SS - pad, cy + th), radius=24 * SS,
+               fill=PANEL_HI, outline=GOLD, width=2 * SS)
+        _text(draw, (pad + 28 * SS, cy + 24 * SS), "MODEL VERDICT", _font("bold", 26 * SS), MUTED)
+        vtxt, vcol = _prop_verdict(side, hitv)
+        _text(draw, (pad + 28 * SS, cy + 60 * SS), vtxt, _font("cond", 72 * SS), vcol)
+        sc = d.get("score")
+        if sc is not None:
+            stxt = "LOGIC %.1f" % float(sc)
+            sf = _font("bold", 30 * SS)
+            sw, _ = _tw(draw, stxt, sf)
+            _text(draw, (W * SS - pad - 28 * SS - sw, cy + 64 * SS), stxt, sf, GOLD_HI)
+    else:
+        # full: LOGIC SCORE | BEST BOOK (price + chip)
+        colw = (W * SS - 2 * pad - 28 * SS) / 2
+        _panel(draw, (pad, cy, pad + colw, cy + th), radius=24 * SS, fill=PANEL_HI)
+        _text(draw, (pad + 28 * SS, cy + 22 * SS), "LOGIC SCORE", _font("bold", 26 * SS), MUTED)
+        sc = d.get("score")
+        sctxt = ("%.1f" % float(sc)) if sc is not None else "—"
+        _text(draw, (pad + 28 * SS, cy + 58 * SS), sctxt, _font("cond", 64 * SS), GOLD_HI)
+        mx = pad + colw + 28 * SS
+        _panel(draw, (mx, cy, mx + colw, cy + th), radius=24 * SS, fill=PANEL_HI)
+        _text(draw, (mx + 28 * SS, cy + 22 * SS), "BEST BOOK", _font("bold", 26 * SS), MUTED)
+        if d.get("book"):   # chip on the label row, never over the number
+            s, _c, _t = _book_meta(d["book"])
+            cf = _font("bold", int(40 * SS * 0.52))
+            cw, _ = _tw(draw, s, cf)
+            chw = cw + int(40 * SS * 0.9)
+            _chip(draw, mx + colw - 28 * SS - chw, cy + 16 * SS, d["book"], h=40 * SS)
+        odds = d.get("odds")
+        otxt = _am(odds) if odds is not None else "—"
+        _text(draw, (mx + 28 * SS, cy + 66 * SS), otxt, _font("mono", 56 * SS), TEXT)
 
     _footer(draw)
     return _finish(img)

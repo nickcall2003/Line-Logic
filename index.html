@@ -5777,11 +5777,14 @@ function peCardUrl(c,props,sp,prop){
         ["book",over?lo.over_book:lo.under_book],["odds",over?lo.over_best_odds:lo.under_best_odds]);
     }else pairs.push(["line",lo.line]);
   }
+  var a=(typeof peArchetype==="function")?peArchetype(c):null;
+  if(a)pairs.push(["arch",a.label]);
+  if(arguments.length>4&&arguments[4])pairs.push(["style",arguments[4]]);
   return "/api/card/prop?"+_cq(pairs);
 }
 // A compact Share button + a right-aligned row to drop it in, reused by every card.
-function shareBtnHTML(url,text){
-  return '<button class="cardshare" title="Share this as a card" data-card="'+_attr(url)+'" data-share="'+_attrNL(text||"")+'" onclick="sharePick(event,this)">⤴ Share card</button>';
+function shareBtnHTML(url,text,label){
+  return '<button class="cardshare" title="Share this as a card" data-card="'+_attr(url)+'" data-share="'+_attrNL(text||"")+'" onclick="sharePick(event,this)">'+(label||"⤴ Share card")+'</button>';
 }
 function shareRowHTML(url,text){return '<div class="cardshare-row">'+shareBtnHTML(url,text)+'</div>';}
 function gameShareText(g,sp){
@@ -7044,12 +7047,51 @@ function peBlueprint(c){
 // Share the player's prop as a branded card. Defers to the global helpers defined
 // in index.html (same runtime scope as this concatenated bundle).
 function peShareRow(c,props,sport,prop){
-  if(!prop||typeof shareRowHTML!=="function"||typeof peCardUrl!=="function")return "";
-  return shareRowHTML(peCardUrl(c,props,sport,prop),
-    (typeof propShareText==="function")?propShareText(c,sport,prop):"");}
+  if(!prop||typeof shareBtnHTML!=="function"||typeof peCardUrl!=="function")return "";
+  var txt=(typeof propShareText==="function")?propShareText(c,sport,prop):"";
+  return '<div class="cardshare-row pe-share2">'+
+    shareBtnHTML(peCardUrl(c,props,sport,prop,"spotlight"),txt,"⤴ Spotlight")+
+    shareBtnHTML(peCardUrl(c,props,sport,prop,"full"),txt,"⤴ Full analysis")+
+    '</div>';}
 function peToggle(gid,i){var b=document.getElementById("body"+gid+"_"+i),r=document.getElementById("row"+gid+"_"+i);
   if(!b)return; var open=b.classList.toggle("show"); r.classList.toggle("open",open);
   if(open){var d=_peData[gid]; if(d&&d.cards[i]&&document.getElementById("rad"+gid+"_"+i))peRadar(gid+"_"+i,d.cards[i].radar);}}
+// ── Advanced filters: sort / position / min-score, applied to the player list ──
+var _peFilt={sort:"logic",pos:"ALL",minScore:0};
+function peSetFilt(k,v){_peFilt[k]=v;if(window._peActiveKey)_pePaint(window._peActiveKey);}
+function peClearFilt(){_peFilt={sort:"logic",pos:"ALL",minScore:0};if(window._peActiveKey)_pePaint(window._peActiveKey);}
+function _pePos(c){return c.pos||(c.type==="pitcher"?"SP":(c.type==="batter"?"BAT":""));}
+function peEffSort(activeProp){return (activeProp&&_peFilt.sort==="logic")?"proj":_peFilt.sort;}
+function peFiltSort(list,activeProp,props){
+  var f=_peFilt,sm=peEffSort(activeProp);
+  var out=list.filter(function(r){var c=r.c;
+    if(f.pos!=="ALL"&&_pePos(c)!==f.pos)return false;
+    if(f.minScore&&Number(c.logic_score||0)<f.minScore)return false;
+    return true;});
+  out.sort(function(a,b){
+    if(sm==="edge")return (Number(b.c.edge_pct)||-99)-(Number(a.c.edge_pct)||-99);
+    if(sm==="proj"&&activeProp)return peSortVal(b.c,activeProp,props)-peSortVal(a.c,activeProp,props);
+    if(sm==="prob"&&activeProp){
+      function pr(c){var v=c.projections&&c.projections[activeProp],lo=peFindLine(props,c.player,activeProp);
+        var op=(v!=null&&lo&&lo.line!=null)?peOverProb(Number(v),Number(lo.line)):null;return op==null?-1:Math.max(op,1-op);}
+      return pr(b.c)-pr(a.c);}
+    return Number(b.c.logic_score||0)-Number(a.c.logic_score||0);});
+  return out;}
+function peFilterBar(cards,activeProp){
+  var f=_peFilt,cs=peEffSort(activeProp);
+  var posSet={};cards.forEach(function(c){var p=_pePos(c);if(p)posSet[p]=1;});
+  var posList=Object.keys(posSet);
+  function chip(k,val,lab,on){return '<button class="pe-fchip'+(on?" on":"")+'" onclick="peSetFilt(\''+k+'\','+(typeof val==="number"?val:("\'"+val+"\'"))+')">'+lab+'</button>';}
+  var sortOpts=[["logic","Logic"],["edge","Edge"]];
+  if(activeProp){sortOpts.push(["proj","Proj"]);sortOpts.push(["prob","P(over)"]);}
+  var html='<div class="pe-filt"><div class="pe-fg"><span class="pe-fl">Sort</span>'+
+    sortOpts.map(function(o){return chip("sort",o[0],o[1],cs===o[0]);}).join("")+'</div>';
+  if(posList.length>1){html+='<div class="pe-fg"><span class="pe-fl">Pos</span>'+
+    chip("pos","ALL","All",f.pos==="ALL")+posList.map(function(p){return chip("pos",p,p,f.pos===p);}).join("")+'</div>';}
+  html+='<div class="pe-fg"><span class="pe-fl">Min</span>'+
+    [[0,"Any"],[70,"70+"],[80,"80+"],[90,"90+"]].map(function(m){return chip("minScore",m[0],m[1],f.minScore===m[0]);}).join("")+'</div>';
+  if(f.sort!=="logic"||f.pos!=="ALL"||f.minScore)html+='<button class="pe-fclear" onclick="peClearFilt()">✕ Clear</button>';
+  return html+'</div>';}
 function peRender(gid,d,props){
   var cards=d.cards||[],sport=d._sport,activeProp=d._prop||null;
   var projSet={}; cards.forEach(function(c){if(c.projections)Object.keys(c.projections).forEach(function(k){projSet[k]=1;});});
@@ -7087,30 +7129,34 @@ function peRender(gid,d,props){
   var vtoolbar='<div class="pe-views">'+[["quick","Quick"],["analysis","Analysis"],["deep","Deep Research"]].map(function(v){
     return '<button class="pe-vbtn'+(view===v[0]?" on":"")+'" onclick="peSetView(\''+v[0]+'\')">'+v[1]+'</button>';}).join("")+
     '<span class="pe-vhint">'+(view==="quick"?"Verdict only":view==="analysis"?"Full breakdown":"Everything + logs")+'</span></div>';
+  var fbar=peFilterBar(cards,activeProp);
+  var _sortLab={logic:"Logic Score",edge:"edge",proj:"projection",prob:"P(over)"};
   function ghBlock(sub){return '<div class="gh"><div class="gh-top"><div><div class="gh-match">'+(d.away_team||"")+'<span class="vs">@</span>'+(d.home_team||"")+'</div>'+
     '<div class="gh-sub">'+sub+'</div></div></div></div>';}
-  function sticky(sub){return '<div class="pe-sticky">'+ghBlock(sub)+vtoolbar+tabs+'</div>';}
+  function sticky(sub){return '<div class="pe-sticky">'+ghBlock(sub)+vtoolbar+fbar+tabs+'</div>';}
+  var total=cards.length;
+  function subCount(n,noun){return n+' of '+total+' '+noun+' · sorted by '+_sortLab[peEffSort(activeProp)];}
   if(activeProp){
-    var fr=cards.filter(function(c){return c.projections&&c.projections[activeProp]!=null;}).map(function(c){return {c:c,i:cards.indexOf(c)};});
-    fr.sort(function(a,b){return peSortVal(b.c,activeProp,props)-peSortVal(a.c,activeProp,props);});
+    var fr=peFiltSort(cards.filter(function(c){return c.projections&&c.projections[activeProp]!=null;}).map(function(c){return {c:c,i:cards.indexOf(c)};}),activeProp,props);
     fr.forEach(function(r,k){r.c.rank=k+1;});
-    return sticky(fr.length+' players · '+(PE_PROJ_LABEL[activeProp]||activeProp)+' · model vs line')+
-      fbPanel+fr.map(function(r){return peCard(gid,r.c,r.i,props,sport,activeProp,view);}).join("");
+    return sticky(subCount(fr.length,"players")+' · '+(PE_PROJ_LABEL[activeProp]||activeProp))+
+      fbPanel+(fr.length?fr.map(function(r){return peCard(gid,r.c,r.i,props,sport,activeProp,view);}).join(""):'<div class="pe-empty">No players match these filters.</div>');
   }
-  var rows=cards.map(function(c,i){return {c:c,i:i};});
   var isMLB=cards.some(function(c){return c.type==="pitcher"||c.type==="batter";});
   if(isMLB){
-    var bats=rows.filter(function(r){return r.c.type!=="pitcher";});
-    var pits=rows.filter(function(r){return r.c.type==="pitcher";});
+    var bats=peFiltSort(cards.filter(function(c){return c.type!=="pitcher";}).map(function(c){return {c:c,i:cards.indexOf(c)};}),null,props);
+    var pits=peFiltSort(cards.filter(function(c){return c.type==="pitcher";}).map(function(c){return {c:c,i:cards.indexOf(c)};}),null,props);
     bats.forEach(function(r,k){r.c.rank=k+1;}); pits.forEach(function(r,k){r.c.rank=k+1;});
     var body="";
     if(bats.length)body+='<div class="pe-seclbl">Batters</div>'+bats.map(function(r){return peCard(gid,r.c,r.i,props,sport,null,view);}).join("");
     if(pits.length)body+='<div class="pe-seclbl">Starting Pitchers</div>'+pits.map(function(r){return peCard(gid,r.c,r.i,props,sport,null,view);}).join("");
-    return sticky(bats.length+' batters · '+pits.length+' pitchers · ranked by Logic Score')+fbPanel+body;
+    if(!bats.length&&!pits.length)body='<div class="pe-empty">No players match these filters.</div>';
+    return sticky(bats.length+' batters · '+pits.length+' pitchers · sorted by '+_sortLab[peEffSort(null)])+fbPanel+body;
   }
+  var rows=peFiltSort(cards.map(function(c,i){return {c:c,i:i};}),null,props);
   rows.forEach(function(r,k){r.c.rank=k+1;});
-  return sticky(rows.length+' players · ranked by Logic Score')+
-    fbPanel+rows.map(function(r){return peCard(gid,r.c,r.i,props,sport,null,view);}).join("");}
+  return sticky(subCount(rows.length,"players"))+
+    fbPanel+(rows.length?rows.map(function(r){return peCard(gid,r.c,r.i,props,sport,null,view);}).join(""):'<div class="pe-empty">No players match these filters.</div>');}
 function _peProps(key){
   var d=_peData[key],sp=d&&d._sport;
   var g=(sp==="mlb")?(typeof mlbProps!=="undefined"?mlbProps:null):(typeof teamProps!=="undefined"?teamProps:null);
@@ -7142,7 +7188,9 @@ function peRefreshTipoff(key){
   }).catch(function(){});
 }
 function _pePaint(key){var mount=document.getElementById("pe-mount"),d=_peData[key];
-  if(!mount||!d)return; window._peActiveKey=key; mount.innerHTML=peRender(key,d,_peProps(key)); if(!d._prop)peToggle(key,0); peRefreshTipoff(key); if(typeof peCmpSync==="function")peCmpSync();}
+  if(!mount||!d)return; window._peActiveKey=key; mount.innerHTML=peRender(key,d,_peProps(key));
+  if(!d._prop){var fr=mount.querySelector(".vrow");if(fr){var m=fr.id.match(/_(\d+)$/);if(m)peToggle(key,parseInt(m[1],10));}}
+  peRefreshTipoff(key); if(typeof peCmpSync==="function")peCmpSync();}
 /* ===== Game Analysis: impact-player strip (top Player Edge movers in the game view) ===== */
 function gaImpactCard(c){
   var u=peHeadshot(c);
