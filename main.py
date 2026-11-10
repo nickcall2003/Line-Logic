@@ -786,6 +786,48 @@ async def lifespan(app: FastAPI):
                 print(f"[depthprobe] setup failed: {e}")
         _thr.Thread(target=_depth_probe, daemon=True).start()
 
+        # One-shot SPORTSDB PROBE: confirms whether this host can reach
+        # TheSportsDB and what it returns (cutout/render availability + venue
+        # fanart) for a few known players. Search Railway logs for
+        # [sportsdbprobe] and paste. Disable with SPORTSDB_PROBE=0.
+        def _sportsdb_probe():
+            import time as _t
+            _t.sleep(35)
+            if os.environ.get("SPORTSDB_PROBE", "1") != "1":
+                return
+            try:
+                import sportsdb
+            except Exception as e:
+                print(f"[sportsdbprobe] import failed: {e}")
+                return
+            print(f"[sportsdbprobe] ===== key={sportsdb._KEY} =====")
+            tests = [("nba", "Jalen Brunson"), ("nba", "Karl-Anthony Towns"),
+                     ("nfl", "Isaiah Likely"), ("nfl", "Patrick Mahomes"),
+                     ("nhl", "Connor McDavid"), ("mlb", "Aaron Judge")]
+            for sp, nm in tests:
+                try:
+                    r = sportsdb._get(
+                        "https://www.thesportsdb.com/api/v1/json/%s/searchplayers.php"
+                        % sportsdb._KEY, {"p": nm})
+                    body = r.text or ""
+                    print(f"[sportsdbprobe] {sp}/{nm} http={r.status_code} bytes={len(body)}")
+                    try:
+                        players = (r.json() or {}).get("player") or []
+                    except Exception:
+                        players = []
+                    print(f"[sportsdbprobe]   matches={len(players)} "
+                          + "; ".join(f"{p.get('strPlayer')}|{p.get('strSport')}|"
+                                      f"cut={bool(p.get('strCutout'))}|ren={bool(p.get('strRender'))}"
+                                      for p in players[:4]))
+                    a = sportsdb.player_assets(nm, sp) or {}
+                    print(f"[sportsdbprobe]   resolved cutout={ (a.get('cutout') or '')[:70] } "
+                          f"fanart={ (a.get('fanart') or '')[:70] } stadium={ (a.get('stadium') or '')[:60] }")
+                except Exception as e:
+                    print(f"[sportsdbprobe] {sp}/{nm} ERR {str(e)[:160]}")
+                _t.sleep(1)
+            print("[sportsdbprobe] ===== done =====")
+        _thr.Thread(target=_sportsdb_probe, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy
