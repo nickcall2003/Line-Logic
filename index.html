@@ -908,19 +908,20 @@ function _byEdge(a,b){
   if(na&&nb)return favPct(b)-favPct(a); // both edgeless -> fall back to model %
   return eb-ea;                         // biggest edge first
 }
-// Chronological order: live games first, then upcoming by start time, then
-// finished. start_ts is the raw ISO UTC kickoff/tip, so it sorts correctly
-// regardless of sport or time zone; falls back to scheduled/kickoff_iso.
+// Fixed tip-off order: every game stays in its scheduled slot regardless of
+// status, so cards never jump around the board as games go live or finish.
+// start_ts is the raw ISO UTC kickoff/tip, so it sorts correctly regardless of
+// sport or time zone; falls back to scheduled/kickoff_iso.
 function _startKey(g){return g.start_ts||g.scheduled||g.kickoff_iso||"";}
 function _statusGroup(g){return g.status==="live"?0:(g.status==="finished"?2:1);}
 function _byTime(a,b){
-  var ga=_statusGroup(a),gb=_statusGroup(b);
-  if(ga!==gb)return ga-gb;
   var sa=_startKey(a),sb=_startKey(b);
   if(sa&&sb&&sa!==sb)return sa<sb?-1:1;
   if(sa&&!sb)return -1;
   if(sb&&!sa)return 1;
-  return 0;
+  // stable tiebreak so equal-time games keep a deterministic order
+  var ia=(a.id!=null?String(a.id):""),ib=(b.id!=null?String(b.id):"");
+  return ia<ib?-1:(ia>ib?1:0);
 }
 function appendSortToggle(el){var wrap=document.createElement("span");wrap.className="sortwrap";
   [["featured","\u2605 Top"],["time","\ud83d\udd52 Time"],["confidence","Model %"],["edge","Edge %"]].forEach(function(pr){
@@ -6827,6 +6828,35 @@ function peTrackRecordHTML(sport){
     '<span class="trec-sub">right side of the line on '+pr.wins+' of '+pr.graded+' graded props'+(pr.avg_abs_error!=null?(' · avg miss '+pr.avg_abs_error):'')+'</span></div>'+
     (rows?'<div class="trec-grid">'+rows+'</div>':'')+
     '<div class="trec-foot">Model quality only — never counts toward the site’s units or ROI.</div></div>';}
+// ── Projection-movement: how a player's model projection has moved over time.
+// Snapshots accumulate server-side as the card is viewed; empty until then. ──
+var _pePropMove={},_pePropMovePending={};
+function peFetchMovement(gid,sport){
+  if(!gid||_pePropMove[gid]!==undefined||_pePropMovePending[gid]||typeof getJSON!=="function")return;
+  _pePropMovePending[gid]=1;
+  getJSON("/api/props/movement?sport="+encodeURIComponent(sport||"")+"&game_ref="+encodeURIComponent(gid)).then(function(r){
+    _pePropMove[gid]=(r&&r.movement)||{};delete _pePropMovePending[gid];
+    if(window._peActiveKey===gid)_pePaint(gid);
+  }).catch(function(){_pePropMove[gid]={};delete _pePropMovePending[gid];});}
+function _peSpark(vals,w,h){
+  if(!vals||vals.length<2)return "";
+  var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),rng=(mx-mn)||1;
+  var pts=vals.map(function(v,i){var x=(i/(vals.length-1))*(w-2)+1,y=h-1-((v-mn)/rng)*(h-2);return x.toFixed(1)+","+y.toFixed(1);}).join(" ");
+  var up=vals[vals.length-1]>=vals[0];
+  return '<svg class="mv-spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><polyline points="'+pts+'" fill="none" stroke="'+(up?"var(--win)":"var(--loss)")+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';}
+function peMovementHTML(gid,c,activeProp){
+  var mv=_pePropMove[gid];if(!mv)return "";
+  var projKeys=PE_PROJ_ORDER.filter(function(k){return c.projections&&c.projections[k]!=null;});
+  var prop=(activeProp&&c.projections&&c.projections[activeProp]!=null)?activeProp:projKeys[0];
+  if(!prop)return "";
+  var key=c.player+"||"+prop.replace(/[^a-z0-9]/gi,"").toLowerCase();
+  var series=mv[key];if(!series||series.length<2)return "";
+  var vals=series.map(function(s){return Number(s.proj);});
+  var open=vals[0],cur=vals[vals.length-1],delta=cur-open;
+  var dir=delta>0.05?"up":(delta<-0.05?"down":"flat"),arrow=dir==="up"?"▲":(dir==="down"?"▼":"→");
+  return '<div class="pe-mv '+dir+'"><span class="pe-mv-k">Projection movement</span>'+_peSpark(vals,64,22)+
+    '<span class="pe-mv-v">'+open.toFixed(1)+' → '+cur.toFixed(1)+' <b>'+arrow+' '+(delta>=0?"+":"")+delta.toFixed(1)+'</b></span>'+
+    '<span class="pe-mv-n">'+series.length+' reads</span></div>';}
 function peTagStrip(c){var t=peTags(c); if(!t.length)return "";
   return '<div class="pe-tags">'+t.map(function(x){return '<span class="pe-ptag'+(x.glow?' on':'')+'">'+String(x.t).toUpperCase()+'</span>';}).join("")+'</div>';}
 function peSortVal(c,prop,props){
@@ -6957,6 +6987,7 @@ function peCard(gid,c,i,props,sport,activeProp,view){
     '<div class="vbody" id="body'+gid+'_'+i+'">'+
       peArchetypeHTML(c)+
       peDecision(c,props,activeProp)+
+      peMovementHTML(gid,c,activeProp)+
       '<div class="pe-cmp-wrap">'+pwBtnHTML(gid,c,props,activeProp)+peCmpBtnHTML(gid,c)+'</div>'+
       peTagStrip(c)+
       // ── ANALYSIS tier: Logic Profile (DNA radar), matchup & component detail ──
@@ -7308,7 +7339,8 @@ function _pePaint(key){var mount=document.getElementById("pe-mount"),d=_peData[k
   if(!mount||!d)return; window._peActiveKey=key; mount.innerHTML=peRender(key,d,_peProps(key));
   if(!d._prop){var fr=mount.querySelector(".vrow");if(fr){var m=fr.id.match(/_(\d+)$/);if(m)peToggle(key,parseInt(m[1],10));}}
   peRefreshTipoff(key); if(typeof peCmpSync==="function")peCmpSync(); if(typeof pwSync==="function")pwSync();
-  if(typeof peFetchPropRec==="function")peFetchPropRec(d._sport);}
+  if(typeof peFetchPropRec==="function")peFetchPropRec(d._sport);
+  if(typeof peFetchMovement==="function")peFetchMovement(key,d._sport);}
 /* ===== Game Analysis: impact-player strip (top Player Edge movers in the game view) ===== */
 function gaImpactCard(c){
   var u=peHeadshot(c);

@@ -686,6 +686,11 @@ def register(app):
             return JSONResponse({"error": str(e)[:200], "cards": []})
         if res is None:
             return JSONResponse({"error": "nba edge unavailable", "cards": []})
+        try:
+            import prop_tracking as PT
+            PT.snapshot_cards_bg("nba", game_id, res.get("cards"))
+        except Exception:
+            pass
         return res
 
     @app.get("/api/wnba/venom/{game_id}")
@@ -697,6 +702,11 @@ def register(app):
             return JSONResponse({"error": str(e)[:200], "cards": []})
         if res is None:
             return JSONResponse({"error": "wnba edge unavailable", "cards": []})
+        try:
+            import prop_tracking as PT
+            PT.snapshot_cards_bg("wnba", game_id, res.get("cards"))
+        except Exception:
+            pass
         return res
 
     @app.get("/api/nba/props-diag")

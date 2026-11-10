@@ -67,11 +67,13 @@
   .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);
     border-radius:13px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s}
   .card:hover{border-color:#4a3b29}
-  .card.correct{border-left:3px solid var(--win)} .card.wrong{border-left:3px solid var(--loss)} .card.live{border-left:3px solid var(--live)}
+  .card.correct{border-left:3px solid var(--win)} .card.wrong{border-left:3px solid var(--loss)} .card.live:not(.gcard){border-left:3px solid var(--live)}
   .card.gcard{position:relative;
     background:linear-gradient(180deg,var(--panel),var(--panel-2));
     background:radial-gradient(130% 75% at 94% -14%, color-mix(in srgb, var(--homeC, transparent) 9%, transparent), transparent 56%),linear-gradient(180deg,var(--panel),var(--panel-2))}
-  .card.gcard:not(.correct):not(.wrong):not(.live)::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;
+  /* live games keep their team-color spine (the LIVE badge already marks them);
+     only finished correct/wrong override it with the grade color. */
+  .card.gcard:not(.correct):not(.wrong)::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;
     border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--awayC,transparent),var(--homeC,transparent))}
   .card.big{background:linear-gradient(180deg,#221a11,#1b1610)}
   .card-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
@@ -2237,3 +2239,12 @@ a{color:var(--gold)}
 .trec-pct.pos{color:var(--win)}
 .trec-n{font:500 9.5px/1 "Space Mono",monospace;color:var(--muted-2);width:54px;text-align:right;flex:none}
 .trec-foot{font:500 10px/1.45 "Hanken Grotesque",sans-serif;color:var(--muted-2);margin-top:10px;font-style:italic}
+
+/* ===== PLAYER EDGE — Phase 3: projection movement ===== */
+.pe-mv{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:8px 12px;margin:-2px 0 12px;
+  border:1px solid var(--line);border-radius:11px;background:var(--panel-2)}
+.pe-mv-k{font:800 8.5px/1 "Archivo",sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2)}
+.mv-spark{display:block;flex:none}
+.pe-mv-v{font:700 12px/1 "Space Mono",monospace;color:var(--muted)}
+.pe-mv.up .pe-mv-v b{color:var(--win)} .pe-mv.down .pe-mv-v b{color:var(--loss)} .pe-mv.flat .pe-mv-v b{color:var(--muted)}
+.pe-mv-n{font:500 9.5px/1 "Space Mono",monospace;color:var(--muted-2);margin-left:auto}

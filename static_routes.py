@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v120";   // bumped: Player Edge Phase 3 — Model Track Record in props panel
+const CACHE = "ll-shell-v121";   // bumped: live color spine + tip-off order + projection movement
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));

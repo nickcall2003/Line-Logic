@@ -6359,6 +6359,20 @@ def props_recent(sport: str | None = None, limit: int = 60):
         return {"error": str(e)[:200], "props": []}
 
 
+@app.get("/api/props/movement")
+def props_movement(sport: str = "", game_ref: str = ""):
+    """Projection-movement series per prop for a game: how each player's model
+    projection has moved over time. Empty until snapshots accumulate."""
+    if not sport or not game_ref:
+        return {"movement": {}}
+    try:
+        import prop_tracking as PT
+        with SessionLocal() as db:
+            return {"movement": PT.game_movement(db, sport, str(game_ref))}
+    except Exception as e:
+        return {"error": str(e)[:200], "movement": {}}
+
+
 @app.get("/api/props/settle")
 def props_settle(days: int = 3, token: str = ""):
     """Grade finished games' props with the players' ACTUAL stats. Runs on a

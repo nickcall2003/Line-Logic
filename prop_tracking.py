@@ -69,6 +69,88 @@ def log_props(db, sport, game_ref, props, when=None):
     return n
 
 
+# ---------- projection-movement snapshots ----------
+_SNAP_LAST = {}   # per-process throttle: sport|game_ref -> epoch seconds
+
+
+def snapshot_cards_bg(sport, game_ref, cards):
+    """Fire-and-forget: snapshot the venom cards' projections in a background
+    thread so the venom endpoint takes no extra latency. Throttled per game."""
+    try:
+        import threading
+        threading.Thread(target=_snapshot_cards_worker,
+                         args=(sport, str(game_ref), cards), daemon=True).start()
+    except Exception:
+        pass
+
+
+def _snapshot_cards_worker(sport, game_ref, cards, throttle_s=900):
+    import time
+    key = sport + "|" + game_ref
+    now = time.time()
+    last = _SNAP_LAST.get(key)
+    if last and (now - last) < throttle_s:   # at most one snapshot per game / 15 min
+        return
+    _SNAP_LAST[key] = now
+    try:
+        from db import SessionLocal
+        from models import PropSnapshot
+        when = dt.datetime.now()
+        with SessionLocal() as db:
+            n = 0
+            for c in (cards or []):
+                player = (c.get("player") or "").strip()
+                projs = c.get("projections")
+                if not player or not isinstance(projs, dict):
+                    continue
+                for skey, val in projs.items():
+                    if val is None:
+                        continue
+                    try:
+                        proj = float(val)
+                    except (TypeError, ValueError):
+                        continue
+                    last_row = db.execute(
+                        select(PropSnapshot).where(
+                            PropSnapshot.sport == sport, PropSnapshot.game_ref == game_ref,
+                            PropSnapshot.player == player, PropSnapshot.stat == skey)
+                        .order_by(PropSnapshot.captured_at.desc()).limit(1)
+                    ).scalar_one_or_none()
+                    if last_row is not None and last_row.projection is not None \
+                            and abs(last_row.projection - proj) < 0.05:
+                        continue
+                    db.add(PropSnapshot(sport=sport, game_ref=game_ref, player=player,
+                                        stat=skey, projection=proj, line=None, captured_at=when))
+                    n += 1
+            if n:
+                db.commit()
+    except Exception:
+        pass
+
+
+def game_movement(db, sport, game_ref, max_points=24):
+    """Per-prop projection history for a game, for the movement UI:
+    {player||statkey: [{t, proj}]}. Only props with >= 2 points are returned."""
+    from models import PropSnapshot
+    rows = db.execute(
+        select(PropSnapshot).where(
+            PropSnapshot.sport == sport, PropSnapshot.game_ref == str(game_ref))
+        .order_by(PropSnapshot.captured_at.asc())
+    ).scalars().all()
+    out = {}
+    for r in rows:
+        k = r.player + "||" + _stat_key(r.stat)
+        out.setdefault(k, []).append({
+            "t": r.captured_at.isoformat() if r.captured_at else None,
+            "proj": round(r.projection, 2) if r.projection is not None else None})
+    for k in list(out.keys()):
+        if len(out[k]) < 2:
+            del out[k]
+        elif len(out[k]) > max_points:
+            out[k] = out[k][-max_points:]
+    return out
+
+
 # ---------- grade (after the game) ----------
 def grade_props(db, sport, game_ref, actuals, when=None):
     """actuals: {(player_lower, stat_lower): value}. Fills in actual + correct.

@@ -400,6 +400,11 @@ def register(app):
         if not mu or mu.get("error"):
             return JSONResponse({"error": "matchups unavailable"})
         cards = game_cards(mu)
+        try:
+            import prop_tracking as PT
+            PT.snapshot_cards_bg("mlb", game_id, cards)
+        except Exception:
+            pass
         return {"game_id": game_id, "home_team": mu.get("home_team"),
                 "away_team": mu.get("away_team"),
                 "pitchers": {"home": (mu.get("away") or {}).get("pitcher"),

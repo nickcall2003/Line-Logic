@@ -597,6 +597,11 @@ def register(app):
         cards.sort(key=lambda c: c.get("logic_score") or 0, reverse=True)
         for i, c in enumerate(cards, 1):
             c["rank"] = i
+        try:
+            import prop_tracking as PT
+            PT.snapshot_cards_bg("nhl", game_id, cards)
+        except Exception:
+            pass
         return {"game_id": game_id, "home_team": home, "away_team": away,
                 "count": len(cards), "cards": cards}
 

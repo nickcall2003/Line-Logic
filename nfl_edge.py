@@ -673,6 +673,11 @@ def register(app):
         except Exception:
             pass
         cards = game_cards(H, A, roster, data.get("defense", {}))
+        try:
+            import prop_tracking as PT
+            PT.snapshot_cards_bg("nfl", game_id, cards)
+        except Exception:
+            pass
         return {"game_id": game_id, "home_team": home, "away_team": away,
                 "count": len(cards), "cards": cards}
 

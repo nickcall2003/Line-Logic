@@ -187,6 +187,23 @@ class PropResult(Base):
                                        name="uq_prop_ref"),)
 
 
+class PropSnapshot(Base):
+    """Append-only time series of a prop's MODEL PROJECTION, so we can show how a
+    player's projection has moved over time (projection-movement tracking). One
+    row per meaningful change per (player, stat); separate from PropResult, which
+    keeps a single graded row. `stat` holds the projection key (e.g. 'rec_yds')."""
+    __tablename__ = "prop_snapshots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sport: Mapped[str] = mapped_column(String(10), index=True)
+    game_ref: Mapped[str] = mapped_column(String(40), index=True)
+    player: Mapped[str] = mapped_column(String(80), index=True)
+    stat: Mapped[str] = mapped_column(String(32))
+    projection: Mapped[float] = mapped_column(Float)
+    line: Mapped[float | None] = mapped_column(Float, nullable=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
 class LadderState(Base):
     """
     The running state of the daily Ladder Challenge: $10 rolled through up to 10
