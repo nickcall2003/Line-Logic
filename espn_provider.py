@@ -915,16 +915,38 @@ def _team_roster_ids(sport, team_id):
     if key in _roster_id_cache:
         return _roster_id_cache[key]
     ids = {}
+
+    def _add(nm, aid):
+        # store under both the exact lower name AND a punctuation/space-stripped
+        # key, so "Karl-Anthony Towns" matches a feed that writes "Karl Anthony
+        # Towns" or drops the hyphen. Prefer the first id seen for a key.
+        if not nm or not aid:
+            return
+        for k in (nm.lower(), re.sub(r"[^a-z0-9]", "", nm.lower())):
+            if k and k not in ids:
+                ids[k] = str(aid)
+
+    # Source 1: athlete statistics endpoint.
     try:
         url = _ATHLETE_STATS.get(sport)
         if url and team_id:
             data = _get(url.format(team=team_id), {"region": "us"})
             for entry in (data.get("athletes") or []):
                 ath = entry.get("athlete", {}) or {}
-                nm = ath.get("displayName")
-                aid = ath.get("id")
-                if nm and aid:
-                    ids[nm.lower()] = str(aid)
+                _add(ath.get("displayName"), ath.get("id"))
+    except Exception:
+        pass
+    # Source 2: dedicated roster endpoint (different shape: athletes[].items[]) —
+    # a reliable id source when the statistics feed is thin or a name mismatches.
+    try:
+        rurl = _ROSTER_URL.get(sport)
+        if rurl and team_id:
+            data = _get(rurl.format(team=team_id), {"region": "us"})
+            for grp in (data.get("athletes") or []):
+                items = grp.get("items") if isinstance(grp, dict) and grp.get("items") is not None else [grp]
+                for ath in (items or []):
+                    if isinstance(ath, dict):
+                        _add(ath.get("displayName") or ath.get("fullName"), ath.get("id"))
     except Exception:
         pass
     _roster_id_cache[key] = ids

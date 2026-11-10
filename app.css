@@ -2248,3 +2248,13 @@ a{color:var(--gold)}
 .pe-mv-v{font:700 12px/1 "Space Mono",monospace;color:var(--muted)}
 .pe-mv.up .pe-mv-v b{color:var(--win)} .pe-mv.down .pe-mv-v b{color:var(--loss)} .pe-mv.flat .pe-mv-v b{color:var(--muted)}
 .pe-mv-n{font:500 9.5px/1 "Space Mono",monospace;color:var(--muted-2);margin-left:auto}
+
+/* Model Track Record — collapsible header */
+.pe-trec .trec-h{cursor:pointer;-webkit-user-select:none;user-select:none;align-items:center}
+.trec-hpct{font:800 15px/1 "Space Mono",monospace;margin-left:2px}
+.trec-hpct.pos{color:var(--win)} .trec-hpct.neg{color:var(--loss)}
+.trec-hsub{font:500 10px/1 "Space Mono",monospace;letter-spacing:0;text-transform:none;color:var(--muted-2)}
+.trec-exp{margin-left:auto;color:var(--gold);transition:transform .15s;font-size:12px}
+.pe-trec.collapsed .trec-exp{transform:rotate(-90deg)}
+.pe-trec.collapsed .trec-body{display:none}
+.pe-trec.collapsed{padding-bottom:13px}

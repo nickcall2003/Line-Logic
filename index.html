@@ -3526,7 +3526,7 @@ function propModelHTML(pr){
   if(keys.length){
     byStat='<div class="pm-stats">'+keys.map(function(k){
       var b=bs[k], hp=b.hit_pct;
-      var lab=k.charAt(0).toUpperCase()+k.slice(1).replace(/_/g," ");
+      var lab=b.label||k;
       return '<div class="pm-stat"><span class="pm-stat-lab">'+lab+'</span>'+
              '<span class="pm-stat-pct '+((hp!=null&&hp>=52.4)?"pos":"")+'">'+
              (hp!=null?hp+"%":"—")+'</span>'+
@@ -5780,6 +5780,9 @@ function peCardUrl(c,props,sp,prop){
   }
   var a=(typeof peArchetype==="function")?peArchetype(c):null;
   if(a)pairs.push(["arch",a.label]);
+  var hs=(typeof peHeadshot==="function")?peHeadshot(c):null;
+  if(hs)pairs.push(["img",hs]);
+  if(c.edge_pct!=null)pairs.push(["edge",c.edge_pct]);
   if(arguments.length>4&&arguments[4])pairs.push(["style",arguments[4]]);
   return "/api/card/prop?"+_cq(pairs);
 }
@@ -6820,14 +6823,18 @@ function peTrackRecordHTML(sport){
   var hit=pr.hit_pct,good=(hit!=null&&hit>=52.4),bs=pr.by_stat||{};
   var keys=Object.keys(bs).filter(function(k){return (bs[k].n||0)>=10;})
     .sort(function(a,b){return (bs[b].hit_pct||0)-(bs[a].hit_pct||0);}).slice(0,8);
-  var rows=keys.map(function(k){var b=bs[k],hp=b.hit_pct,lab=k.charAt(0).toUpperCase()+k.slice(1).replace(/_/g," ");
+  var rows=keys.map(function(k){var b=bs[k],hp=b.hit_pct,lab=b.label||k;
     return '<div class="trec-s"><span class="trec-lab">'+lab+'</span><span class="trec-pct'+((hp!=null&&hp>=52.4)?" pos":"")+'">'+(hp!=null?hp+"%":"—")+'</span><span class="trec-n">'+b.n+' graded</span></div>';}).join("");
   var spL=(typeof SPORT_LABEL!=="undefined"&&SPORT_LABEL[sport])||(sport||"").toUpperCase();
-  return '<div class="pe-trec"><div class="trec-h">Model track record <span>last '+(pr.days||30)+'d · '+spL+'</span></div>'+
+  return '<div class="pe-trec collapsed"><div class="trec-h" onclick="peTrecToggle(this)">Model track record'+
+    '<span class="trec-hpct '+(good?"pos":"neg")+'">'+(hit!=null?hit+"%":"—")+'</span>'+
+    '<span class="trec-hsub">last '+(pr.days||30)+'d · '+spL+'</span><span class="trec-exp">▾</span></div>'+
+    '<div class="trec-body">'+
     '<div class="trec-top"><span class="trec-big '+(good?"pos":"neg")+'">'+(hit!=null?hit+"%":"—")+'</span>'+
     '<span class="trec-sub">right side of the line on '+pr.wins+' of '+pr.graded+' graded props'+(pr.avg_abs_error!=null?(' · avg miss '+pr.avg_abs_error):'')+'</span></div>'+
     (rows?'<div class="trec-grid">'+rows+'</div>':'')+
-    '<div class="trec-foot">Model quality only — never counts toward the site’s units or ROI.</div></div>';}
+    '<div class="trec-foot">Model quality only — never counts toward the site’s units or ROI.</div></div></div>';}
+function peTrecToggle(el){var p=el.parentNode;if(p)p.classList.toggle("collapsed");}
 // ── Projection-movement: how a player's model projection has moved over time.
 // Snapshots accumulate server-side as the card is viewed; empty until then. ──
 var _pePropMove={},_pePropMovePending={};

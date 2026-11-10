@@ -29,6 +29,40 @@ def _stat_key(s):
     return re.sub(r"[^a-z0-9]", "", (s or "").lower())
 
 
+# Canonical display label per normalized stat key, so "Points"/"points"/"PTS"
+# collapse into ONE category instead of showing up as duplicate rows.
+_STAT_CANON = {
+    "points": "Points", "pts": "Points", "playerpoints": "Points",
+    "rebounds": "Rebounds", "reb": "Rebounds", "rebs": "Rebounds",
+    "totalrebounds": "Rebounds", "playerrebounds": "Rebounds",
+    "assists": "Assists", "ast": "Assists", "playerassists": "Assists",
+    "threepointersmade": "3-Pointers", "threepointmade": "3-Pointers",
+    "threept": "3-Pointers", "3pm": "3-Pointers", "madethrees": "3-Pointers",
+    "threepm": "3-Pointers", "fg3m": "3-Pointers",
+    "steals": "Steals", "stl": "Steals", "blocks": "Blocks", "blk": "Blocks",
+    "turnovers": "Turnovers", "to": "Turnovers", "tov": "Turnovers",
+    "pointsreboundsassists": "Pts+Reb+Ast", "pra": "Pts+Reb+Ast",
+    "pointsrebounds": "Pts+Reb", "pr": "Pts+Reb",
+    "pointsassists": "Pts+Ast", "pa": "Pts+Ast",
+    "reboundsassists": "Reb+Ast", "ra": "Reb+Ast",
+    "passingyards": "Passing Yards", "passyards": "Passing Yards",
+    "rushingyards": "Rushing Yards", "rushyards": "Rushing Yards",
+    "receivingyards": "Receiving Yards", "recyards": "Receiving Yards",
+    "recyds": "Receiving Yards", "rushyds": "Rushing Yards", "passyds": "Passing Yards",
+    "receptions": "Receptions", "rec": "Receptions",
+    "passingtouchdowns": "Passing TDs", "passtd": "Passing TDs",
+    "strikeouts": "Strikeouts", "ks": "Strikeouts", "hits": "Hits",
+    "totalbases": "Total Bases", "rbis": "RBIs", "rbi": "RBIs", "runs": "Runs",
+    "shotsongoal": "Shots on Goal", "sog": "Shots on Goal", "shots": "Shots on Goal",
+    "goals": "Goals", "saves": "Saves",
+}
+
+
+def _stat_label(s):
+    k = _stat_key(s)
+    return _STAT_CANON.get(k) or (s or "").strip().title() or "Other"
+
+
 # ---------- record (when props are shown) ----------
 def log_props(db, sport, game_ref, props, when=None):
     """Upsert the props we showed for a game (projection/line/lean), ungraded."""
@@ -198,7 +232,8 @@ def prop_record(db, sport=None, days=30):
               and _stat_key(r.stat) not in _SKEW_STATS]
     by_stat = {}
     for r in graded:
-        b = by_stat.setdefault(r.stat, {"w": 0, "l": 0})
+        lab = _stat_label(r.stat)          # merge Points/points/PTS into one row
+        b = by_stat.setdefault(lab, {"w": 0, "l": 0, "label": lab})
         b["w" if r.correct else "l"] += 1
     for b in by_stat.values():
         t = b["w"] + b["l"]

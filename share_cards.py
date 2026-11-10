@@ -396,6 +396,48 @@ def _prop_verdict(side, hitv):
     return ("LEAN " + s, GOLD_HI)
 
 
+def _grad_panel(img, box, radius, top, bot, outline=None, width=2):
+    """Rounded panel with a vertical gradient fill."""
+    x0, y0, x1, y1 = [int(v) for v in box]
+    w, h = x1 - x0, y1 - y0
+    if w <= 0 or h <= 0:
+        return
+    col = Image.new("RGB", (1, h))
+    for yy in range(h):
+        f = yy / max(1, h - 1)
+        col.putpixel((0, yy), tuple(int(top[i] + (bot[i] - top[i]) * f) for i in range(3)))
+    grad = col.resize((w, h))
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, w - 1, h - 1), radius=int(radius), fill=255)
+    img.paste(grad, (x0, y0), mask)
+    if outline:
+        ImageDraw.Draw(img).rounded_rectangle((x0, y0, x1, y1), radius=int(radius),
+                                              outline=outline, width=int(width))
+
+
+def _fetch_photo(url):
+    """Fetch a player headshot PNG (transparent) for compositing. None on failure
+    (e.g. a thin roster id); the card falls back to an initials medallion."""
+    if not url:
+        return None
+    try:
+        import httpx
+        import io as _io
+        r = httpx.get(url, timeout=8, follow_redirects=True,
+                      headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code != 200 or not r.content:
+            return None
+        return Image.open(_io.BytesIO(r.content)).convert("RGBA")
+    except Exception:
+        return None
+
+
+def _shadow_text(draw, xy, text, font, fill, sh=3):
+    x, y = int(xy[0]), int(xy[1])
+    draw.text((x + sh * SS, y + sh * SS), text, font=font, fill=(0, 0, 0))
+    draw.text((x, y), text, font=font, fill=fill)
+
+
 def render_prop_card(d: dict) -> bytes:
     """A Player Edge prop share. d: sport, player, pos?, team?, opp?, prop (label,
     e.g. 'Rec Yds'), proj (model number), line?, side? ('over'/'under'), hit?
@@ -404,65 +446,23 @@ def render_prop_card(d: dict) -> bytes:
     img, draw = _canvas()
     pad = 60 * SS
     ry = _header(img, draw)
+    style = (d.get("style") or "full").lower()
 
     sport = (d.get("sport") or "").upper()
-    py = ry + 34 * SS
+    py = ry + 30 * SS
     if sport:
         pf = _font("bold", 30 * SS)
         tw, _ = _tw(draw, sport, pf)
         _panel(draw, (pad, py, pad + tw + 44 * SS, py + 52 * SS), radius=26 * SS,
                fill=PANEL_HI, outline=GOLD, width=2 * SS)
         _text(draw, (pad + 22 * SS, py + 8 * SS), sport, pf, GOLD_HI)
-    label = "PLAYER EDGE"
+    lab = "PLAYER EDGE"
     lf = _font("bold", 28 * SS)
-    w, _ = _tw(draw, label, lf)
-    _text(draw, (W * SS - pad - w, py + 10 * SS), label, lf, FAINT)
+    w, _ = _tw(draw, lab, lf)
+    _text(draw, (W * SS - pad - w, py + 12 * SS), lab, lf, FAINT)
 
-    # player name (+ pos chip)
-    ny = py + 126 * SS
-    _text(draw, (pad, ny), "PLAYER", _font("bold", 26 * SS), FAINT)
-    player = d.get("player") or "Player"
-    nf = _fit(draw, player, "cond", 86 * SS, W * SS - 2 * pad)
-    _text(draw, (pad, ny + 36 * SS), player, nf, TEXT)
-    # team vs opp
-    team = d.get("team") or ""
-    opp = d.get("opp") or ""
-    sub = team
-    if opp:
-        sub = (team + "  vs  " + opp) if team else ("vs " + opp)
-    pos = d.get("pos") or ""
-    if pos:
-        sub = (pos + "   ·   " + sub) if sub else pos
-    if sub:
-        _text(draw, (pad, ny + 132 * SS), sub, _font("bold", 32 * SS), GOLD_HI)
-
-    # archetype chip (the Logic Profile signature) between the sub and projection
-    arch = (d.get("arch") or "").strip()
-    extra = 0
-    if arch:
-        ay = ny + 182 * SS
-        atxt = "◆ " + arch.upper()
-        af = _font("bold", 26 * SS)
-        aw, _ = _tw(draw, atxt, af)
-        _panel(draw, (pad, ay, pad + aw + 44 * SS, ay + 50 * SS), radius=25 * SS,
-               fill=PANEL_HI, outline=GOLD, width=2 * SS)
-        _text(draw, (pad + 22 * SS, ay + 9 * SS), atxt, af, GOLD_HI)
-        extra = 74 * SS
-
-    style = (d.get("style") or "full").lower()
-
-    # THE PROJECTION panel
-    pb_y = ny + 226 * SS + extra
-    _panel(draw, (pad, pb_y, W * SS - pad, pb_y + 256 * SS), radius=28 * SS,
-           fill=PANEL, outline=(70, 60, 38), width=2 * SS)
-    prop = (d.get("prop") or "PROP").upper()
-    _text(draw, (pad + 34 * SS, pb_y + 28 * SS), "MODEL PROJECTION · " + prop,
-          _font("bold", 28 * SS), GOLD)
+    # ---- HERO: player photo over a gradient stage ----
     proj = d.get("proj")
-    ptxt = ("%.1f" % float(proj)) if proj is not None else "—"
-    pf2 = _font("cond", 150 * SS)
-    _text(draw, (pad + 30 * SS, pb_y + 64 * SS), ptxt, pf2, TEXT)
-    # line + side + hit%  (right side of the panel)
     line = d.get("line")
     side = (d.get("side") or "").lower()
     hit = d.get("hit")
@@ -470,59 +470,131 @@ def render_prop_card(d: dict) -> bytes:
         hitv = None if hit is None else (float(hit) * (100 if float(hit) <= 1 else 1))
     except Exception:
         hitv = None
-    if line is not None:
-        pre = ("o" if side == "over" else "u" if side == "under" else "")
-        ltxt = "%s%s" % (pre, line)
-        lf2 = _font("mono", 44 * SS)
-        lw, _ = _tw(draw, ltxt, lf2)
-        lx = W * SS - pad - 34 * SS - lw
-        _text(draw, (lx, pb_y + 150 * SS), ltxt, lf2,
-              WIN if side == "over" else LOSS if side == "under" else GOLD_HI)
-        llab = _font("bold", 24 * SS)
-        lwl, _ = _tw(draw, "LINE", llab)
-        _text(draw, (W * SS - pad - 34 * SS - lwl, pb_y + 114 * SS), "LINE", llab, MUTED)
-    if hitv is not None:
-        htxt = "%d%% TO HIT" % round(hitv)
-        hf2 = _font("bold", 30 * SS)
-        hw, _ = _tw(draw, htxt, hf2)
-        _text(draw, (W * SS - pad - 34 * SS - hw, pb_y + 198 * SS), htxt, hf2, GOLD_HI)
 
-    # bottom section
-    cy = pb_y + 300 * SS
-    th = 160 * SS
-    if style == "spotlight":
-        # one clean model-verdict strip — minimal, built to be posted
-        _panel(draw, (pad, cy, W * SS - pad, cy + th), radius=24 * SS,
-               fill=PANEL_HI, outline=GOLD, width=2 * SS)
-        _text(draw, (pad + 28 * SS, cy + 24 * SS), "MODEL VERDICT", _font("bold", 26 * SS), MUTED)
-        vtxt, vcol = _prop_verdict(side, hitv)
-        _text(draw, (pad + 28 * SS, cy + 60 * SS), vtxt, _font("cond", 72 * SS), vcol)
-        sc = d.get("score")
-        if sc is not None:
-            stxt = "LOGIC %.1f" % float(sc)
-            sf = _font("bold", 30 * SS)
-            sw, _ = _tw(draw, stxt, sf)
-            _text(draw, (W * SS - pad - 28 * SS - sw, cy + 64 * SS), stxt, sf, GOLD_HI)
+    hx0, hx1 = pad, W * SS - pad
+    hy0 = py + 92 * SS
+    reserve = (182 if style == "spotlight" else 360) * SS
+    hy1 = (H - 104) * SS - reserve
+    hero_w, hero_h = hx1 - hx0, hy1 - hy0
+    _grad_panel(img, (hx0, hy0, hx1, hy1), 30 * SS, (30, 31, 36), (13, 14, 12),
+                outline=(74, 63, 40), width=2 * SS)
+
+    photo = _fetch_photo(d.get("img"))
+    if photo is not None:
+        target_h = int(hero_h - 96 * SS)
+        scale = target_h / photo.height
+        pw, ph = int(photo.width * scale), target_h
+        maxw = int(hero_w * 0.98)
+        if pw > maxw:
+            scale = maxw / photo.width
+            pw, ph = maxw, int(photo.height * scale)
+        photo = photo.resize((pw, ph), Image.LANCZOS)
+        img.paste(photo, (int(hx0 + (hero_w - pw) / 2), int(hy1 - ph - 6 * SS)), photo)
     else:
-        # full: LOGIC SCORE | BEST BOOK (price + chip)
-        colw = (W * SS - 2 * pad - 28 * SS) / 2
-        _panel(draw, (pad, cy, pad + colw, cy + th), radius=24 * SS, fill=PANEL_HI)
-        _text(draw, (pad + 28 * SS, cy + 22 * SS), "LOGIC SCORE", _font("bold", 26 * SS), MUTED)
+        r0 = 150 * SS
+        cx, cyc = (hx0 + hx1) // 2, (hy0 + hy1) // 2
+        draw.ellipse((cx - r0, cyc - r0, cx + r0, cyc + r0), fill=PANEL_HI,
+                     outline=GOLD, width=3 * SS)
+        ini = "".join([p[0] for p in (d.get("player") or "?").split()[:2]]).upper()
+        f0 = _font("cond", 118 * SS)
+        iw, ih = _tw(draw, ini, f0)
+        _text(draw, (cx - iw // 2, cyc - ih // 2 - 12 * SS), ini, f0, GOLD_HI)
+
+    # archetype chip — top-left of the stage
+    arch = (d.get("arch") or "").strip()
+    if arch:
+        atxt = "◆ " + arch.upper()
+        af = _font("bold", 26 * SS)
+        aw, _ = _tw(draw, atxt, af)
+        _panel(draw, (hx0 + 28 * SS, hy0 + 28 * SS, hx0 + 28 * SS + aw + 42 * SS,
+                      hy0 + 28 * SS + 50 * SS), radius=25 * SS, fill=(13, 14, 11),
+               outline=GOLD, width=2 * SS)
+        _text(draw, (hx0 + 28 * SS + 21 * SS, hy0 + 28 * SS + 9 * SS), atxt, af, GOLD_HI)
+
+    # big projection — top-right of the stage (shadowed over the photo)
+    prop = (d.get("prop") or "PROP").upper()
+    ptxt = ("%.1f" % float(proj)) if proj is not None else "—"
+    pf2 = _font("cond", 128 * SS)
+    pw2, ph2 = _tw(draw, ptxt, pf2)
+    prx = hx1 - 32 * SS - pw2
+    pry = hy0 + 24 * SS
+    _shadow_text(draw, (prx, pry), ptxt, pf2, TEXT)
+    lf2 = _font("bold", 30 * SS)
+    lw2, _ = _tw(draw, prop, lf2)
+    _shadow_text(draw, (hx1 - 32 * SS - lw2, pry + ph2 + 2 * SS), prop, lf2, GOLD_HI)
+
+    # player name + team — bottom-left of the stage (shadowed)
+    player = d.get("player") or "Player"
+    nf = _fit(draw, player, "cond", 72 * SS, hero_w - 64 * SS)
+    npx = hx0 + 32 * SS
+    npy = hy1 - 120 * SS
+    _shadow_text(draw, (npx, npy), player, nf, TEXT)
+    team, opp, pos = d.get("team") or "", d.get("opp") or "", d.get("pos") or ""
+    sub = "  ·  ".join([x for x in [pos, team, ("vs " + opp if opp else "")] if x])
+    if sub:
+        _shadow_text(draw, (npx + 2 * SS, npy + 80 * SS), sub, _font("bold", 30 * SS), GOLD_HI)
+
+    # ---- LINE + EDGE strip (what the user bets on) ----
+    sy = hy1 + 26 * SS
+    sh = 156 * SS
+    _grad_panel(img, (pad, sy, W * SS - pad, sy + sh), 24 * SS, (27, 28, 32), (18, 19, 22),
+                outline=(74, 63, 40), width=2 * SS)
+    # left: book line + side + hit%
+    _text(draw, (pad + 30 * SS, sy + 22 * SS), "BOOK LINE", _font("bold", 24 * SS), MUTED)
+    if line is not None:
+        pre = "o" if side == "over" else "u" if side == "under" else ""
+        lcol = WIN if side == "over" else LOSS if side == "under" else GOLD_HI
+        _text(draw, (pad + 30 * SS, sy + 56 * SS), "%s%s" % (pre, line), _font("cond", 74 * SS), lcol)
+        if hitv is not None:
+            _text(draw, (pad + 30 * SS, sy + 128 * SS), "%d%% to hit" % round(hitv),
+                  _font("bold", 24 * SS), MUTED)
+    else:
+        _text(draw, (pad + 30 * SS, sy + 56 * SS), "—", _font("cond", 74 * SS), GOLD_HI)
+    # right: edge vs market + verdict
+    edge = d.get("edge")
+    elab = "EDGE vs MARKET"
+    elf = _font("bold", 24 * SS)
+    elw, _ = _tw(draw, elab, elf)
+    _text(draw, (W * SS - pad - 30 * SS - elw, sy + 22 * SS), elab, elf, MUTED)
+    if edge is not None:
+        ev = float(edge)
+        etxt = ("+%.1f%%" % ev) if ev >= 0 else ("%.1f%%" % ev)
+        ecol = WIN if ev >= 0 else LOSS
+        ef = _font("cond", 74 * SS)
+        ew, _ = _tw(draw, etxt, ef)
+        _text(draw, (W * SS - pad - 30 * SS - ew, sy + 56 * SS), etxt, ef, ecol)
+    else:
+        etxt = "—"
+        ef = _font("cond", 74 * SS)
+        ew, _ = _tw(draw, etxt, ef)
+        _text(draw, (W * SS - pad - 30 * SS - ew, sy + 56 * SS), etxt, ef, GOLD_HI)
+    vtxt, vcol = _prop_verdict(side, hitv)
+    vf = _font("bold", 26 * SS)
+    vw, _ = _tw(draw, vtxt, vf)
+    _text(draw, (W * SS - pad - 30 * SS - vw, sy + 128 * SS), vtxt, vf, vcol)
+
+    # ---- FULL only: Logic Score | Best Book row ----
+    if style != "spotlight":
+        cy = sy + sh + 22 * SS
+        th = (H - 104) * SS - cy
+        colw = (W * SS - 2 * pad - 24 * SS) / 2
+        _panel(draw, (pad, cy, pad + colw, cy + th), radius=22 * SS, fill=PANEL_HI)
+        _text(draw, (pad + 26 * SS, cy + 20 * SS), "LOGIC SCORE", _font("bold", 24 * SS), MUTED)
         sc = d.get("score")
-        sctxt = ("%.1f" % float(sc)) if sc is not None else "—"
-        _text(draw, (pad + 28 * SS, cy + 58 * SS), sctxt, _font("cond", 64 * SS), GOLD_HI)
-        mx = pad + colw + 28 * SS
-        _panel(draw, (mx, cy, mx + colw, cy + th), radius=24 * SS, fill=PANEL_HI)
-        _text(draw, (mx + 28 * SS, cy + 22 * SS), "BEST BOOK", _font("bold", 26 * SS), MUTED)
-        if d.get("book"):   # chip on the label row, never over the number
+        _text(draw, (pad + 26 * SS, cy + 52 * SS),
+              ("%.1f" % float(sc)) if sc is not None else "—", _font("cond", 60 * SS), GOLD_HI)
+        mx = pad + colw + 24 * SS
+        _panel(draw, (mx, cy, mx + colw, cy + th), radius=22 * SS, fill=PANEL_HI)
+        _text(draw, (mx + 26 * SS, cy + 20 * SS), "BEST BOOK", _font("bold", 24 * SS), MUTED)
+        if d.get("book"):
             s, _c, _t = _book_meta(d["book"])
             cf = _font("bold", int(40 * SS * 0.52))
             cw, _ = _tw(draw, s, cf)
             chw = cw + int(40 * SS * 0.9)
-            _chip(draw, mx + colw - 28 * SS - chw, cy + 16 * SS, d["book"], h=40 * SS)
+            _chip(draw, mx + colw - 26 * SS - chw, cy + 14 * SS, d["book"], h=40 * SS)
         odds = d.get("odds")
-        otxt = _am(odds) if odds is not None else "—"
-        _text(draw, (mx + 28 * SS, cy + 66 * SS), otxt, _font("mono", 56 * SS), TEXT)
+        _text(draw, (mx + 26 * SS, cy + 56 * SS), _am(odds) if odds is not None else "—",
+              _font("mono", 52 * SS), TEXT)
 
     _footer(draw)
     return _finish(img)

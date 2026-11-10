@@ -16,6 +16,7 @@ renders it. Everything is best-effort and returns [] on any failure — a blocke
 host or missing snapshot must never break the page or invent a number.
 """
 import math
+import re
 import datetime as dt
 
 # reference per-game distributions for rotation players (mean, std). Used for the
@@ -627,7 +628,7 @@ def game_cards(sport, game_id, date):
         for name, vals in plist:
             bucket = _pos_bucket(vals.get("_pos"))
             urow = usage.get(str(name).lower())
-            pid = roster.get(str(name).lower())
+            pid = roster.get(str(name).lower()) or roster.get(re.sub(r"[^a-z0-9]", "", str(name).lower()))
             c = _score_player(sport, name, vals, bucket, urow, usage_lg, team_lg,
                               own_adv, opp_adv, oname, HA, ranks, tabbr, oabbr, pid)
             if vals.get("boosted_by"):
