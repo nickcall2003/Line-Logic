@@ -523,7 +523,18 @@ def render_prop_card(d: dict) -> bytes:
     ImageDraw.Draw(img).rounded_rectangle((hx0, hy0, hx1, hy1), radius=30 * SS,
                                           outline=(74, 63, 40), width=2 * SS)
 
-    photo = _fetch_photo(d.get("img"))
+    # Prefer a TheSportsDB cutout (free, transparent, often an action pose);
+    # fall back to the ESPN headshot passed in `img`, then to initials.
+    photo = None
+    try:
+        import sportsdb
+        _curl = sportsdb.player_cutout(d.get("player"), d.get("sport"))
+        if _curl:
+            photo = _fetch_photo(_curl)
+    except Exception:
+        photo = None
+    if photo is None:
+        photo = _fetch_photo(d.get("img"))
     if photo is not None:
         target_h = int(hero_h - 96 * SS)
         scale = target_h / photo.height

@@ -5804,22 +5804,28 @@ function matchShareText(m){
   return ["🎾 TENNIS — "+(favA?m.player_a:m.player_b),
     m.player_a+" vs "+m.player_b,"Model "+pct+"%","","Every pick graded, win or lose.","thelinelogic.com"].join("\n");
 }
+function _sportEmoji(sp){return ({nfl:"🏈",ncaaf:"🏈",nba:"🏀",wnba:"🏀",ncaab:"🏀",ncaabb:"🏀",wncaab:"🏀",mlb:"⚾",nhl:"🏒"})[(sp||"").toLowerCase()]||"📊";}
 function propShareText(c,sp,prop,props){
   var label=(typeof PE_PROJ_LABEL!=="undefined"&&PE_PROJ_LABEL[prop])||prop||"";
   var proj=(c.projections&&c.projections[prop]!=null)?Number(c.projections[prop]):null;
   var lo=(props&&typeof peFindLine==="function")?peFindLine(props,c.player,prop):null;
   var line=(lo&&lo.line!=null)?Number(lo.line):null;
-  var L=["📊 "+c.player+" — "+label,(c.team||"")+(c.opp?" vs "+c.opp:"")];
+  var L=[_sportEmoji(sp)+" "+c.player];
+  L.push(label+(c.team?", "+c.team:"")+(c.opp?" vs "+c.opp:""));
+  L.push("");
+  if(proj!=null)L.push("Model projection: "+proj.toFixed(1));
   if(proj!=null&&line!=null){
     var op=peOverProb(proj,line),over=op>=0.5,v=(typeof peVerdict==="function")?peVerdict(op):{k:""};
-    L.push("Line Logic model: "+proj.toFixed(1)+"  (vs "+(over?"o":"u")+line+
-      (c.edge_pct!=null?(" · "+(c.edge_pct>=0?"+":"")+Number(c.edge_pct).toFixed(1)+"% edge"):"")+")");
-    L.push((v.k?v.k+"  ·  ":"")+Math.round((over?op:1-op)*100)+"% to hit");
-  } else if(proj!=null){
-    L.push("Line Logic model projection: "+proj.toFixed(1));
+    L.push("Book line: "+(over?"o":"u")+line);
+    if(c.edge_pct!=null)L.push("Model edge: "+(c.edge_pct>=0?"+":"")+Number(c.edge_pct).toFixed(1)+"%");
+    L.push("Chance to hit: "+Math.round((over?op:1-op)*100)+"%");
+    var lean;
+    if(!v.k||v.k==="PASS"||v.k==="MODEL READ")lean="No strong lean";
+    else{lean=over?"Over":"Under";if(/STRONG/i.test(v.k))lean+=" (strong)";}
+    L.push("Lean: "+lean);
   }
   L.push("");
-  L.push("Every prop graded, win or lose → thelinelogic.com");
+  L.push("thelinelogic.com");
   return L.join("\n");
 }
 function sharePayload(p){
