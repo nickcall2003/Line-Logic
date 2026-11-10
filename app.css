@@ -2060,3 +2060,50 @@ a{color:var(--gold)}
    background blends in rather than showing a hard box. */
 .home-logo{display:block;margin:6px auto 20px;max-width:min(320px,72vw);width:100%;
   height:auto;border-radius:16px}
+
+/* ========================================================================
+   PLAYER EDGE — Phase 1: view modes, Decision Center, metric tooltips
+   (preserves every existing section; adds a sticky toolbar + verdict block)
+   ======================================================================== */
+.pe-sticky{position:sticky;top:0;z-index:30;background:var(--panel);
+  margin:0 -2px;padding:4px 2px 0;border-bottom:1px solid var(--line)}
+.pe-views{display:flex;align-items:center;gap:6px;padding:8px 2px 8px;flex-wrap:wrap}
+.pe-vbtn{font:800 11px/1 "Archivo",sans-serif;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);background:var(--panel-2);border:1px solid var(--line);
+  border-radius:999px;padding:7px 13px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pe-vbtn.on{color:#13140f;background:var(--gold);border-color:var(--gold)}
+.pe-vhint{font:500 10.5px/1 "Space Mono",monospace;color:var(--muted-2);margin-left:auto}
+@media(max-width:400px){.pe-vhint{display:none}}
+
+/* Decision Center — the consolidated verdict at the top of each card */
+.dc{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:2px 0 12px;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel))}
+.dc-h{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}
+.dc-h>span:first-child{font:800 10.5px/1 "Archivo",sans-serif;letter-spacing:.11em;text-transform:uppercase;color:var(--gold)}
+.dc-prop{font:700 11px/1 "Space Mono",monospace;color:var(--muted)}
+.dc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line)}
+.dc-t{background:var(--panel);padding:11px 7px;text-align:center}
+.dc-k{font:800 8px/1.3 "Archivo",sans-serif;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--muted-2);margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:3px}
+.dc-v{font:700 19px/1 "Space Mono",monospace;color:var(--ink)}
+.dc-v.pos{color:var(--win)} .dc-v.neg{color:var(--loss)}
+.dc-verdict{display:flex;align-items:center;gap:11px;padding:11px 14px;border-top:1px solid var(--line)}
+.dc-badge{font:800 12px/1 "Archivo",sans-serif;letter-spacing:.06em;padding:7px 11px;border-radius:7px;white-space:nowrap}
+.dc-verdict.over .dc-badge{background:rgba(95,207,134,.16);color:var(--win);border:1px solid rgba(95,207,134,.42)}
+.dc-verdict.under .dc-badge{background:rgba(238,106,84,.16);color:var(--loss);border:1px solid rgba(238,106,84,.42)}
+.dc-verdict.neu .dc-badge{background:rgba(142,143,138,.14);color:var(--muted);border:1px solid var(--line)}
+.dc-expl{font:500 11.5px/1.45 "Hanken Grotesque",sans-serif;color:var(--muted)}
+@media(max-width:400px){.dc-grid{grid-template-columns:repeat(2,1fr)}.dc-v{font-size:17px}}
+
+/* metric tooltips */
+.pe-i{display:inline-flex;align-items:center;justify-content:center;min-width:13px;height:13px;
+  padding:0 2px;border-radius:50%;font:700 9px/1 "Space Mono",monospace;color:var(--muted-2);
+  border:1px solid var(--line);cursor:pointer;vertical-align:middle;-webkit-tap-highlight-color:transparent}
+.pe-i:active{color:var(--gold);border-color:var(--gold)}
+.pe-tipbox{position:absolute;z-index:9999;background:#0d0e0b;color:var(--ink);border:1px solid var(--gold);
+  border-radius:10px;padding:10px 12px;font:500 12px/1.5 "Hanken Grotesque",sans-serif;
+  box-shadow:0 10px 30px rgba(0,0,0,.55);display:none}
+
+/* Quick-view hint line under a collapsed card */
+.pe-qhint{font:500 11px/1.4 "Hanken Grotesque",sans-serif;color:var(--muted-2);
+  padding:2px 2px 6px;text-align:center}
