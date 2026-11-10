@@ -55,6 +55,11 @@ _SPORT_BARS = {"nba": "_pts", "wnba": "_pts", "nfl": "_pts", "ncaaf": "_pts",
 _FILLER = {"fc", "sc", "the"}
 _ALIAS = {"utd": "united"}
 
+# Leagues whose site.api v2 standings are unreliable (college football returns
+# placeholder/split entries with no per-game or win% fields). cdn.espn core
+# carries clean season totals + the overall record, one entry per team.
+_CORE_FEED = {"ncaaf"}
+
 
 def enabled() -> bool:
     return os.environ.get("ESPN_DEPTH_ENABLED", "1") == "1"
@@ -86,6 +91,62 @@ def _tokens(name):
     return {(_ALIAS.get(t, t)) for t in n.split() if t not in _FILLER and len(t) >= 2}
 
 
+def _parse_record(s):
+    """Pull (wins, losses, ties) from a team's record displayValues. Primary:
+    the 'overall' display ('8-2'). Fallback: sum Home + Away/Road splits."""
+    import re as _re
+    for key in ("overall__d", "total__d"):
+        m = _re.match(r"\s*(\d+)\s*-\s*(\d+)(?:\s*-\s*(\d+))?", str(s.get(key) or ""))
+        if m:
+            return int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
+    w = l = t = 0
+    found = False
+    for key in ("Home__d", "Away__d", "Road__d"):
+        m = _re.match(r"\s*(\d+)\s*-\s*(\d+)(?:\s*-\s*(\d+))?", str(s.get(key) or ""))
+        if m:
+            found = True
+            w += int(m.group(1)); l += int(m.group(2)); t += int(m.group(3) or 0)
+    return (w, l, t) if found else None
+
+
+def _gp_robust(stats):
+    gp = _num(stats.get("gamesPlayed"))
+    if gp:
+        return gp
+    w, l, t = _num(stats.get("wins")), _num(stats.get("losses")), _num(stats.get("ties"))
+    if w is not None and l is not None:
+        return w + l + (t or 0)
+    rec = _parse_record(stats)
+    if rec:
+        g = rec[0] + rec[1] + rec[2]
+        return g or None
+    return None
+
+
+def _enrich(stats):
+    """Normalize a team's stats so the generic bar engine has per-game points,
+    differential and win% regardless of which feed supplied them. Only fills
+    gaps — existing per-game/win% values (NFL, NCAAB) are left untouched."""
+    games = _gp_robust(stats)
+    pf, pa = _num(stats.get("pointsFor")), _num(stats.get("pointsAgainst"))
+    if stats.get("avgPointsFor") is None and pf is not None and games:
+        stats["avgPointsFor"] = round(pf / games, 2)
+    if stats.get("avgPointsAgainst") is None and pa is not None and games:
+        stats["avgPointsAgainst"] = round(pa / games, 2)
+    if stats.get("pointDifferential") is None and pf is not None and pa is not None:
+        stats["pointDifferential"] = pf - pa
+    wp = stats.get("winPercent")
+    if wp in (None, 0, 0.0, "0", "0.0"):
+        w = _num(stats.get("wins"))
+        rec = _parse_record(stats)
+        if w is None and rec:
+            w = rec[0]
+        if w is not None and games:
+            stats["winPercent"] = round(w / games, 4)
+    if games and stats.get("gamesPlayed") is None:
+        stats["gamesPlayed"] = games
+
+
 def _collect(node, acc):
     if isinstance(node, dict):
         if isinstance(node.get("entries"), list):
@@ -111,13 +172,18 @@ def _standings(sport, league=None):
     if sport == "soccer":
         if not league:
             return {}
-        path = f"soccer/{league}"
+        url = f"https://site.api.espn.com/apis/v2/sports/soccer/{league}/standings"
+    elif sport in _CORE_FEED:
+        sp = _PATH.get(sport)
+        if not sp:
+            return {}
+        url = f"https://cdn.espn.com/core/{sp[1]}/standings?xhr=1"
     else:
         sp = _PATH.get(sport)
         if not sp:
             return {}
-        path = f"{sp[0]}/{sp[1]}"
-    data = _get(f"https://site.api.espn.com/apis/v2/sports/{path}/standings")
+        url = f"https://site.api.espn.com/apis/v2/sports/{sp[0]}/{sp[1]}/standings"
+    data = _get(url)
     table = {}
     if data:
         acc = []
@@ -132,6 +198,7 @@ def _standings(sport, league=None):
                 if s.get("name") is not None:
                     stats[s["name"]] = s.get("value")
                     stats[s["name"] + "__d"] = s.get("displayValue")
+            _enrich(stats)
             table[name] = {"id": str(tm.get("id") or ""), "name": name, "stats": stats}
     _cache[ck] = (time.time(), table)
     return table
@@ -150,13 +217,7 @@ def _match(name, table):
 
 
 def _gp(stats):
-    gp = _num(stats.get("gamesPlayed"))
-    if gp:
-        return gp
-    w, l, t = _num(stats.get("wins")), _num(stats.get("losses")), _num(stats.get("ties"))
-    if w is not None and l is not None:
-        return w + l + (t or 0)
-    return None
+    return _gp_robust(stats)
 
 
 def _val(stats, cand, mode):

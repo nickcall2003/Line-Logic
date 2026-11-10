@@ -667,6 +667,9 @@ async def lifespan(app: FastAPI):
                 for s in (e.get("stats") or []):
                     if s.get("name") is not None:
                         sv[s["name"]] = s.get("value")
+                        dv = s.get("displayValue")
+                        if dv not in (None, ""):
+                            sv[s["name"] + "/d"] = dv
                 return str(tm.get("id") or ""), nm, sv
 
             def _dump_standings(tag, url):
