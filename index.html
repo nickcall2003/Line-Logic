@@ -6803,6 +6803,30 @@ function pwRemoveEv(ev){ev.stopPropagation();var el=ev.currentTarget;
   pwRemove(el.getAttribute("data-gid"),el.getAttribute("data-player"),el.getAttribute("data-prop"));
   pwSync();if(PWATCH.length)pwOpen();else pwClose();}
 function pwClearAll(){PWATCH=[];pwSave();pwSync();pwClose();}
+// ── Model Track Record (by prop category), surfaced in the props panel. Reuses
+// /api/props/record (same data the Record page shows) so the model's honesty
+// scoreboard sits right where you're reading props. ──
+var _pePropRec={},_pePropRecPending={};
+function peFetchPropRec(sport){
+  if(!sport||_pePropRec[sport]!==undefined||_pePropRecPending[sport]||typeof getJSON!=="function")return;
+  _pePropRecPending[sport]=1;
+  getJSON("/api/props/record?sport="+encodeURIComponent(sport)+"&days=30").then(function(r){
+    _pePropRec[sport]=r||null;delete _pePropRecPending[sport];
+    if(window._peActiveKey){var d=_peData[window._peActiveKey];if(d&&d._sport===sport)_pePaint(window._peActiveKey);}
+  }).catch(function(){_pePropRec[sport]=null;delete _pePropRecPending[sport];});}
+function peTrackRecordHTML(sport){
+  var pr=_pePropRec[sport];if(!pr||!pr.graded||pr.graded<20)return "";
+  var hit=pr.hit_pct,good=(hit!=null&&hit>=52.4),bs=pr.by_stat||{};
+  var keys=Object.keys(bs).filter(function(k){return (bs[k].n||0)>=10;})
+    .sort(function(a,b){return (bs[b].hit_pct||0)-(bs[a].hit_pct||0);}).slice(0,8);
+  var rows=keys.map(function(k){var b=bs[k],hp=b.hit_pct,lab=k.charAt(0).toUpperCase()+k.slice(1).replace(/_/g," ");
+    return '<div class="trec-s"><span class="trec-lab">'+lab+'</span><span class="trec-pct'+((hp!=null&&hp>=52.4)?" pos":"")+'">'+(hp!=null?hp+"%":"—")+'</span><span class="trec-n">'+b.n+' graded</span></div>';}).join("");
+  var spL=(typeof SPORT_LABEL!=="undefined"&&SPORT_LABEL[sport])||(sport||"").toUpperCase();
+  return '<div class="pe-trec"><div class="trec-h">Model track record <span>last '+(pr.days||30)+'d · '+spL+'</span></div>'+
+    '<div class="trec-top"><span class="trec-big '+(good?"pos":"neg")+'">'+(hit!=null?hit+"%":"—")+'</span>'+
+    '<span class="trec-sub">right side of the line on '+pr.wins+' of '+pr.graded+' graded props'+(pr.avg_abs_error!=null?(' · avg miss '+pr.avg_abs_error):'')+'</span></div>'+
+    (rows?'<div class="trec-grid">'+rows+'</div>':'')+
+    '<div class="trec-foot">Model quality only — never counts toward the site’s units or ROI.</div></div>';}
 function peTagStrip(c){var t=peTags(c); if(!t.length)return "";
   return '<div class="pe-tags">'+t.map(function(x){return '<span class="pe-ptag'+(x.glow?' on':'')+'">'+String(x.t).toUpperCase()+'</span>';}).join("")+'</div>';}
 function peSortVal(c,prop,props){
@@ -7216,6 +7240,7 @@ function peRender(gid,d,props){
       }).join("")+
       '<div style="font-size:10.5px;color:var(--muted-2);margin-top:8px;font-style:italic">Model estimate: early-shot volume × make rate, fair odds (no vig). Starters on the floor at tip. Not a graded market.</div></div>';
   }
+  fbPanel=peTrackRecordHTML(sport)+fbPanel;
   var view=peView;
   var savedBtn=(typeof PWATCH!=="undefined"&&PWATCH.length)?'<button class="pe-saved-btn" onclick="pwOpen()">★ Saved ('+PWATCH.length+')</button>':'';
   var vtoolbar='<div class="pe-views">'+[["quick","Quick"],["analysis","Analysis"],["deep","Deep Research"]].map(function(v){
@@ -7282,7 +7307,8 @@ function peRefreshTipoff(key){
 function _pePaint(key){var mount=document.getElementById("pe-mount"),d=_peData[key];
   if(!mount||!d)return; window._peActiveKey=key; mount.innerHTML=peRender(key,d,_peProps(key));
   if(!d._prop){var fr=mount.querySelector(".vrow");if(fr){var m=fr.id.match(/_(\d+)$/);if(m)peToggle(key,parseInt(m[1],10));}}
-  peRefreshTipoff(key); if(typeof peCmpSync==="function")peCmpSync(); if(typeof pwSync==="function")pwSync();}
+  peRefreshTipoff(key); if(typeof peCmpSync==="function")peCmpSync(); if(typeof pwSync==="function")pwSync();
+  if(typeof peFetchPropRec==="function")peFetchPropRec(d._sport);}
 /* ===== Game Analysis: impact-player strip (top Player Edge movers in the game view) ===== */
 function gaImpactCard(c){
   var u=peHeadshot(c);

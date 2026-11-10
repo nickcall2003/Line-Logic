@@ -2218,3 +2218,22 @@ a{color:var(--gold)}
 .pw-pct.pos{color:var(--win)} .pw-pct.neg{color:var(--loss)}
 .pw-del{font:700 15px/1 system-ui;color:var(--muted-2);background:transparent;border:0;padding:6px;cursor:pointer;flex:none}
 .pw-clear{font:700 10.5px/1 "Archivo",sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--loss);background:transparent;border:0;cursor:pointer;padding:0}
+
+/* ===== PLAYER EDGE — Phase 3: Model Track Record panel ===== */
+.pe-trec{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);
+  border-radius:14px;padding:13px 15px;margin:12px 0 2px}
+.trec-h{font:800 11px/1 "Archivo",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.trec-h span{font:500 10px/1 "Space Mono",monospace;letter-spacing:0;text-transform:none;color:var(--muted-2)}
+.trec-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:11px}
+.trec-big{font:700 30px/1 "Space Mono",monospace;color:var(--ink)}
+.trec-big.pos{color:var(--win)} .trec-big.neg{color:var(--loss)}
+.trec-sub{font:500 11px/1.4 "Hanken Grotesque",sans-serif;color:var(--muted);flex:1;min-width:140px}
+.trec-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+@media(max-width:400px){.trec-grid{grid-template-columns:1fr}}
+.trec-s{display:flex;align-items:center;gap:7px;background:var(--panel);padding:8px 11px}
+.trec-lab{flex:1;font:600 11.5px/1.2 "Hanken Grotesque",sans-serif;color:var(--ink);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trec-pct{font:700 13px/1 "Space Mono",monospace;color:var(--muted)}
+.trec-pct.pos{color:var(--win)}
+.trec-n{font:500 9.5px/1 "Space Mono",monospace;color:var(--muted-2);width:54px;text-align:right;flex:none}
+.trec-foot{font:500 10px/1.45 "Hanken Grotesque",sans-serif;color:var(--muted-2);margin-top:10px;font-style:italic}
