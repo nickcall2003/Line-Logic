@@ -6613,6 +6613,103 @@ function peTags(c){
   if(c.signals&&c.signals.length)c.signals.forEach(function(s){add(s.label,!!s.on);});
   if(c.edge_pct>=6)add("Plus Edge",true);
   return out.slice(0,6);}
+// ── Logic Profile / Archetype: the signature "analytical fingerprint" label,
+// derived from the player's own radar percentiles (no new data). Keys off the
+// real per-sport axis names so a hockey player never gets a football label.
+function _peOrd(p){p=Math.round(p);var v=p%100;if(v>=11&&v<=13)return p+"th";
+  return p+(["th","st","nd","rd"][p%10]||"th");}
+function peArchetype(c){
+  if(!c.radar)return null;
+  var skip={Matchup:1,Logic:1};
+  var axes=Object.keys(c.radar).filter(function(k){return !skip[k]&&c.radar[k]!=null;});
+  if(axes.length<3)return null;
+  var val={};axes.forEach(function(k){val[k]=Number(c.radar[k])||0;});
+  function dim(re){var b=null;axes.forEach(function(k){if(re.test(k.toLowerCase())){if(b==null||val[k]>b)b=val[k];}});return b;}
+  var vol=dim(/tgt share|target|carr|usage|minutes|wopr|snap|touch|attempt|chances|ice time/);
+  var eff=dim(/ypc|epa|cpoe|catch|comp %|pacr|whiff|k %|soft contact|save %|effic|accuracy|per |supp/);
+  var dep=dim(/adot|air yd|deep|depth|downfield/);
+  var prod=dim(/rec yds|rush yds|pass yds|scoring|ppr|yds|yards|pass td|points|production|goals|assists/);
+  var sorted=axes.slice().sort(function(a,b){return val[b]-val[a];});
+  var top=sorted[0],t2=sorted[1];
+  var mx=val[top],mn=val[sorted[sorted.length-1]],spread=mx-mn;
+  var lab,tier;
+  if(vol!=null&&eff!=null&&prod!=null&&vol>=75&&eff>=68&&prod>=70){lab="Complete Alpha";tier="elite";}
+  else if(dep!=null&&dep>=80&&(vol==null||vol<72)){lab="Deep Threat";tier="strong";}
+  else if(/target|tgt/.test(top.toLowerCase())&&mx>=82){lab="Target Magnet";tier="elite";}
+  else if(vol!=null&&dep!=null&&vol>=80&&dep>=70){lab="Field Stretcher";tier="strong";}
+  else if(vol!=null&&vol>=80&&(eff==null||eff<60)){lab="Volume Producer";tier="strong";}
+  else if(eff!=null&&eff>=80&&(vol==null||vol<62)){lab="Efficiency Machine";tier="strong";}
+  else if(vol!=null&&eff!=null&&vol>=76&&eff>=68){lab="Workhorse";tier="elite";}
+  else if(spread>=46&&mx>=80){lab="Boom-or-Bust";tier="strong";}
+  else if(mx<55){lab="Rotational Role";tier="role";}
+  else if(mn>=64){lab="Balanced Threat";tier="strong";}
+  else {lab=top.replace(/%/g,"").trim()+" Specialist";tier="role";}
+  var blurb=_peOrd(val[top])+"-pct "+top+((t2&&val[t2]>=60)?(" · "+_peOrd(val[t2])+"-pct "+t2):"");
+  return {label:lab,tier:tier,blurb:blurb,top:top,topv:val[top]};
+}
+function peArchetypeHTML(c){var a=peArchetype(c);if(!a)return "";
+  return '<div class="pe-lp"><div class="pe-lp-k">Logic Profile</div>'+
+    '<div class="pe-arch '+a.tier+'"><span class="pe-arch-dot"></span>'+a.label+'</div>'+
+    '<div class="pe-lp-b">'+a.blurb+'</div></div>';}
+// ── Player Comparison: pick 2–3 players, see them side by side. Missing
+// component values stay blank (no estimates), per the design doc. ──
+var PE_CMP=[];
+function peCmpHas(gid,player){return PE_CMP.some(function(x){return x.gid===gid&&x.player===player;});}
+function peCmpBtnHTML(gid,c){var on=peCmpHas(gid,c.player);
+  return '<button class="pe-cmp-btn'+(on?" on":"")+'" data-gid="'+gid+'" data-player="'+String(c.player||"").replace(/"/g,"&quot;")+'" onclick="peCmpToggle(event)">'+(on?"✓ In compare":"⇄ Compare")+'</button>';}
+function peCmpToggle(ev){ev.stopPropagation();var el=ev.currentTarget;
+  var gid=el.getAttribute("data-gid"),player=el.getAttribute("data-player");
+  var idx=-1;for(var j=0;j<PE_CMP.length;j++){if(PE_CMP[j].gid===gid&&PE_CMP[j].player===player){idx=j;break;}}
+  if(idx>=0)PE_CMP.splice(idx,1);
+  else{if(PE_CMP.length>=3)PE_CMP.shift();PE_CMP.push({gid:gid,player:player});}
+  peCmpSync();}
+function peCmpSync(){
+  var btns=document.querySelectorAll(".pe-cmp-btn");
+  for(var i=0;i<btns.length;i++){var el=btns[i];
+    var on=peCmpHas(el.getAttribute("data-gid"),el.getAttribute("data-player"));
+    el.classList.toggle("on",on);el.textContent=on?"✓ In compare":"⇄ Compare";}
+  var bar=document.getElementById("pe-cmp-bar");
+  if(!PE_CMP.length){if(bar)bar.remove();return;}
+  if(!bar){bar=document.createElement("div");bar.id="pe-cmp-bar";bar.className="pe-cmp-bar";document.body.appendChild(bar);}
+  bar.innerHTML='<span class="pe-cmp-n">'+PE_CMP.length+' player'+(PE_CMP.length>1?"s":"")+' selected</span>'+
+    '<button class="pe-cmp-go" onclick="peCmpOpen()"'+(PE_CMP.length<2?' disabled':'')+'>Compare →</button>'+
+    '<button class="pe-cmp-x" onclick="peCmpClear()">Clear</button>';}
+function peCmpClear(){PE_CMP=[];peCmpSync();}
+function _peCardByRef(ref){var d=_peData[ref.gid];if(!d)return null;
+  var cs=(d.cards||[]).filter(function(c){return c.player===ref.player;});return cs[0]||null;}
+function peCmpOpen(){
+  var cs=PE_CMP.map(_peCardByRef).filter(Boolean);if(cs.length<2)return;
+  var props=_peProps(PE_CMP[0].gid)||[];
+  var rows=[];
+  rows.push(["Logic Score",cs.map(function(c){return Number(c.logic_score).toFixed(1);})]);
+  rows.push(["Opportunity",cs.map(function(c){return c.opportunity!=null?Number(c.opportunity).toFixed(1):"—";})]);
+  rows.push(["Baseline",cs.map(function(c){return c.baseline!=null?Number(c.baseline).toFixed(1):"—";})]);
+  rows.push(["Edge %",cs.map(function(c){return c.edge_pct!=null?((c.edge_pct>=0?"+":"")+Number(c.edge_pct).toFixed(1)):"—";})]);
+  rows.push(["Archetype",cs.map(function(c){var a=peArchetype(c);return a?a.label:"—";})]);
+  rows.push(["Position",cs.map(function(c){return c.pos||(c.type==="pitcher"?"SP":"—");})]);
+  rows.push(["Team",cs.map(function(c){return c.team||"—";})]);
+  var projKeys=PE_PROJ_ORDER.filter(function(k){return cs.some(function(c){return c.projections&&c.projections[k]!=null;});});
+  projKeys.forEach(function(k){
+    rows.push([PE_PROJ_LABEL[k]||k,cs.map(function(c){
+      var v=c.projections&&c.projections[k];if(v==null)return "—";
+      var lo=peFindLine(props,c.player,k),op=(lo&&lo.line!=null)?peOverProb(Number(v),Number(lo.line)):null;
+      return Number(v).toFixed(1)+(op!=null?(' <span class="pe-cmp-p">'+Math.round(op*100)+'%</span>'):'');})]);
+  });
+  // highlight the best (max) cell per numeric row
+  function bestIdx(vals){var bi=-1,bv=-1e9;vals.forEach(function(s,i){var n=parseFloat(String(s).replace(/[^0-9.\-]/g,""));if(!isNaN(n)&&n>bv){bv=n;bi=i;}});return bi;}
+  var head='<tr><th>Metric</th>'+cs.map(function(c){return '<th>'+String(c.player).split(" ").slice(-1)[0]+'</th>';}).join("")+'</tr>';
+  var body=rows.map(function(r){var bi=(["Position","Team","Archetype"].indexOf(r[0])<0)?bestIdx(r[1]):-1;
+    return '<tr><td class="pe-cmp-k">'+r[0]+'</td>'+r[1].map(function(v,i){return '<td'+(i===bi?' class="pe-cmp-best"':'')+'>'+v+'</td>';}).join("")+'</tr>';}).join("");
+  var heads=cs.map(function(c){var a=peArchetype(c);
+    return '<div class="pe-cmp-ph"><div class="pe-cmp-pn">'+c.player+'</div><div class="pe-cmp-ls">'+Number(c.logic_score).toFixed(1)+'</div>'+(a?'<div class="pe-cmp-pa">'+a.label+'</div>':'')+'</div>';}).join("");
+  var ov=document.getElementById("pe-cmp-ov");
+  if(!ov){ov=document.createElement("div");ov.id="pe-cmp-ov";ov.className="pe-cmp-ov";ov.onclick=function(e){if(e.target===ov)peCmpCloseModal();};document.body.appendChild(ov);}
+  ov.innerHTML='<div class="pe-cmp-modal"><div class="pe-cmp-top"><span>Player Comparison</span><button class="pe-cmp-close" onclick="peCmpCloseModal()">✕</button></div>'+
+    '<div class="pe-cmp-heads">'+heads+'</div>'+
+    '<div class="pe-cmp-tw"><table class="pe-cmp-tbl"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+
+    '<div class="pe-cmp-foot">Green = best in row. Blank = not published for that player (never estimated).</div></div>';
+  ov.style.display="flex";}
+function peCmpCloseModal(){var ov=document.getElementById("pe-cmp-ov");if(ov)ov.style.display="none";}
 function peTagStrip(c){var t=peTags(c); if(!t.length)return "";
   return '<div class="pe-tags">'+t.map(function(x){return '<span class="pe-ptag'+(x.glow?' on':'')+'">'+String(x.t).toUpperCase()+'</span>';}).join("")+'</div>';}
 function peSortVal(c,prop,props){
@@ -6741,7 +6838,9 @@ function peCard(gid,c,i,props,sport,activeProp,view){
       '<div class="vr-score">'+scoreMain+'<span class="vr-exp">▾</span></div>'+
     '</div>'+
     '<div class="vbody" id="body'+gid+'_'+i+'">'+
+      peArchetypeHTML(c)+
       peDecision(c,props,activeProp)+
+      '<div class="pe-cmp-wrap">'+peCmpBtnHTML(gid,c)+'</div>'+
       peTagStrip(c)+
       // ── ANALYSIS tier: Logic Profile (DNA radar), matchup & component detail ──
       ((view!=="quick")?(
@@ -7043,7 +7142,7 @@ function peRefreshTipoff(key){
   }).catch(function(){});
 }
 function _pePaint(key){var mount=document.getElementById("pe-mount"),d=_peData[key];
-  if(!mount||!d)return; window._peActiveKey=key; mount.innerHTML=peRender(key,d,_peProps(key)); if(!d._prop)peToggle(key,0); peRefreshTipoff(key);}
+  if(!mount||!d)return; window._peActiveKey=key; mount.innerHTML=peRender(key,d,_peProps(key)); if(!d._prop)peToggle(key,0); peRefreshTipoff(key); if(typeof peCmpSync==="function")peCmpSync();}
 /* ===== Game Analysis: impact-player strip (top Player Edge movers in the game view) ===== */
 function gaImpactCard(c){
   var u=peHeadshot(c);
