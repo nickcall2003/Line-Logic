@@ -723,18 +723,63 @@ async def lifespan(app: FastAPI):
                 except Exception as e:
                     print(f"[depthprobe] {tag} teamstats parse-fail {e}")
 
+            def _dump_sched(tag, sw, lg, acc, name_substr):
+                # find a played team by name in the standings entries, then sum
+                # its completed-game scores (confirms the schedule-feed fix).
+                tid = tnm = None
+                for e in (acc or []):
+                    tm = e.get("team") or {}
+                    nm = tm.get("displayName") or ""
+                    if name_substr.lower() in nm.lower():
+                        tid = str(tm.get("id") or ""); tnm = nm; break
+                if not tid:
+                    print(f"[depthprobe] {tag} sched: '{name_substr}' not found in standings")
+                    return
+                st, body = _grab(f"https://site.api.espn.com/apis/site/v2/sports/{sw}/{lg}/teams/{tid}/schedule")
+                if st != 200 or not body.startswith("{"):
+                    print(f"[depthprobe] {tag} sched status={st} head={str(body)[:120]}")
+                    return
+                try:
+                    d = _json.loads(body)
+                    pf = pa = g = w = 0
+                    for ev in (d.get("events") or []):
+                        comp = (ev.get("competitions") or [{}])[0]
+                        stt = (comp.get("status") or ev.get("status") or {}).get("type") or {}
+                        if not stt.get("completed"):
+                            continue
+                        cs = comp.get("competitors") or []
+                        me = next((x for x in cs if str((x.get("team") or {}).get("id")) == tid), None)
+                        op = next((x for x in cs if str((x.get("team") or {}).get("id")) != tid), None)
+                        if not me or not op:
+                            continue
+                        def _sc(c):
+                            s = c.get("score"); return (s.get("value") if isinstance(s, dict) else s)
+                        ms, oss = _sc(me), _sc(op)
+                        try:
+                            ms = float(ms); oss = float(oss)
+                        except Exception:
+                            continue
+                        pf += ms; pa += oss; g += 1
+                        if me.get("winner") is True or ms > oss:
+                            w += 1
+                    if g:
+                        print(f"[depthprobe] {tag} sched {tnm}#{tid}: games={g} ppg={round(pf/g,1)} papg={round(pa/g,1)} diff={round(pf-pa,1)} win%={round(100*w/g,1)}")
+                    else:
+                        print(f"[depthprobe] {tag} sched {tnm}#{tid}: no completed games yet")
+                except Exception as e:
+                    print(f"[depthprobe] {tag} sched parse-fail {e}")
+
             try:
                 probes = [
-                    ("ncaaf", "football", "college-football"),
-                    ("ncaab", "basketball", "mens-college-basketball"),
-                    ("nfl", "football", "nfl"),
+                    ("ncaaf", "football", "college-football", "Ohio State"),
+                    ("ncaab", "basketball", "mens-college-basketball", "Washington"),
+                    ("nfl", "football", "nfl", "Buffalo"),
                 ]
-                for sp, sw, lg in probes:
+                for sp, sw, lg, team in probes:
                     print(f"[depthprobe] ===== {sp} =====")
-                    _dump_standings(f"{sp}/site.api.v2", f"https://site.api.espn.com/apis/v2/sports/{sw}/{lg}/standings")
-                    _dump_standings(f"{sp}/site.web.v2", f"https://site.web.api.espn.com/apis/v2/sports/{sw}/{lg}/standings?region=us&lang=en&contentorigin=espn&season={yr}&type=2&level=3")
+                    acc = _dump_standings(f"{sp}/site.api.v2", f"https://site.api.espn.com/apis/v2/sports/{sw}/{lg}/standings")
                     _dump_standings(f"{sp}/cdn.core", f"https://cdn.espn.com/core/{lg}/standings?xhr=1")
-                    _dump_teamstats(f"{sp}", sw, lg)
+                    _dump_sched(f"{sp}", sw, lg, acc, team)
                     _t.sleep(1)
                 print("[depthprobe] ===== done =====")
             except Exception as e:

@@ -60,6 +60,13 @@ _ALIAS = {"utd": "united"}
 # carries clean season totals + the overall record, one entry per team.
 _CORE_FEED = {"ncaaf"}
 
+# Leagues whose standings never carry per-game scoring (college basketball
+# shows records but zero points even for teams that have played). For these we
+# compute season scoring from each team's completed games (the schedule feed =
+# the real stat sheet), fetched lazily for the two teams in a matchup.
+_SCHED_FALLBACK = {"ncaab", "ncaabb", "wncaab"}
+_sched_cache = {}
+
 
 def enabled() -> bool:
     return os.environ.get("ESPN_DEPTH_ENABLED", "1") == "1"
@@ -145,6 +152,53 @@ def _enrich(stats):
             stats["winPercent"] = round(w / games, 4)
     if games and stats.get("gamesPlayed") is None:
         stats["gamesPlayed"] = games
+
+
+def _score_val(c):
+    sc = c.get("score")
+    if isinstance(sc, dict):
+        return _num(sc.get("value"))
+    return _num(sc)
+
+
+def _schedule_scoring(sport, team_id):
+    """Sum a team's completed-game scores into per-game points for/against,
+    differential and win%. Cached per (sport, id) for the standings TTL."""
+    if not team_id:
+        return None
+    ck = f"{sport}|{team_id}"
+    c = _sched_cache.get(ck)
+    if c and (time.time() - c[0]) < _TTL:
+        return c[1]
+    sp = _PATH.get(sport)
+    if not sp:
+        return None
+    data = _get(f"https://site.api.espn.com/apis/site/v2/sports/{sp[0]}/{sp[1]}/teams/{team_id}/schedule")
+    out = None
+    if data:
+        pf = pa = g = w = 0
+        for ev in (data.get("events") or []):
+            comp = (ev.get("competitions") or [{}])[0]
+            st = (comp.get("status") or ev.get("status") or {}).get("type") or {}
+            if not st.get("completed"):
+                continue
+            cs = comp.get("competitors") or []
+            me = next((x for x in cs if str((x.get("team") or {}).get("id")) == str(team_id)), None)
+            opp = next((x for x in cs if str((x.get("team") or {}).get("id")) != str(team_id)), None)
+            if not me or not opp:
+                continue
+            ms, os_ = _score_val(me), _score_val(opp)
+            if ms is None or os_ is None:
+                continue
+            pf += ms; pa += os_; g += 1
+            if me.get("winner") is True or ms > os_:
+                w += 1
+        if g:
+            out = {"avgPointsFor": round(pf / g, 2), "avgPointsAgainst": round(pa / g, 2),
+                   "pointDifferential": round(pf - pa, 1), "winPercent": round(w / g, 4),
+                   "gamesPlayed": g}
+    _sched_cache[ck] = (time.time(), out)
+    return out
 
 
 def _collect(node, acc):
@@ -269,6 +323,18 @@ def match_depth(sport, home_name, away_name, league=None):
     a = _match(away_name, table)
     if not h and not a:
         return None
+    # College basketball standings carry records but no per-game scoring — fill
+    # each matchup team's scoring from its completed games (the real stat sheet).
+    if sport in _SCHED_FALLBACK:
+        for rec in (a, h):
+            if not rec:
+                continue
+            st = rec["stats"]
+            if st.get("avgPointsFor") in (None, 0, 0.0):
+                sc = _schedule_scoring(sport, rec.get("id"))
+                if sc:
+                    for k, v in sc.items():
+                        st[k] = v
     barcfg = _BARS.get(_SPORT_BARS.get(sport, "_pts"))
     bars = []
     for cand, label, lb, mode in barcfg:
