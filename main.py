@@ -6359,6 +6359,31 @@ def props_recent(sport: str | None = None, limit: int = 60):
         return {"error": str(e)[:200], "props": []}
 
 
+@app.get("/api/sportsdb/diag")
+def sportsdb_diag(player: str = "Jalen Brunson", sport: str = "nba"):
+    """Confirm whether Railway can reach TheSportsDB and what it returns for a
+    player (cutout/render availability + venue art). Hit this and paste it."""
+    import sportsdb
+    info = {"key": sportsdb._KEY, "player": player, "sport": sport}
+    try:
+        r = sportsdb._get("https://www.thesportsdb.com/api/v1/json/%s/searchplayers.php"
+                          % sportsdb._KEY, {"p": player})
+        info["http_status"] = r.status_code
+        info["bytes"] = len(r.text or "")
+        players = (r.json() or {}).get("player") or []
+        info["match_count"] = len(players)
+        info["samples"] = [{"name": p.get("strPlayer"), "sport": p.get("strSport"),
+                            "team": p.get("strTeam"), "cutout": bool(p.get("strCutout")),
+                            "render": bool(p.get("strRender"))} for p in players[:5]]
+    except Exception as e:
+        info["fetch_error"] = str(e)[:250]
+    try:
+        info["resolved"] = sportsdb.player_assets(player, sport)
+    except Exception as e:
+        info["resolve_error"] = str(e)[:250]
+    return info
+
+
 @app.get("/api/props/movement")
 def props_movement(sport: str = "", game_ref: str = ""):
     """Projection-movement series per prop for a game: how each player's model
