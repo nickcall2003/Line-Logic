@@ -828,6 +828,42 @@ async def lifespan(app: FastAPI):
             print("[sportsdbprobe] ===== done =====")
         _thr.Thread(target=_sportsdb_probe, daemon=True).start()
 
+        # One-shot WIKIPEDIA PROBE: TheSportsDB's free tier is paywalled (403),
+        # so check whether Wikipedia (free, no key) is reachable and returns a
+        # real photo for the same players. Search logs for [wikiprobe]. Disable
+        # with WIKI_PROBE=0.
+        def _wiki_probe():
+            import time as _t
+            _t.sleep(40)
+            if os.environ.get("WIKI_PROBE", "1") != "1":
+                return
+            try:
+                import wikiphoto
+            except Exception as e:
+                print(f"[wikiprobe] import failed: {e}")
+                return
+            print("[wikiprobe] ===== start =====")
+            for nm in ("Jalen Brunson", "Karl-Anthony Towns", "Isaiah Likely",
+                       "Patrick Mahomes", "Connor McDavid", "Aaron Judge"):
+                try:
+                    import httpx
+                    r = httpx.get("https://en.wikipedia.org/api/rest_v1/page/summary/"
+                                  + nm.replace(" ", "_"), timeout=8, follow_redirects=True,
+                                  headers={"User-Agent": wikiphoto._UA})
+                    img = None
+                    try:
+                        j = r.json() or {}
+                        img = (j.get("originalimage") or {}).get("source") or \
+                              (j.get("thumbnail") or {}).get("source")
+                    except Exception:
+                        pass
+                    print(f"[wikiprobe] {nm} http={r.status_code} img={(img or 'NONE')[:90]}")
+                except Exception as e:
+                    print(f"[wikiprobe] {nm} ERR {str(e)[:150]}")
+                _t.sleep(1)
+            print("[wikiprobe] ===== done =====")
+        _thr.Thread(target=_wiki_probe, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy
