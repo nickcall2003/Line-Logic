@@ -625,6 +625,17 @@ font-family:var(--body);color:var(--fg)}
     cursor:pointer;opacity:.55;padding:2px 4px}
   .cta-x:hover{opacity:1}
   @media(max-width:460px){.cta-txt .cta-sub{display:none}.cta-bar{gap:9px;padding:8px 12px}}
+  /* Game-analysis top-line verdict */
+  .gv{border-radius:14px;padding:13px 15px;margin-bottom:12px;border:1px solid var(--line);background:var(--panel)}
+  .gv-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .gv-k{font-family:var(--disp,inherit);font-weight:900;font-size:16px;letter-spacing:.04em;text-transform:uppercase}
+  .gv-side{margin-left:auto;font-weight:800;font-size:14px;color:var(--fg)}
+  .gv-sub{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.38}
+  .gv.v-edge{border-color:rgba(83,217,138,.5);background:linear-gradient(180deg,rgba(83,217,138,.12),var(--panel))}
+  .gv.v-edge .gv-k{color:#53D98A}
+  .gv.v-lean{border-color:rgba(240,185,78,.5);background:linear-gradient(180deg,rgba(240,185,78,.1),var(--panel))}
+  .gv.v-lean .gv-k{color:#F0B94E}
+  .gv.v-pass .gv-k,.gv.v-read .gv-k{color:var(--muted)}
   </style>
   <div class="cta-bar" id="cta-bar" hidden>
     <span class="cta-pulse"></span>
@@ -2151,6 +2162,38 @@ function coverProbHome(g,sp){
   if(!g||!g.odds||g.odds.spread_home==null||g.exp_margin==null)return null;
   return normCDF((g.exp_margin + g.odds.spread_home)/marginSigma(sp));
 }
+// One unmistakable top-line read so a beginner knows "is there a bet here?"
+// before the three detailed indicators below. Bands mirror edgeTier (2/5/10),
+// including its honest caution that very large edges are usually a stale line.
+function gameVerdict(g,sp){
+  if(!g||g.prob_home==null)return null;
+  var ph=Math.round(g.prob_home*100),winP=Math.max(ph,100-ph);
+  var winTeam=g.prob_home>=0.5?g.home:g.away;
+  var winName=(winTeam&&(winTeam.abbr||winTeam.name))||"";
+  var o=g.odds||{};
+  var hasMarket=(o.ml_home!=null||o.ml_away!=null||o.spread_home!=null);
+  var edge=(g.edge_pct!=null&&!isNaN(g.edge_pct))?g.edge_pct:null;
+  if(!hasMarket||edge==null){
+    return {label:"MODEL READ",cls:"v-read",side:winName+" "+winP+"%",
+      sub:"Model favors "+winName+" — no market line posted yet, so there’s no bet to price."};
+  }
+  var mlFav=g.prob_home>=0.5?o.ml_home:o.ml_away;
+  var side=winName+(mlFav!=null?" "+fmtOdds(mlFav):"");
+  if(edge<2)return {label:"NO PLAY",cls:"v-pass",side:side,
+    sub:(edge<0?"The market price already beats the model — no value here.":"The model’s edge is too thin to play at this price.")};
+  if(edge<5)return {label:"LEAN",cls:"v-lean",side:side,
+    sub:"Model leans "+winName+", but the edge is modest — a watch, not a strong play."};
+  if(edge<10)return {label:"STRONG EDGE",cls:"v-edge",side:side,
+    sub:"Model sees real value on "+winName+" at this price."};
+  return {label:"STRONG EDGE",cls:"v-edge",side:side,
+    sub:"Big gap vs the market on "+winName+" — double-check the line hasn’t moved or gone stale first."};
+}
+function verdictBadgeHTML(g,sp){
+  var v=gameVerdict(g,sp);if(!v)return "";
+  return '<div class="gv '+v.cls+'"><div class="gv-top"><span class="gv-k">'+v.label+'</span>'+
+    (v.side?'<span class="gv-side">'+v.side+'</span>':'')+'</div>'+
+    '<div class="gv-sub">'+v.sub+'</div></div>';
+}
 // Three distinct answers so a 98% WIN never reads as a 98% BET:
 // who wins, who beats the spread, and whether the price is worth it.
 function threeIndicatorsHTML(g,sp){
@@ -2299,7 +2342,7 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
   else if(teamDetailTab==="box"){body=boxscoreHTML(teamBox);}
   else if(teamDetailTab==="props"){body=(sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div class="panel">'+gameScriptHTML(g)+'<div id="pe-mount" class="pew"><div class="pe-empty">Loading Player Edge&hellip;</div></div></div>':propsPanelHTML(teamProps);}
   else{const mp=writeupHTML(g.analysis);
-    body='<div class="panel">'+threeIndicatorsHTML(g,sp)+modelVsMarketHTML(g,sp)+modelMovementHTML(g,sp)+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+insideTheModelHTML(g,sp)+'<details class="itm"><summary><span class="itm-n">¶</span><span class="itm-t">Full write-up</span><span class="itm-tag">Prose</span></summary><div class="itm-body wu">'+mp+'</div></details>'+
+    body='<div class="panel">'+verdictBadgeHTML(g,sp)+threeIndicatorsHTML(g,sp)+modelVsMarketHTML(g,sp)+modelMovementHTML(g,sp)+predictionReportHTML(g,sp)+((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")?'<div id="ga-impact" class="ga-impact"></div>':"")+gameScriptHTML(g)+whyChipsHTML(g)+insideTheModelHTML(g,sp)+'<details class="itm"><summary><span class="itm-n">¶</span><span class="itm-t">Full write-up</span><span class="itm-tag">Prose</span></summary><div class="itm-body wu">'+mp+'</div></details>'+
     teamFactorsHTML(g,sp)+
     injuryPanelHTML(g)+
     teamLinesHTML(g)+
