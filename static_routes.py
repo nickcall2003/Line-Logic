@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v128";   // bumped: game-analysis top-line verdict badge
+const CACHE = "ll-shell-v129";   // bumped: verdict badge on UFC detail + edge fallback
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));

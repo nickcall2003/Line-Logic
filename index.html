@@ -2173,6 +2173,13 @@ function gameVerdict(g,sp){
   var o=g.odds||{};
   var hasMarket=(o.ml_home!=null||o.ml_away!=null||o.spread_home!=null);
   var edge=(g.edge_pct!=null&&!isNaN(g.edge_pct))?g.edge_pct:null;
+  // Fallback for sports that don't pre-compute edge_pct (e.g. UFC): derive it from
+  // the favored side's moneyline, same as the share cards (model prob - implied).
+  if(edge==null&&hasMarket){
+    var mlF0=g.prob_home>=0.5?o.ml_home:o.ml_away;
+    if(mlF0!=null){var imp0=mlF0>0?100/(mlF0+100):Math.abs(mlF0)/(Math.abs(mlF0)+100);
+      edge=Math.round((Math.max(g.prob_home,1-g.prob_home)-imp0)*1000)/10;}
+  }
   if(!hasMarket||edge==null){
     return {label:"MODEL READ",cls:"v-read",side:winName+" "+winP+"%",
       sub:"Model favors "+winName+" — no market line posted yet, so there’s no bet to price."};
@@ -2768,9 +2775,9 @@ function renderUFCDetail(g){
   const fighters='<div class="soc-row big">'+ufcFighter(g.away,winAway)+'<div class="soc-mid">'+mid+'</div>'+ufcFighter(g.home,winHome)+'</div>';
   const edge='<div class="panel" style="margin-top:12px">'+edgeLineHTML(g,g.prob_home)+'</div>';
   const pickName=(g.prob_home>=g.prob_away?g.home.name:g.away.name),pickPct=Math.round(Math.max(g.prob_home,g.prob_away)*100);
-  const reason='<div class="panel" style="margin-top:12px"><div class="el-lab">Model read</div><div style="margin-top:6px;color:var(--muted);font-size:13px;line-height:1.5">'+
-    (g.odds?("Market-implied from the moneyline, de-vigged. "):("Estimated from career records (no market line posted yet). "))+
-    'Leans <b>'+pickName+'</b> at '+pickPct+'%.</div></div>';
+  const reason='<div class="panel" style="margin-top:12px"><div class="el-lab">How the model read this</div><div style="margin-top:6px;color:var(--muted);font-size:13px;line-height:1.5">'+
+    (g.odds?("Win probability is market-implied from the moneyline, de-vigged, then compared to the model’s own number. "):("Estimated from career records — no market line posted yet. "))+
+    'Model leans <b>'+pickName+'</b> at '+pickPct+'%.</div></div>';
   let rest="";
   const others=(ufcGames||[]).filter(b=>String(b.id)!==String(g.id));
   if(others.length){rest='<div class="panel" style="margin-top:12px"><div class="el-lab">Rest of the card</div>'+
@@ -2805,7 +2812,7 @@ function renderUFCDetail(g){
       '<div class="tale-head"><span class="th-a">'+(F[0].name||"")+'</span><span></span><span class="th-h">'+(F[1].name||"")+'</span></div>'+body+bars+why+'</div>';
   }
   document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to card</button>'+
-    '<div class="detail-wrap">'+head+mvMount("ufc",g.id)+fighters+heroStatHTML(g,'ufc')+ufcBarHTML(g)+edge+reason+tale+rest+'</div>';
+    '<div class="detail-wrap">'+head+mvMount("ufc",g.id)+fighters+heroStatHTML(g,'ufc')+ufcBarHTML(g)+verdictBadgeHTML(g,'ufc')+edge+reason+tale+rest+'</div>';
 }
 async function loadSoccer(){
   let d;try{d=await getJSON("/api/soccer/games?league="+soccerLeague+"&date="+ymd(selected));}catch(e){d={games:[],leagues:[]};}
