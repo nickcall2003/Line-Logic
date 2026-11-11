@@ -2315,7 +2315,8 @@ function ufcCardHTML(g){
   const wcTxt=(g.weight_class||"")+(g.is_main?(g.weight_class?" \u00b7 ":"")+"Main Event":"");
   return '<div class="card-top"><span class="tier" style="background:'+(TIER_COLOR.ufc||"#c8412f")+'">'+(g.event_label||"UFC")+'</span><span class="tourn">'+wcTxt+'</span><span class="status">'+mark+'</span></div>'+
     '<div class="soc-row">'+ufcFighter(g.away,winAway)+'<div class="soc-mid">'+mid+'</div>'+ufcFighter(g.home,winHome)+'</div>'+
-    ufcBarHTML(g)+edgeLineHTML(g,g.prob_home);
+    ufcBarHTML(g)+edgeLineHTML(g,g.prob_home)+
+    shareRowHTML(ufcCardUrl(g),gameShareText(g,"ufc"));
 }
 async function loadGolf(){
   try{golfBoard=await getJSON("/api/golf/board?tour="+golfTour);}catch(e){golfBoard=null;}
@@ -2806,7 +2807,8 @@ function soccerCardHTML(g){
   const tcol=(side,winSide)=>'<div class="soc-team'+(winSide?" win":"")+'"><img src="'+(side.logo||"")+'" onerror="this.style.visibility=\'hidden\'"><div class="nm">'+(side.name||"")+'</div>'+(side.record?'<div class="rec">'+side.record+'</div>':"")+'</div>';
   return '<div class="card-top"><span class="tier" style="background:'+(TIER_COLOR.soccer||"#2f9e6f")+'">'+(g.league_label||"Soccer")+'</span><span class="tourn">'+(g.venue||"")+'</span><span class="status">'+mark+'</span></div>'+
     '<div class="soc-row">'+tcol(g.away,winAway)+'<div class="soc-mid"><div class="rs">'+midTop+'</div><div class="t'+(live?" live":"")+'">'+midBot+'</div></div>'+tcol(g.home,winHome)+'</div>'+
-    soccerBarHTML(g,false)+soccerProjHTML(g)+soccerEdgeLineHTML(g);
+    soccerBarHTML(g,false)+soccerProjHTML(g)+soccerEdgeLineHTML(g)+
+    shareRowHTML(soccerCardUrl(g),soccerShareText(g));
 }
 function soccerDayStats(){
   // Mirror the card grading: model picks the higher-probability side; a finished
@@ -5763,6 +5765,41 @@ function matchCardUrl(m){
     ["pick",favA?m.player_a:m.player_b],["fair",_fairFrom(modelProb)],["market",mkt],["book",book],
     ["edge",edge],["prob",modelProb],["best_book",book]]);
 }
+// Soccer match -> pick card URL. Mirrors soccerEdgeLineHTML: a 3-way model, so
+// the shared side is whichever of home/draw/away the model likes most, with the
+// edge computed against the de-vigged implied probability of that same side.
+function soccerCardUrl(g){
+  var o=g.odds||{};
+  var sides=[["home",g.prob_home||0,(g.home&&g.home.name)||"Home",o.ml_home,o.ml_home_book],
+             ["draw",g.prob_draw||0,"Draw",o.ml_draw,o.ml_draw_book],
+             ["away",g.prob_away||0,(g.away&&g.away.name)||"Away",o.ml_away,o.ml_away_book]];
+  sides.sort(function(a,b){return b[1]-a[1];});
+  var top=sides[0],mp=top[1];
+  if(!mp)return "";
+  var fair=mp>=0.5?-Math.round(100*mp/(1-mp)):Math.round(100*(1-mp)/mp);
+  var mkt=top[3],book=top[4]||null,edge=null;
+  if(mkt!=null){
+    var imp=function(v){return v==null?null:(v>0?100/(v+100):Math.abs(v)/(Math.abs(v)+100));};
+    var ih=imp(o.ml_home),id=imp(o.ml_draw),ia=imp(o.ml_away),tot=(ih||0)+(id||0)+(ia||0);
+    var sImp=top[0]==="home"?ih:top[0]==="draw"?id:ia;
+    if(tot>0&&sImp!=null)edge=Math.round((mp-sImp/tot)*1000)/10;
+  }
+  return "/api/card/pick?"+_cq([["sport","soccer"],["away",g.away&&g.away.name],
+    ["home",g.home&&g.home.name],["pick",top[2]],["fair",fair],["market",mkt],["book",book],
+    ["edge",edge],["prob",mp],["date",g.event_time],["best_book",book]]);
+}
+function soccerShareText(g){
+  var sides=[[g.prob_home||0,(g.home&&g.home.name)||"Home"],[g.prob_draw||0,"Draw"],
+             [g.prob_away||0,(g.away&&g.away.name)||"Away"]];
+  sides.sort(function(a,b){return b[0]-a[0];});
+  return ["⚽ "+(g.league_label||"SOCCER").toUpperCase()+" — "+sides[0][1],
+    ((g.away&&g.away.name)||"")+" @ "+((g.home&&g.home.name)||""),
+    "Model "+Math.round(sides[0][0]*100)+"%","","Every pick graded, win or lose.",
+    "thelinelogic.com"].join("\n");
+}
+// UFC fight -> pick card URL. Reuses the team builder (same odds shape via
+// edgeLineHTML) but with the "vs" separator and no spread for a fight.
+function ufcCardUrl(g){return gameCardUrl(g,"ufc")+"&vs=1";}
 // Player Edge prop tile -> prop card URL. props is the game's props array (in scope
 // inside peCard); prop is the projection key being shared.
 function peCardUrl(c,props,sp,prop){
