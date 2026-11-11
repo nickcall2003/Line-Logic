@@ -89,12 +89,34 @@ def predict(home_name, away_name):
     d = _load()
     h = _lookup(home_name)
     a = _lookup(away_name)
+    # D1-vs-non-D1 mismatch. Our ratings cover D1 only, so a team that doesn't
+    # match is a non-D1 (buy-game) opponent. Never fall through to win%-seeding
+    # for these: it favored tiny schools carrying gaudy records against OTHER
+    # tiny schools (a 2-0 NAIA side shown as a 96% favorite over a D1 team).
+    # Default the D1 side to a decisive win so the weaker team is never favored.
     if bool(h) != bool(a):
         miss = away_name if h else home_name
         if miss not in _logged_miss:
             _logged_miss.add(miss)
-            print(f"[ncaab] adj-rating name unmatched: {miss!r}")
-    if not h or not a:
+            print(f"[ncaab] non-D1 opponent -> default D1 win: {miss!r}")
+        d1 = h or a
+        try:
+            net = float(d1.get("net", 0.0) or 0.0)
+        except Exception:
+            net = 0.0
+        base = 18.0 + max(0.0, min(14.0, net * 0.5))   # stronger D1 -> bigger blowout (18..32)
+        margin = (base + HOME_COURT) if h else (-base + HOME_COURT)
+        return {
+            "prob_home": 0.97 if h else 0.03,
+            "exp_margin": round(margin, 1),
+            "home_rating": round(h.get("net", 0.0), 1) if h else None,
+            "away_rating": round(a.get("net", 0.0), 1) if a else None,
+            "confidence": "low",
+            "avg_total": None,
+            "model": "default-d1",
+            "mismatch": True,
+        }
+    if not h or not a:        # neither side is D1 -> can't rank them, stay neutral
         return None
     avg = d.get("avg_eff") or 104.0
     tempo = d.get("tempo") or 68.0
