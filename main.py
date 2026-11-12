@@ -872,6 +872,79 @@ async def lifespan(app: FastAPI):
             print("[wikiprobe] ===== done =====")
         _thr.Thread(target=_wiki_probe, daemon=True).start()
 
+        # One-shot INJURY PROBE (CBB): ESPN's college-basketball injury feed is
+        # thin/laggy, so dump exactly what it returns before we trust or re-weight
+        # it -- how many teams/players, a sample, whether a watched team (Kansas)
+        # and player (Council) actually appear, and what the MODEL ends up with
+        # after processing. Logs [injprobe]. Enable INJURY_PROBE=1; override the
+        # watch with INJURY_PROBE_TEAM / INJURY_PROBE_PLAYER. Disable with =0.
+        def _injury_probe():
+            import time as _t
+            _t.sleep(45)
+            if os.environ.get("INJURY_PROBE", "0") != "1":
+                return
+            try:
+                import injuries as _inj
+            except Exception as e:
+                print(f"[injprobe] import failed: {e}")
+                return
+            wteam = os.environ.get("INJURY_PROBE_TEAM", "kansas").lower()
+            wplayer = os.environ.get("INJURY_PROBE_PLAYER", "council").lower()
+            print("[injprobe] ===== start (ncaab) =====")
+            url = _inj._inj_url("ncaab")
+            print(f"[injprobe] url={url}")
+            try:
+                data = _inj._ep._get(url, {}) or {}
+            except Exception as e:
+                print(f"[injprobe] FETCH FAILED: {str(e)[:200]}")
+                data = None
+            if data is not None:
+                blocks = data.get("injuries") or []
+                total_players = teams_with = shown = 0
+                hit_team, hit_player = [], []
+                for blk in blocks:
+                    team = blk.get("team") or {}
+                    tname = team.get("displayName") or team.get("name") or "?"
+                    items = blk.get("injuries") or blk.get("items") or []
+                    if items:
+                        teams_with += 1
+                    for it in items:
+                        total_players += 1
+                        ath = it.get("athlete") or {}
+                        nm = ath.get("displayName", "?")
+                        pos = ((ath.get("position") or {}).get("abbreviation")
+                               or (ath.get("position") or {}).get("name") or "?")
+                        status = (it.get("status") or (it.get("type") or {}).get("description")
+                                  or (it.get("details") or {}).get("type") or "?")
+                        if shown < 30:
+                            print(f"[injprobe]   {tname} | {nm} | {pos} | {status}")
+                            shown += 1
+                        if wteam in tname.lower():
+                            hit_team.append(f"{nm} ({pos}, {status})")
+                        if wplayer in nm.lower():
+                            hit_player.append(f"{tname}: {nm} ({pos}, {status})")
+                print(f"[injprobe] BLOCKS={len(blocks)} teams_with_injuries={teams_with} "
+                      f"total_player_rows={total_players}")
+                print(f"[injprobe] WATCH team '{wteam}': "
+                      + ("; ".join(hit_team) if hit_team else "NOT LISTED in feed"))
+                print(f"[injprobe] WATCH player '{wplayer}': "
+                      + ("; ".join(hit_player) if hit_player else "NOT FOUND in feed"))
+            try:                                  # what the MODEL actually uses:
+                tbl = _inj._table("ncaab")
+                bn = tbl.get("by_name") or {}
+                print(f"[injprobe] MODEL table: {len(bn)} teams carry an injury penalty")
+                wt = _inj._norm(wteam)
+                ent = next((v for k, v in bn.items() if wt in k), None)
+                if ent:
+                    plys = ", ".join(f"{p['name']}({p['impact']})" for p in ent.get("players", []))
+                    print(f"[injprobe] MODEL '{wteam}' penalty={ent.get('penalty')} players=[{plys}]")
+                else:
+                    print(f"[injprobe] MODEL '{wteam}': no penalty entry")
+            except Exception as e:
+                print(f"[injprobe] table failed: {str(e)[:170]}")
+            print("[injprobe] ===== done =====")
+        _thr.Thread(target=_injury_probe, daemon=True).start()
+
 
     # Results backfill — fills the 30-day accuracy by replaying past finished
     # games into PickResults. Own daemon thread, delayed so the app is healthy
