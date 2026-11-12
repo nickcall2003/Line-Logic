@@ -2780,15 +2780,32 @@ def _attach_odds(sport, games):
                          "total": o.get("total"),
                          "books": o.get("books")}
         elif sgo is not None:
-            try:
-                so = sgo.get_game_odds(sport, g["home"]["name"], g["away"]["name"])
+            try:                              # full read: ml + SPREAD + total, so
+                                              # the market anchor has a line to pull to
+                so = sgo.get_game_markets(sport, g["home"]["name"], g["away"]["name"])
             except Exception:
                 so = None
-            if so and (so.get("ml_home") is not None or so.get("ml_away") is not None):
+            if so and (so.get("ml_home") is not None or so.get("ml_away") is not None
+                       or so.get("spread_home") is not None):
+                _sb = "SportsGameOdds"
                 g["odds"] = {"ml_home": so.get("ml_home"), "ml_away": so.get("ml_away"),
-                             "spread_home": None, "total": None,
-                             "books": ["SportsGameOdds"]}
-        if g.get("odds"):                     # snapshot the side we pick (CLV)
+                             "ml_draw": so.get("ml_draw"),
+                             "ml_home_book": _sb if so.get("ml_home") is not None else None,
+                             "ml_away_book": _sb if so.get("ml_away") is not None else None,
+                             "spread_home": so.get("spread_home"), "spread_away": so.get("spread_away"),
+                             "spread_home_book": _sb if so.get("spread_home") is not None else None,
+                             "spread_away_book": _sb if so.get("spread_away") is not None else None,
+                             "total": so.get("total"),
+                             "books": [_sb]}
+        if g.get("odds"):
+            # Anchor the model margin to the market BEFORE snapshotting, so the
+            # pick/side and its CLV reflect the number we actually show.
+            try:
+                import market_anchor
+                market_anchor.anchor_game(sport, g)
+            except Exception:
+                pass
+            # snapshot the side we pick (CLV)
             side = "home" if g["prob_home"] >= 0.5 else "away"
             taken = g["odds"]["ml_home"] if side == "home" else g["odds"]["ml_away"]
             if taken is not None:
@@ -2829,13 +2846,27 @@ def _attach_odds_one(sport, g):
     try:
         import sgo_api
         if sgo_api.enabled():
-            so = sgo_api.get_game_odds(sport, g["home"]["name"], g["away"]["name"])
-            if so and (so.get("ml_home") is not None or so.get("ml_away") is not None):
+            so = sgo_api.get_game_markets(sport, g["home"]["name"], g["away"]["name"])
+            if so and (so.get("ml_home") is not None or so.get("ml_away") is not None
+                       or so.get("spread_home") is not None):
+                _sb = "SportsGameOdds"
                 g["odds"] = {"ml_home": so.get("ml_home"), "ml_away": so.get("ml_away"),
-                             "spread_home": None, "total": None,
-                             "books": ["SportsGameOdds"]}
+                             "ml_draw": so.get("ml_draw"),
+                             "ml_home_book": _sb if so.get("ml_home") is not None else None,
+                             "ml_away_book": _sb if so.get("ml_away") is not None else None,
+                             "spread_home": so.get("spread_home"), "spread_away": so.get("spread_away"),
+                             "spread_home_book": _sb if so.get("spread_home") is not None else None,
+                             "spread_away_book": _sb if so.get("spread_away") is not None else None,
+                             "total": so.get("total"),
+                             "books": [_sb]}
     except Exception as e:
         print(f"[odds] detail sgo {sport} skipped: {e}")
+    if g.get("odds"):
+        try:
+            import market_anchor
+            market_anchor.anchor_game(sport, g)
+        except Exception:
+            pass
     return g
 
 
