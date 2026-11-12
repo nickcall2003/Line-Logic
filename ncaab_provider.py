@@ -75,9 +75,18 @@ def _lookup(name):
             return teams[av]
     best = None
     for k, v in teams.items():
-        if n.startswith(k) or k.startswith(n):
-            if best is None or len(k) > len(best[0]):
-                best = (k, v)
+        if k.startswith(n):
+            pass                        # ESPN short name is a prefix of the fuller
+                                        # ratings name (miami -> miamifl): safe.
+        elif n.startswith(k) and len(k) / len(n) >= 0.85:
+            pass                        # ratings key is a prefix of a LONGER name;
+                                        # only trust it when it covers most of the
+                                        # name. Blocks "virginialynchburg" (non-D1)
+                                        # from matching "virginia" (UVA).
+        else:
+            continue
+        if best is None or len(k) > len(best[0]):
+            best = (k, v)
     return best[1] if best else None
 
 
