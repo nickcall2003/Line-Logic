@@ -6798,6 +6798,72 @@ def _f(v):
         return None
 
 
+@app.get("/api/probe/injuries")
+def probe_injuries(sport: str = "ncaab", team: str = "kansas", player: str = "council"):
+    """Read-only diagnostic: what does ESPN's injury feed return for a sport, and
+    what does the model end up with after processing it? Open it in a browser:
+      /api/probe/injuries?sport=ncaab&team=kansas&player=council
+    Lives under /api/ so the service worker doesn't swallow it (that's why plain
+    page-style routes come back as the app shell). No env var, no redeploy."""
+    import injuries as _inj
+    out = []
+    P = out.append
+    wteam, wplayer = (team or "").lower(), (player or "").lower()
+    P(f"injury probe - sport={sport} team~{wteam!r} player~{wplayer!r}")
+    url = _inj._inj_url(sport)
+    P(f"url = {url}")
+    data = None
+    try:
+        data = _inj._ep._get(url, {}) or {}
+    except Exception as e:
+        P(f"FETCH FAILED: {str(e)[:200]}")
+    if data is not None:
+        blocks = data.get("injuries") or []
+        total = teams_with = 0
+        hit_team, hit_player, sample = [], [], []
+        for blk in blocks:
+            tm = blk.get("team") or {}
+            tname = tm.get("displayName") or tm.get("name") or "?"
+            items = blk.get("injuries") or blk.get("items") or []
+            if items:
+                teams_with += 1
+            for it in items:
+                total += 1
+                ath = it.get("athlete") or {}
+                nm = ath.get("displayName", "?")
+                pos = ((ath.get("position") or {}).get("abbreviation")
+                       or (ath.get("position") or {}).get("name") or "?")
+                status = (it.get("status") or (it.get("type") or {}).get("description")
+                          or (it.get("details") or {}).get("type") or "?")
+                if len(sample) < 40:
+                    sample.append(f"  {tname} | {nm} | {pos} | {status}")
+                if wteam and wteam in tname.lower():
+                    hit_team.append(f"{nm} ({pos}, {status})")
+                if wplayer and wplayer in nm.lower():
+                    hit_player.append(f"{tname}: {nm} ({pos}, {status})")
+        P(f"BLOCKS={len(blocks)} teams_with_injuries={teams_with} total_player_rows={total}")
+        P(f"WATCH team '{wteam}': " + ("; ".join(hit_team) if hit_team else "NOT LISTED in feed"))
+        P(f"WATCH player '{wplayer}': " + ("; ".join(hit_player) if hit_player else "NOT FOUND in feed"))
+        P("")
+        P("sample (first 40 rows):")
+        out.extend(sample or ["  (none)"])
+    try:
+        tbl = _inj._table(sport)
+        bn = tbl.get("by_name") or {}
+        P("")
+        P(f"MODEL table: {len(bn)} teams carry an injury penalty")
+        wt = _inj._norm(wteam)
+        ent = next((v for k, v in bn.items() if wt and wt in k), None)
+        if ent:
+            plys = ", ".join(f"{p['name']}({p['impact']})" for p in ent.get("players", []))
+            P(f"MODEL '{wteam}' penalty={ent.get('penalty')} players=[{plys}]")
+        else:
+            P(f"MODEL '{wteam}': no penalty entry")
+    except Exception as e:
+        P(f"table failed: {str(e)[:170]}")
+    return Response(content="\n".join(out), media_type="text/plain")
+
+
 @app.get("/api/card/pick")
 def card_pick(sport: str = "", away: str = "", home: str = "", pick: str = "",
               line: str = "", fair: str = "", market: str = "", book: str = "",
