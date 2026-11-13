@@ -734,23 +734,28 @@ function toTop(){try{window.scrollTo(0,0);}catch(e){}}
 // list/detail innerHTML; on its own that (plus the search filter re-applying and
 // content growing) yanks the user to the top mid-scroll. Capture scroll, render,
 // then pin it back across the paint + the async filter/content settle.
-function keepScroll(fn){
-  var y=window.scrollY||window.pageYOffset||document.documentElement.scrollTop||0;
-  try{fn();}finally{
-    var r=function(){try{window.scrollTo(0,y);}catch(e){}};
-    r(); try{requestAnimationFrame(r);}catch(e){} setTimeout(r,60); setTimeout(r,180);
-  }
+function _scrollY(){return window.scrollY||window.pageYOffset||document.documentElement.scrollTop||document.body.scrollTop||0;}
+// Re-pin scroll to y across several frames + a couple of timeouts, hitting every
+// scroll root. A full innerHTML re-render can reset scroll AFTER our first call
+// (notably iOS Safari), so one scrollTo isn't enough.
+function _pinScroll(y){
+  var r=function(){try{window.scrollTo(0,y);var de=document.documentElement,b=document.body;
+    if(de&&de.scrollTop!==y)de.scrollTop=y;if(b&&b.scrollTop!==y)b.scrollTop=y;}catch(e){}};
+  r();
+  var n=0,loop=function(){r();if(++n<6){try{requestAnimationFrame(loop);}catch(e){}}};
+  try{requestAnimationFrame(loop);}catch(e){}
+  setTimeout(r,120);setTimeout(r,300);
 }
+function keepScroll(fn){var y=_scrollY();try{fn();}finally{_pinScroll(y);}}
 // Write the detail pane WITHOUT moving the viewport. Every detail renderer goes
 // through here, so live polling + box/plays/props sub-loads all hold position.
 // Initial opens land at top because the skeleton already collapsed scroll to ~0
 // before the first render, so the captured position is 0.
 function setDetailHTML(html){
   var el=document.getElementById("detail"); if(!el)return;
-  var y=window.scrollY||window.pageYOffset||document.documentElement.scrollTop||0;
+  var y=_scrollY();
   el.innerHTML=html;
-  var r=function(){try{window.scrollTo(0,y);}catch(e){}};
-  r(); try{requestAnimationFrame(r);}catch(e){} setTimeout(r,60); setTimeout(r,180);
+  _pinScroll(y);
 }
 function prefGet(k,dflt){
   try{var v=localStorage.getItem("ll_"+k);return v===null?dflt:v;}catch(e){return dflt;}
@@ -1271,7 +1276,7 @@ function connectWS(){const proto=location.protocol==="https:"?"wss":"ws";let ws;
   ws.onmessage=ev=>{let msg;try{msg=JSON.parse(ev.data);}catch(e){return;}if(msg.type!=="score")return;const m=byId[msg.match_id];if(!m)return;
     m.score=msg.score;m.status=msg.score.status;
     if(msg.score.status==="finished"&&m.predicted_winner&&(msg.score.winner==="a"||msg.score.winner==="b"))m.correct=(m.predicted_winner===msg.score.winner);
-    if(!detailId&&sport==="tennis"&&view==="sport")render();};}
+    if(!detailId&&sport==="tennis"&&view==="sport")keepScroll(render);};}
 // ===== SPORTS STATE =====
 let sport=prefGet("sport","mlb"),teamGames=[],mlbDetailTab="prediction",mlbMatchups=null,mlbInjuries=null,mlbProps=null,mlbBox=null,mlbGame=null,mlbPlays=null;
 let soccerGames=[],soccerLeague="all",soccerLeagues=[],soccerGame=null,soccerDetailTab="prediction",soccerBox=null,soccerProps=null,soccerDetailLeague="all";
