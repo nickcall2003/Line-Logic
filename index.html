@@ -730,6 +730,17 @@ let selected=startOfDay(new Date());
 // the top. instant, not smooth: a scroll animation on a view change feels
 // like lag, not polish.
 function toTop(){try{window.scrollTo(0,0);}catch(e){}}
+// Run a live re-render WITHOUT moving the viewport. Live polling rebuilds the
+// list/detail innerHTML; on its own that (plus the search filter re-applying and
+// content growing) yanks the user to the top mid-scroll. Capture scroll, render,
+// then pin it back across the paint + the async filter/content settle.
+function keepScroll(fn){
+  var y=window.scrollY||window.pageYOffset||document.documentElement.scrollTop||0;
+  try{fn();}finally{
+    var r=function(){try{window.scrollTo(0,y);}catch(e){}};
+    r(); try{requestAnimationFrame(r);}catch(e){} setTimeout(r,60); setTimeout(r,180);
+  }
+}
 function prefGet(k,dflt){
   try{var v=localStorage.getItem("ll_"+k);return v===null?dflt:v;}catch(e){return dflt;}
 }
@@ -1205,11 +1216,11 @@ async function reload(){if(detailId)return;if(view==="free"||view==="best"||view
 async function silentReload(){
   if(detailId||view!=="sport")return;
   const tok=++loadToken,mySport=sport;
-  if(mySport==="soccer"){await loadSoccer();if(tok!==loadToken||sport!=="soccer"||view!=="sport")return;renderSoccer();}
-  else if(mySport==="ufc"){await loadUFC();if(tok!==loadToken||sport!=="ufc"||view!=="sport")return;renderUFC();}
-  else if(mySport==="golf"){await loadGolf();if(tok!==loadToken||sport!=="golf"||view!=="sport")return;renderGolf();}
-  else if(isTeam(mySport)){await loadTeam(mySport);if(tok!==loadToken||sport!==mySport||view!=="sport")return;renderTeam();}
-  else{await loadDay();if(tok!==loadToken||sport!=="tennis"||view!=="sport")return;render();}
+  if(mySport==="soccer"){await loadSoccer();if(tok!==loadToken||sport!=="soccer"||view!=="sport")return;keepScroll(renderSoccer);}
+  else if(mySport==="ufc"){await loadUFC();if(tok!==loadToken||sport!=="ufc"||view!=="sport")return;keepScroll(renderUFC);}
+  else if(mySport==="golf"){await loadGolf();if(tok!==loadToken||sport!=="golf"||view!=="sport")return;keepScroll(renderGolf);}
+  else if(isTeam(mySport)){await loadTeam(mySport);if(tok!==loadToken||sport!==mySport||view!=="sport")return;keepScroll(renderTeam);}
+  else{await loadDay();if(tok!==loadToken||sport!=="tennis"||view!=="sport")return;keepScroll(render);}
   loadAccuracy();   // refresh today/30d W-L as live games settle
 }
 // A game should be polled if it's live OR it's past its scheduled start but not
@@ -1746,7 +1757,7 @@ function renderTeam(){renderDatebar();renderTabsTeam();
 async function openMLBDetail(id){detailId="mlb"+id;mlbDetailTab="prediction";mlbMatchups=null;mlbInjuries=null;mlbProps=null;mlbBox=null;mlbPlays=null;showView(true);
   document.getElementById("detail").innerHTML='<div class="skel-wrap"><div class="skel-card" style="height:130px"></div><div class="skel-card"></div><div class="skel-card"></div></div>';await refreshMLBDetail(id);
   if(detailTimer)clearInterval(detailTimer);detailTimer=setInterval(()=>{if(detailId==="mlb"+id)refreshMLBDetail(id);},10000);}
-async function refreshMLBDetail(id){let g;try{g=await getJSON("/api/mlb/game/"+id+"?date="+ymd(selected));}catch(e){return;}if(detailId!=="mlb"+id||g.error)return;mlbGame=g;renderMLBDetail(g);if(mlbDetailTab==="box"&&mlbBox&&mlbBox!=="loading")loadMLBBox(id,true);if(mlbDetailTab==="plays")loadMLBPlays(id,true);}
+async function refreshMLBDetail(id){let g;try{g=await getJSON("/api/mlb/game/"+id+"?date="+ymd(selected));}catch(e){return;}if(detailId!=="mlb"+id||g.error)return;mlbGame=g;keepScroll(function(){renderMLBDetail(g);});if(mlbDetailTab==="box"&&mlbBox&&mlbBox!=="loading")loadMLBBox(id,true);if(mlbDetailTab==="plays")loadMLBPlays(id,true);}
 function setMLBTab(t){mlbDetailTab=t;renderMLBDetail(mlbGame);
   if(t==="matchups"&&mlbMatchups===null)loadMatchups(mlbGame.id);
   if(t==="injuries"&&mlbInjuries===null)loadInjuries(mlbGame.id);
@@ -1981,7 +1992,7 @@ async function openTeamDetail(id){detailId=sport+id;teamDetailTab="prediction";t
     const cur=byId[sp+id];
     if(cur&&cur.status==="live")refreshTeamDetail(id,sp);
   },10000);}
-async function refreshTeamDetail(id,sp){let g;try{g=await getJSON("/api/"+sp+"/game/"+id+"?date="+ymd(selected));}catch(e){return;}if(detailId!==sp+id||g.error)return;teamGame=g;teamGame._sp=sp;renderTeamDetail(g,sp);if(teamDetailTab==="box"&&teamBox&&teamBox!=="loading")loadTeamBox(id,sp,true);if(teamDetailTab==="plays")loadTeamPlays(id,sp,true);}
+async function refreshTeamDetail(id,sp){let g;try{g=await getJSON("/api/"+sp+"/game/"+id+"?date="+ymd(selected));}catch(e){return;}if(detailId!==sp+id||g.error)return;teamGame=g;teamGame._sp=sp;keepScroll(function(){renderTeamDetail(g,sp);});if(teamDetailTab==="box"&&teamBox&&teamBox!=="loading")loadTeamBox(id,sp,true);if(teamDetailTab==="plays")loadTeamPlays(id,sp,true);}
 function setTeamTab(t){teamDetailTab=t;renderTeamDetail(teamGame,teamGame._sp);
   if(t==="props"&&teamProps===null)loadTeamProps(teamGame.id,teamGame._sp);
   if(t==="box"&&teamBox===null)loadTeamBox(teamGame.id,teamGame._sp);
@@ -2764,7 +2775,7 @@ async function openUFCDetail(id){
 async function refreshUFCDetail(id){
   let g;try{g=await getJSON("/api/ufc/game/"+id+"?date="+ymd(selected));}catch(e){return;}
   if(detailId!=="ufc"+id||(g&&g.error))return;
-  ufcGame=g;byId["ufc"+id]=g;renderUFCDetail(g);
+  ufcGame=g;byId["ufc"+id]=g;keepScroll(function(){renderUFCDetail(g);});
 }
 function renderUFCDetail(g){
   const fin=g.status==="finished";
@@ -2924,7 +2935,7 @@ async function openSoccerDetail(id,league){
 async function refreshSoccerDetail(id){
   let g;try{g=await getJSON("/api/soccer/game/"+id+"?league="+(soccerDetailLeague||"epl")+"&date="+ymd(selected));}catch(e){return;}
   if(detailId!=="soccer"+id||g.error)return;
-  soccerGame=g;byId["soccer"+id]=g;renderSoccerDetail(g);
+  soccerGame=g;byId["soccer"+id]=g;keepScroll(function(){renderSoccerDetail(g);});
   if(soccerDetailTab==="box"&&soccerBox&&soccerBox!=="loading")loadSoccerBox(id,true);
 }
 function setSoccerTab(t){soccerDetailTab=t;renderSoccerDetail(soccerGame);if(t==="box"&&soccerBox===null)loadSoccerBox(soccerGame.id);if(t==="props"&&soccerProps===null)loadSoccerProps(soccerGame.id);}
@@ -6055,7 +6066,7 @@ setInterval(()=>{
   if(detailId||view!=="sport")return;
   if(ymd(selected)!==ymd(startOfDay(new Date())))return;
   const anyLive=(sport==="soccer"?soccerGames:isTeam(sport)?teamGames:current).some(g=>g.status==="live");
-  if(anyLive)reload();
+  if(anyLive)silentReload();   // was reload(): the loader flash collapsed the page and threw you to the top
 },30000);
 setInterval(loadAccuracy,300000);
 /* ===== Slate search/filter — self-contained; filters the visible slate by player/team name ===== */
