@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v130";   // bumped: live refresh preserves scroll (no jump to top)
+const CACHE = "ll-shell-v131";   // bumped: scroll-preserve on every detail render + home/wintotals/tennis
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));

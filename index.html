@@ -741,6 +741,17 @@ function keepScroll(fn){
     r(); try{requestAnimationFrame(r);}catch(e){} setTimeout(r,60); setTimeout(r,180);
   }
 }
+// Write the detail pane WITHOUT moving the viewport. Every detail renderer goes
+// through here, so live polling + box/plays/props sub-loads all hold position.
+// Initial opens land at top because the skeleton already collapsed scroll to ~0
+// before the first render, so the captured position is 0.
+function setDetailHTML(html){
+  var el=document.getElementById("detail"); if(!el)return;
+  var y=window.scrollY||window.pageYOffset||document.documentElement.scrollTop||0;
+  el.innerHTML=html;
+  var r=function(){try{window.scrollTo(0,y);}catch(e){}};
+  r(); try{requestAnimationFrame(r);}catch(e){} setTimeout(r,60); setTimeout(r,180);
+}
 function prefGet(k,dflt){
   try{var v=localStorage.getItem("ll_"+k);return v===null?dflt:v;}catch(e){return dflt;}
 }
@@ -831,7 +842,7 @@ async function loadTournaments(){
     it.onclick=()=>{tFilter=t.key;render();};el.appendChild(it);});
 }
 let _accData=null,_clvData=null,_wagData=null,_toursData=null,_atsData=null;
-async function loadAccuracy(){try{_accData=await getJSON("/api/accuracy?days=30");}catch(e){}try{_clvData=await getJSON("/api/clv?days=30");}catch(e){}try{_wagData=await getJSON("/api/edges/wagers?days=3650&min_edge=0.03&min_sample=25");}catch(e){}try{_toursData=await getJSON("/api/tennis/tours");}catch(e){}try{_atsData=await getJSON("/api/ats");}catch(e){}renderAccuracy();if(view==="home")renderHome();}
+async function loadAccuracy(){try{_accData=await getJSON("/api/accuracy?days=30");}catch(e){}try{_clvData=await getJSON("/api/clv?days=30");}catch(e){}try{_wagData=await getJSON("/api/edges/wagers?days=3650&min_edge=0.03&min_sample=25");}catch(e){}try{_toursData=await getJSON("/api/tennis/tours");}catch(e){}try{_atsData=await getJSON("/api/ats");}catch(e){}renderAccuracy();if(view==="home")keepScroll(renderHome);}
 function _recCell(w,l){w=w||0;l=l||0;var cls=(w>l?"pos":(l>w?"neg":""));return '<span class="sb-v '+cls+'">'+w+"–"+l+'</span>';}
 function _uCell(u){if(u==null)return '<span class="sb-dash">—</span>';var cls=(u>=0?"pos":"neg");return '<span class="sb-v '+cls+'">'+(u>=0?"+":"")+u+'u</span>';}
 function _rCell(r){if(r==null)return '<span class="sb-dash">—</span>';var cls=(r>=0?"pos":"neg");return '<span class="sb-v '+cls+'">'+(r>=0?"+":"")+r+'%</span>';}
@@ -1009,7 +1020,7 @@ function closeDetail(){detailId=null;if(detailTimer)clearInterval(detailTimer);
   if(view==="home"){document.getElementById("detail").style.display="none";document.getElementById("home").classList.add("show");return;}
   showView(false);renderCurrent();}
 function renderCurrent(){if(view==="free"||view==="best")renderPicks();else if(view==="parlays")renderParlays();else if(view==="news")renderNews();else if(sport==="soccer")renderSoccer();else if(sport==="ufc")renderUFC();else if(sport==="golf")renderGolf();else if(isTeam(sport))renderTeam();else render();}
-async function refreshDetail(){let m;try{m=await getJSON("/api/match/"+detailId);}catch(e){return;}if(detailId!==m.id)return;renderDetail(m);}
+async function refreshDetail(){let m;try{m=await getJSON("/api/match/"+detailId);}catch(e){return;}if(detailId!==m.id)return;keepScroll(function(){renderDetail(m);});}
 function formPills(arr){if(!arr||!arr.length)return "";return '<span class="form-pills">'+arr.slice(0,5).map(r=>{const w=r[0]==="W";return '<span class="fp '+(w?'w':'l')+'" title="'+r+'">'+r[0]+'</span>';}).join("")+'</span>';}
 function tennisLinesHTML(m){const L=m.lines;if(!L)return "";const pc=v=>Math.round(v*100)+"%";
   const fav=(m.prediction&&m.prediction.prob_a>=0.5)?m.player_a:m.player_b;const favL=fav.split(" ").pop();
@@ -1047,7 +1058,7 @@ function renderDetail(m){const sc=m.score||{},live=m.status==="live",fin=m.statu
        +'<div class="meta-line" style="margin-top:10px"><b>Model confidence:</b> '+confLabel+' &nbsp;'+wagerChipC(conf)+' <span style="color:var(--muted);font-size:12px">recommended stake</span></div></div>';
   }else if(detailTab==="surface"){body='<div class="panel">'+surfaceHTML(m)+'</div>';
   }else{body='<div class="panel">'+statsHTML(m)+'</div>';}
-  document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to matches</button>'+hero+(live?'<div id="twp-host" class="twp-host" style="margin:0 0 14px"></div>':"")+tabs+body;
+  setDetailHTML('<button class="back" onclick="goBack()">\u2039 Back to matches</button>'+hero+(live?'<div id="twp-host" class="twp-host" style="margin:0 0 14px"></div>':"")+tabs+body);
   if(live){try{loadTennisWinProb(m.id);}catch(e){}}
   if(detailTab==="analysis"){try{loadDeep(m.id);}catch(e){}}}
 function setDetailTab(t){detailTab=t;refreshDetail(true);}
@@ -1978,7 +1989,7 @@ function renderMLBDetail(g){const fin=g.status==="finished",live=g.status==="liv
     mlbLinesHTML(g)+
     officialsHostHTML("mlb",g.id)+
     '<div class="note">Starter is each team\u2019s announced probable; bullpen is the team staff ERA. Park &amp; weather scale the run environment for both sides. Lines are the model\u2019s own fair probabilities, not sportsbook numbers. Not betting advice.</div></div>'+depthHTML(g);}
-  document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to games</button>'+head+mvMount("mlb",g.id)+tabs+body;
+  setDetailHTML('<button class="back" onclick="goBack()">\u2039 Back to games</button>'+head+mvMount("mlb",g.id)+tabs+body);
   if(mlbDetailTab==="prediction")setTimeout(function(){loadOfficials("mlb",g.id,(g.exp_runs_home||0)+(g.exp_runs_away||0));},30);
   if(mlbDetailTab==="prediction")setTimeout(function(){try{loadGameImpact(g.id,"mlb","");}catch(e){}},20);
   if(mlbDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id);}catch(e){}},20);}
@@ -2366,7 +2377,7 @@ function renderTeamDetail(g,sp){const fin=g.status==="finished",live=g.status===
     teamLinesHTML(g)+
     officialsHostHTML(sp,g.id)+
     '<div class="note">Predictions use an Elo model seeded from season records with home-court/field advantage. Lines are the model\u2019s own fair probabilities, not sportsbook numbers. Not betting advice.</div></div>'+depthHTML(g);}
-  document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to games</button>'+head+mvMount(sp,g.id)+tabs+body;
+  setDetailHTML('<button class="back" onclick="goBack()">\u2039 Back to games</button>'+head+mvMount(sp,g.id)+tabs+body);
   if(teamDetailTab!=="box"&&teamDetailTab!=="props")setTimeout(function(){loadOfficials(sp,g.id);},30);
   if((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")&&teamDetailTab==="props")setTimeout(function(){try{loadPlayerEdge(g.id,sp,"home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);
   if((sp==="nfl"||sp==="nhl"||sp==="nba"||sp==="wnba")&&teamDetailTab==="prediction")setTimeout(function(){try{loadGameImpact(g.id,sp,"home="+encodeURIComponent(g.home.abbr)+"&away="+encodeURIComponent(g.away.abbr));}catch(e){}},20);}
@@ -2727,7 +2738,7 @@ function renderGolf(){
 function openGolfDetail(id){
   const p=golfById[id];if(!p)return;
   detailId="golf"+id;showView(true);
-  document.getElementById("detail").innerHTML=renderGolfDetail(p);
+  setDetailHTML(renderGolfDetail(p));
   _trap();
 }
 function renderGolfDetail(p){
@@ -2822,8 +2833,8 @@ function renderUFCDetail(g){
     tale='<div class="panel" style="margin-top:12px"><div class="el-lab">Tale of the tape <span class="src">'+(g.tale.source||"")+'</span></div>'+
       '<div class="tale-head"><span class="th-a">'+(F[0].name||"")+'</span><span></span><span class="th-h">'+(F[1].name||"")+'</span></div>'+body+bars+why+'</div>';
   }
-  document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to card</button>'+
-    '<div class="detail-wrap">'+head+mvMount("ufc",g.id)+fighters+heroStatHTML(g,'ufc')+ufcBarHTML(g)+verdictBadgeHTML(g,'ufc')+edge+reason+tale+rest+'</div>';
+  setDetailHTML('<button class="back" onclick="goBack()">\u2039 Back to card</button>'+
+    '<div class="detail-wrap">'+head+mvMount("ufc",g.id)+fighters+heroStatHTML(g,'ufc')+ufcBarHTML(g)+verdictBadgeHTML(g,'ufc')+edge+reason+tale+rest+'</div>');
 }
 async function loadSoccer(){
   let d;try{d=await getJSON("/api/soccer/games?league="+soccerLeague+"&date="+ymd(selected));}catch(e){d={games:[],leagues:[]};}
@@ -3031,7 +3042,7 @@ function renderSoccerDetail(g){
   else if(soccerDetailTab==="events"){body='<div class="panel"><div class="stat-sec">Match events</div>'+soccerEventsHTML(g)+'<div class="note">Goals, cards and substitutions as ESPN posts them, newest feeds may lag a minute or two.</div></div>';}
   else{body='<div class="panel">'+soccerProbExplain(g)+soccerProjDetailHTML(g)+
     '<div class="note">Three-way result probability (home / draw / away) from a Poisson goals model with home advantage, updated live from the score and minute. Not betting advice.</div></div>'+depthHTML(g);}
-  document.getElementById("detail").innerHTML='<button class="back" onclick="goBack()">\u2039 Back to matches</button>'+head+mvMount("soccer",g.id)+tabs+body;
+  setDetailHTML('<button class="back" onclick="goBack()">\u2039 Back to matches</button>'+head+mvMount("soccer",g.id)+tabs+body);
 }
 
 function mlbLinesHTML(g){const L=g.lines;if(!L)return "";
@@ -4582,7 +4593,7 @@ async function renderWinTotals(){
     // First build runs server-side (30-100 team schedules). Show progress and
     // poll until it's ready instead of a misleading "no season" message.
     body.innerHTML=sportLoader(reqSport,"Building "+reqSport.toUpperCase()+" projections \u2014 first load can take a minute");
-    setTimeout(function(){if(view==="wintotals"&&reqSport===_wtSport)renderWinTotals();},5000);
+    setTimeout(function(){if(view==="wintotals"&&reqSport===_wtSport)keepScroll(renderWinTotals);},5000);
     return;
   }
   if(!d||d.error||!d.teams||!d.teams.length){
