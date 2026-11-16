@@ -609,9 +609,12 @@ font-family:var(--body);color:var(--fg)}
     </div>
   </header>
   <style id="cta-css">
-  .cta-bar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:12px;
+  .cta-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;
     padding:9px 14px;background:linear-gradient(90deg,#F0B94E,#E0A43A);color:#1a1205;
     box-shadow:0 2px 14px rgba(0,0,0,.35);border-bottom:1px solid rgba(0,0,0,.22)}
+  /* The class sets display:flex, which otherwise overrides the [hidden] attribute
+     so the X (and prior dismissals) couldn't hide the bar. This makes hidden win. */
+  .cta-bar[hidden]{display:none!important}
   .cta-bar .cta-pulse{width:9px;height:9px;border-radius:50%;background:#1a1205;flex:0 0 auto;
     animation:ctaPulse 1.8s infinite}
   @keyframes ctaPulse{0%{box-shadow:0 0 0 0 rgba(26,18,5,.5)}70%{box-shadow:0 0 0 8px rgba(26,18,5,0)}100%{box-shadow:0 0 0 0 rgba(26,18,5,0)}}

@@ -122,7 +122,7 @@ def _service_worker():
     so every client fetches the new shell once and the redesign finally appears.
     """
     js = """
-const CACHE = "ll-shell-v132";   // bumped: stronger multi-frame scroll re-pin (iOS) + tennis WS
+const CACHE = "ll-shell-v133";   // bumped: CTA dismiss (X) actually hides + no longer overlays menu
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).catch(()=>{}));
